@@ -12,7 +12,7 @@ license = { text = "Proprietary" }
 authors = [{ name = "Pickleball Vision contributors" }]
 dependencies = [
   "numpy>=2,<2.5",
-  "opencv-python-headless>=4.10,<5",
+  "opencv-python>=4.10,<5",
 ]
 
 [project.optional-dependencies]

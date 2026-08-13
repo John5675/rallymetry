@@ -17,7 +17,7 @@ Exit criteria:
 - Tests, Ruff checks, Ruff formatting, and static type checks pass.
 - No video ingestion or computer-vision behavior was implemented.
 
-## 1. Video ingestion — current
+## 1. Video ingestion — complete
 
 Read local video files through a reusable OpenCV boundary, expose source metadata,
 extract a full-resolution frame by timestamp, and sample frames across the full
@@ -39,12 +39,40 @@ Exit criteria:
   required or committed.
 - Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
   pass.
-- No court calibration, detection, tracking, or product-service behavior is
-  implemented.
+- No court calibration, detection, tracking, or product-service behavior was
+  implemented by this milestone.
+
+## 2. Court calibration — current
+
+Manually associate at least four visible image points with named canonical
+pickleball court landmarks, fit an image/court-plane homography using all valid
+correspondences, persist the calibration and its provenance, and create inspectable
+image-space and top-down debug artifacts.
+
+Exit criteria:
+
+- Court dimensions, axes, units, named landmarks, and line geometry are explicit
+  and documented.
+- `pickleball-vision calibrate <video> --timestamp <seconds> --output <json>`
+  guides the user through visible landmark selection without requiring all outer
+  corners.
+- Four valid correspondences are required; additional correspondences support
+  robust fitting and retain their inlier status.
+- Degenerate, duplicated, out-of-frame, non-finite, unreadable, cancelled, and
+  non-invertible calibration configurations produce useful typed errors.
+- Calibration JSON retains source-frame provenance, correspondences, both
+  homography directions, court configuration, and reprojection error in court
+  meters and image pixels.
+- Reusable APIs transform a court-plane image point to canonical court coordinates
+  and perform the reverse transformation.
+- `calibration-overlay.jpg` labels selected landmarks and projected court lines;
+  `court-topdown.jpg` rectifies the selected frame and draws canonical geometry.
+- Unit tests verify transformations, robust multi-point fitting, degeneracy,
+  persistence, and debug rendering with synthetic data.
+- No automatic court detection or later vision milestone is implemented.
 
 ## Future milestones — not current
 
-2. Court calibration
 3. Person detection
 4. Primary-player isolation
 5. Persistent player tracking

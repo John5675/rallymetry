@@ -13,6 +13,7 @@ from pickleball_vision.errors import (
     VideoUnreadableError,
 )
 from pickleball_vision.video import (
+    decode_video_frame,
     extract_frame,
     inspect_video,
     sample_frame_indices,
@@ -70,6 +71,15 @@ def test_extract_frame_preserves_source_resolution(synthetic_video: Path, tmp_pa
     assert decoded_image is not None
     image = np.asarray(decoded_image)
     assert image.shape[:2] == (SYNTHETIC_HEIGHT, SYNTHETIC_WIDTH)
+
+
+def test_decode_video_frame_returns_source_provenance(synthetic_video: Path) -> None:
+    decoded = decode_video_frame(synthetic_video, timestamp_seconds=0.8)
+
+    assert decoded.metadata.path == synthetic_video.resolve()
+    assert decoded.frame_index == 6
+    assert decoded.timestamp == pytest.approx(0.8)
+    assert decoded.image.shape[:2] == (SYNTHETIC_HEIGHT, SYNTHETIC_WIDTH)
 
 
 @pytest.mark.parametrize("timestamp", [-0.1, math.nan, 1.6, math.inf])

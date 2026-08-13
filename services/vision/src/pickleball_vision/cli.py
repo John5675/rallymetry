@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import cast
 
 from pickleball_vision import __version__
+from pickleball_vision.calibration_workflow import calibrate_video
 from pickleball_vision.config import Settings
 from pickleball_vision.errors import ErrorCode, PickleballVisionError
 from pickleball_vision.logging import configure_logging
@@ -75,6 +76,24 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         required=True,
         help="directory for sampled JPEG images",
+    )
+
+    calibrate_parser = subparsers.add_parser(
+        "calibrate",
+        help="manually calibrate a video frame to the canonical court plane",
+    )
+    calibrate_parser.add_argument("video", type=Path, help="path to a local video file")
+    calibrate_parser.add_argument(
+        "--timestamp",
+        type=float,
+        required=True,
+        help="timestamp of a clear calibration frame in [0, duration)",
+    )
+    calibrate_parser.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+        help="output calibration JSON path",
     )
     return parser
 
@@ -160,6 +179,36 @@ def _run_sample_frames(video_path: Path, *, count: int, output_dir: Path) -> int
     return EXIT_OK
 
 
+def _run_calibrate(video_path: Path, *, timestamp: float, output_path: Path) -> int:
+    artifacts = calibrate_video(
+        video_path,
+        timestamp_seconds=timestamp,
+        output_path=output_path,
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "court_calibrated",
+        extra={
+            "context": {
+                "video": str(video_path.expanduser().resolve()),
+                "frame_index": artifacts.calibration.source.frame_index,
+                "correspondence_count": len(artifacts.calibration.correspondences),
+                "inlier_count": artifacts.calibration.inlier_count,
+                "fit_method": artifacts.calibration.fit_method.value,
+                "quality_status": artifacts.calibration.quality.status.value,
+                "calibration_path": str(artifacts.calibration_path),
+            }
+        },
+    )
+    _print_json(
+        {
+            "video": str(video_path.expanduser().resolve()),
+            "requested_timestamp": timestamp,
+            **artifacts.as_dict(),
+        }
+    )
+    return EXIT_OK
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command and translate failures into stable process exit codes."""
 
@@ -187,6 +236,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 cast(Path, args.video),
                 count=cast(int, args.count),
                 output_dir=cast(Path, args.output_dir),
+            )
+        if args.command == "calibrate":
+            return _run_calibrate(
+                cast(Path, args.video),
+                timestamp=cast(float, args.timestamp),
+                output_path=cast(Path, args.output),
             )
         parser.error(f"unsupported command: {args.command}")
     except PickleballVisionError as error:

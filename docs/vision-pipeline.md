@@ -1,8 +1,8 @@
 # Vision Pipeline Contract
 
 This document describes stable stage boundaries. A stage may be introduced only
-when its matching milestone is current. Video ingestion is currently implemented;
-all later stages remain contracts only.
+when its matching milestone is current. Video ingestion and manual court
+calibration are currently implemented; all later stages remain contracts only.
 
 ## Intended flow
 
@@ -35,6 +35,24 @@ zero-based frame index using the reported FPS. Frames are decoded and written at
 their source pixel dimensions. Uniform sampling selects unique indices over the
 inclusive range from the first to the last frame; a one-frame sample uses the
 middle frame.
+
+## Court calibration contract
+
+Manual calibration uses named court-plane landmarks defined in
+`coordinate-system.md`. At least four geometrically valid image/court
+correspondences are required. Additional selected landmarks participate in a
+robust fit and retain their inlier/outlier status rather than being silently
+discarded.
+
+Fit selection evaluates all-point residuals before falling back to robust outlier
+rejection. Quality reporting uses errors across every selected correspondence and
+must warn when a tight inlier subset masks poor whole-court alignment.
+
+The stored image-to-court homography applies only to points known to lie on the
+court plane. Its inverse maps canonical court points into the calibrated image.
+Calibration quality reports forward reprojection error in meters and reverse
+reprojection error in pixels. These errors describe the selected plane landmarks;
+they do not make homography valid for an airborne ball.
 
 ## Observation contract
 

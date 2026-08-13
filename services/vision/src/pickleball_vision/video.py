@@ -76,6 +76,16 @@ class ExtractedFrame:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class DecodedVideoFrame:
+    """An in-memory source-resolution frame and its video provenance."""
+
+    metadata: VideoMetadata
+    frame_index: int
+    timestamp: float
+    image: Image
+
+
 def _resolved_video_path(path: Path) -> Path:
     expanded = path.expanduser()
     if not expanded.exists():
@@ -221,6 +231,24 @@ def _frame_artifact(
 def extract_frame(path: Path, *, timestamp_seconds: float, output_path: Path) -> ExtractedFrame:
     """Decode and write the frame containing a valid source timestamp."""
 
+    decoded = decode_video_frame(path, timestamp_seconds=timestamp_seconds)
+    resolved_output = _resolved_output_path(output_path)
+    if resolved_output == decoded.metadata.path:
+        raise OutputWriteError(
+            str(resolved_output), reason="output would overwrite the source video"
+        )
+    _write_frame(decoded.image, resolved_output)
+    return _frame_artifact(
+        decoded.image,
+        resolved_output,
+        decoded.frame_index,
+        decoded.metadata.fps,
+    )
+
+
+def decode_video_frame(path: Path, *, timestamp_seconds: float) -> DecodedVideoFrame:
+    """Decode the source frame containing a timestamp without resizing it."""
+
     with _open_video(path) as (capture, metadata):
         if (
             not math.isfinite(timestamp_seconds)
@@ -231,13 +259,12 @@ def extract_frame(path: Path, *, timestamp_seconds: float, output_path: Path) ->
 
         frame_index = min(int(timestamp_seconds * metadata.fps), metadata.frame_count - 1)
         frame = _read_frame(capture, metadata, frame_index)
-        resolved_output = _resolved_output_path(output_path)
-        if resolved_output == metadata.path:
-            raise OutputWriteError(
-                str(resolved_output), reason="output would overwrite the source video"
-            )
-        _write_frame(frame, resolved_output)
-        return _frame_artifact(frame, resolved_output, frame_index, metadata.fps)
+        return DecodedVideoFrame(
+            metadata=metadata,
+            frame_index=frame_index,
+            timestamp=frame_index / metadata.fps,
+            image=frame,
+        )
 
 
 def sample_frame_indices(*, frame_count: int, count: int) -> tuple[int, ...]:

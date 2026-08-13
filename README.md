@@ -5,9 +5,9 @@ doubles pickleball matches into inspectable, structured match data. The long-ter
 goal includes court and player tracking, ball trajectories, rally and shot events,
 match analytics, and AI-assisted coaching.
 
-The current milestone is **Video ingestion**. The local CLI can inspect video
-metadata, extract a source-resolution frame, and sample frames across a video. It
-does not run any vision model yet.
+The current milestone is **Court calibration**. The local CLI can inspect video
+metadata, extract and sample source-resolution frames, and manually fit a
+multi-point court-plane homography. It does not run any detection model yet.
 
 ## Repository map
 
@@ -53,11 +53,19 @@ uv run pickleball-vision extract-frame /absolute/path/to/match.mp4 \
 uv run pickleball-vision sample-frames /absolute/path/to/match.mp4 \
   --count 12 \
   --output-dir ../../output/sample-frames
+uv run pickleball-vision calibrate /absolute/path/to/match.mp4 \
+  --timestamp 30.5 \
+  --output ../../output/calibration.json
 ```
 
 Command results are emitted as JSON on standard output. Diagnostic structured
 logs go to standard error. Video inputs keep their local provenance; do not put a
 private URL in the repository or CLI command history.
+
+The calibration command opens a local window for named court-landmark clicks and
+writes `calibration.json`, `calibration-overlay.jpg`, and `court-topdown.jpg`.
+See [the manual calibration guide](docs/court-calibration.md) for controls and
+quality checks.
 
 Configuration uses environment variables prefixed with `PICKLEBALL_VISION_`:
 

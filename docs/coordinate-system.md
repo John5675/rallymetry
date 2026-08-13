@@ -33,10 +33,39 @@ The canonical doubles court uses meters:
 - Positive y-axis: from the near baseline toward the far baseline.
 - Bounds: `0 <= x <= 6.096 m`, `0 <= y <= 13.4112 m` (20 ft by 44 ft).
 - Net line: `y = 6.7056 m`.
+- Near non-volley-zone (kitchen) line: `y = 4.5720 m`.
+- Far non-volley-zone (kitchen) line: `y = 8.8392 m`.
+- Court centerline: `x = 3.0480 m`, drawn from each baseline to its kitchen line.
+
+The explicit default configuration is width `6.096 m`, length `13.4112 m`, and
+non-volley-zone depth `2.1336 m` (20 ft, 44 ft, and 7 ft). Calibration JSON stores
+these values rather than relying on implicit constants.
 
 “Near” and “far” are calibration labels relative to the source camera, not player
 identities. A calibration record must store the corner correspondence and units so
 orientation is recoverable.
+
+## Manual calibration landmarks
+
+The initial calibration catalog associates each label with a canonical point:
+
+| Landmark | Court coordinate `(x_m, y_m)` |
+| --- | --- |
+| near baseline left | `(0, 0)` |
+| near baseline right | `(6.096, 0)` |
+| near kitchen left | `(0, 4.572)` |
+| near kitchen right | `(6.096, 4.572)` |
+| near centerline/kitchen intersection | `(3.048, 4.572)` |
+| far kitchen left | `(0, 8.8392)` |
+| far kitchen right | `(6.096, 8.8392)` |
+| far centerline/kitchen intersection | `(3.048, 8.8392)` |
+| far baseline left | `(0, 13.4112)` |
+| far baseline right | `(6.096, 13.4112)` |
+
+“Left” and “right” are defined while looking from the near baseline toward the far
+baseline. A click should mark the court-line intersection on the court plane, not
+a fence, post, person, or airborne object. Calibration does not require every
+catalog landmark to be visible.
 
 ## Homography limits
 

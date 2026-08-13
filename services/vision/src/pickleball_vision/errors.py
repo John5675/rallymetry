@@ -7,6 +7,9 @@ from enum import StrEnum
 class ErrorCode(StrEnum):
     """Stable machine-readable application error codes."""
 
+    CALIBRATION_CANCELLED = "calibration_cancelled"
+    CALIBRATION_INVALID = "calibration_invalid"
+    CALIBRATION_IO = "calibration_io_error"
     CONFIGURATION = "configuration_error"
     FRAME_DECODE = "frame_decode_error"
     INTERNAL = "internal_error"
@@ -111,5 +114,37 @@ class OutputWriteError(PickleballVisionError):
         super().__init__(
             f"Unable to write frame image {path}: {reason}",
             code=ErrorCode.OUTPUT_WRITE,
+            details={"path": path, "reason": reason},
+        )
+
+
+class InvalidCalibrationError(PickleballVisionError):
+    """Raised when court correspondences cannot define a valid homography."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Invalid court calibration: {reason}",
+            code=ErrorCode.CALIBRATION_INVALID,
+            details={"reason": reason},
+        )
+
+
+class CalibrationCancelledError(PickleballVisionError):
+    """Raised when a user cancels manual landmark selection."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Court calibration was cancelled; no calibration was written",
+            code=ErrorCode.CALIBRATION_CANCELLED,
+        )
+
+
+class CalibrationIoError(PickleballVisionError):
+    """Raised when calibration JSON cannot be read or written."""
+
+    def __init__(self, path: str, *, reason: str) -> None:
+        super().__init__(
+            f"Unable to access calibration {path}: {reason}",
+            code=ErrorCode.CALIBRATION_IO,
             details={"path": path, "reason": reason},
         )
