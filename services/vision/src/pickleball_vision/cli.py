@@ -7,11 +7,14 @@ import json
 import logging
 import sys
 from collections.abc import Sequence
+from pathlib import Path
+from typing import cast
 
 from pickleball_vision import __version__
 from pickleball_vision.config import Settings
 from pickleball_vision.errors import ErrorCode, PickleballVisionError
 from pickleball_vision.logging import configure_logging
+from pickleball_vision.video import extract_frame, inspect_video, sample_frames
 
 EXIT_OK = 0
 EXIT_INTERNAL_ERROR = 1
@@ -30,6 +33,48 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser(
         "doctor",
         help="validate Foundation configuration and report service metadata",
+    )
+
+    inspect_parser = subparsers.add_parser(
+        "inspect",
+        help="inspect metadata for a local video file",
+    )
+    inspect_parser.add_argument("video", type=Path, help="path to a local video file")
+
+    extract_parser = subparsers.add_parser(
+        "extract-frame",
+        help="extract a source-resolution frame at a timestamp",
+    )
+    extract_parser.add_argument("video", type=Path, help="path to a local video file")
+    extract_parser.add_argument(
+        "--timestamp",
+        type=float,
+        required=True,
+        help="timestamp in seconds in the range [0, duration)",
+    )
+    extract_parser.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+        help="output image path (.jpg, .png, .webp, .bmp, or .tiff)",
+    )
+
+    sample_parser = subparsers.add_parser(
+        "sample-frames",
+        help="sample unique frames across a local video's duration",
+    )
+    sample_parser.add_argument("video", type=Path, help="path to a local video file")
+    sample_parser.add_argument(
+        "--count",
+        type=int,
+        required=True,
+        help="number of frames to sample",
+    )
+    sample_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=True,
+        help="directory for sampled JPEG images",
     )
     return parser
 
@@ -50,6 +95,71 @@ def _run_doctor(settings: Settings) -> int:
     return EXIT_OK
 
 
+def _print_json(value: object) -> None:
+    print(json.dumps(value, sort_keys=True))
+
+
+def _run_inspect(video_path: Path) -> int:
+    metadata = inspect_video(video_path)
+    logging.getLogger("pickleball_vision.cli").info(
+        "video_inspected",
+        extra={"context": {"path": str(metadata.path)}},
+    )
+    _print_json(metadata.as_dict())
+    return EXIT_OK
+
+
+def _run_extract_frame(video_path: Path, *, timestamp: float, output_path: Path) -> int:
+    artifact = extract_frame(
+        video_path,
+        timestamp_seconds=timestamp,
+        output_path=output_path,
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "frame_extracted",
+        extra={
+            "context": {
+                "video": str(video_path.expanduser().resolve()),
+                "frame_index": artifact.frame_index,
+                "output_path": str(artifact.output_path),
+            }
+        },
+    )
+    _print_json(
+        {
+            "video": str(video_path.expanduser().resolve()),
+            "requested_timestamp": timestamp,
+            "frame": artifact.as_dict(),
+        }
+    )
+    return EXIT_OK
+
+
+def _run_sample_frames(video_path: Path, *, count: int, output_dir: Path) -> int:
+    artifacts = sample_frames(video_path, count=count, output_dir=output_dir)
+    resolved_video = video_path.expanduser().resolve()
+    resolved_output_dir = output_dir.expanduser().resolve()
+    logging.getLogger("pickleball_vision.cli").info(
+        "frames_sampled",
+        extra={
+            "context": {
+                "video": str(resolved_video),
+                "count": len(artifacts),
+                "output_dir": str(resolved_output_dir),
+            }
+        },
+    )
+    _print_json(
+        {
+            "video": str(resolved_video),
+            "count": len(artifacts),
+            "output_dir": str(resolved_output_dir),
+            "frames": [artifact.as_dict() for artifact in artifacts],
+        }
+    )
+    return EXIT_OK
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command and translate failures into stable process exit codes."""
 
@@ -64,6 +174,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         logger = configure_logging(level=settings.log_level, log_format=settings.log_format)
         if args.command == "doctor":
             return _run_doctor(settings)
+        if args.command == "inspect":
+            return _run_inspect(cast(Path, args.video))
+        if args.command == "extract-frame":
+            return _run_extract_frame(
+                cast(Path, args.video),
+                timestamp=cast(float, args.timestamp),
+                output_path=cast(Path, args.output),
+            )
+        if args.command == "sample-frames":
+            return _run_sample_frames(
+                cast(Path, args.video),
+                count=cast(int, args.count),
+                output_dir=cast(Path, args.output_dir),
+            )
         parser.error(f"unsupported command: {args.command}")
     except PickleballVisionError as error:
         print(f"error [{error.code}]: {error}", file=sys.stderr)

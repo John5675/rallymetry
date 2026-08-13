@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 
@@ -50,3 +51,101 @@ def test_no_command_prints_help(capsys: pytest.CaptureFixture[str]) -> None:
     captured = capsys.readouterr()
     assert exit_code == EXIT_OK
     assert "doctor" in captured.out
+
+
+def test_inspect_command_outputs_video_metadata(
+    synthetic_video: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _clear_settings(monkeypatch)
+
+    exit_code = main(["inspect", str(synthetic_video)])
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+    log_record = json.loads(captured.err)
+    assert exit_code == EXIT_OK
+    assert report["filename"] == "synthetic.avi"
+    assert report["path"] == str(synthetic_video.resolve())
+    assert report["width"] == 96
+    assert report["height"] == 64
+    assert report["fps"] == pytest.approx(7.5)
+    assert report["frame_count"] == 12
+    assert report["duration"] == pytest.approx(1.6)
+    assert "codec" in report
+    assert log_record["event"] == "video_inspected"
+
+
+def test_extract_frame_command_writes_requested_image(
+    synthetic_video: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _clear_settings(monkeypatch)
+    output_path = tmp_path / "extracted" / "frame.jpg"
+
+    exit_code = main(
+        [
+            "extract-frame",
+            str(synthetic_video),
+            "--timestamp",
+            "0.8",
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+    assert exit_code == EXIT_OK
+    assert output_path.is_file()
+    assert report["requested_timestamp"] == 0.8
+    assert report["frame"]["frame_index"] == 6
+    assert report["frame"]["width"] == 96
+    assert report["frame"]["height"] == 64
+
+
+def test_sample_frames_command_spans_source_duration(
+    synthetic_video: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _clear_settings(monkeypatch)
+    output_dir = tmp_path / "samples"
+
+    exit_code = main(
+        [
+            "sample-frames",
+            str(synthetic_video),
+            "--count",
+            "4",
+            "--output-dir",
+            str(output_dir),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+    assert exit_code == EXIT_OK
+    assert report["count"] == 4
+    assert [frame["frame_index"] for frame in report["frames"]] == [0, 4, 7, 11]
+    assert len(tuple(output_dir.glob("*.jpg"))) == 4
+
+
+def test_video_command_returns_useful_error_for_missing_file(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _clear_settings(monkeypatch)
+
+    exit_code = main(["inspect", str(tmp_path / "missing.mp4")])
+
+    captured = capsys.readouterr()
+    assert exit_code == EXIT_USAGE_ERROR
+    assert captured.out == ""
+    assert "error [video_not_found]" in captured.err
+    assert "Video file does not exist" in captured.err

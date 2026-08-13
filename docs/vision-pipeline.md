@@ -1,8 +1,8 @@
 # Vision Pipeline Contract
 
-This document describes intended stage boundaries, not implemented Foundation
-functionality. A stage may be introduced only when its matching milestone is
-current.
+This document describes stable stage boundaries. A stage may be introduced only
+when its matching milestone is current. Video ingestion is currently implemented;
+all later stages remain contracts only.
 
 ## Intended flow
 
@@ -17,6 +17,24 @@ video metadata
   -> structured match data
   -> analytics
 ```
+
+## Video source contract
+
+The pipeline accepts a local file path. How bytes arrived locally—camera transfer,
+object-store download, or a separately performed download from an unlisted
+source—is outside the vision service. Private source URLs and credentials never
+enter pipeline output or source control.
+
+Video metadata records the resolved path, pixel dimensions, OpenCV-reported FPS
+as a floating-point value, frame count, duration in seconds, and codec FourCC when
+available. Duration is `frame_count / fps`; it is an OpenCV/container estimate,
+not a promise of constant-frame-rate presentation timestamps.
+
+Timestamp extraction maps a valid timestamp in `[0, duration)` to the containing
+zero-based frame index using the reported FPS. Frames are decoded and written at
+their source pixel dimensions. Uniform sampling selects unique indices over the
+inclusive range from the first to the last frame; a one-frame sample uses the
+middle frame.
 
 ## Observation contract
 

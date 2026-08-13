@@ -3,7 +3,7 @@
 Milestones are intentionally sequential. Exactly one milestone is current. Work
 outside the current milestone requires this plan to be deliberately updated first.
 
-## 0. Foundation — current
+## 0. Foundation — complete
 
 Establish repository instructions, architecture documentation, a typed Python
 package, an installable CLI shell, environment-based configuration, structured
@@ -15,11 +15,35 @@ Exit criteria:
 - The vision package installs in a clean environment.
 - `pickleball-vision doctor` reports a valid Foundation setup.
 - Tests, Ruff checks, Ruff formatting, and static type checks pass.
-- No video ingestion or computer-vision behavior is implemented.
+- No video ingestion or computer-vision behavior was implemented.
+
+## 1. Video ingestion — current
+
+Read local video files through a reusable OpenCV boundary, expose source metadata,
+extract a full-resolution frame by timestamp, and sample frames across the full
+source duration. All commands validate their inputs and translate expected OpenCV
+or filesystem failures into useful application errors.
+
+Exit criteria:
+
+- `pickleball-vision inspect <video>` reports the resolved source path, dimensions,
+  non-integer FPS, frame count, duration in seconds, and codec when available.
+- `pickleball-vision extract-frame` writes the requested valid frame without
+  resizing it.
+- `pickleball-vision sample-frames` selects the requested number of unique frames
+  across the complete frame-index span rather than only from its beginning.
+- Missing, non-file, unreadable, corrupt, invalid-timestamp, invalid-count, decode,
+  and image-write failures produce stable, useful errors rather than raw OpenCV
+  exceptions.
+- Automated tests generate their own synthetic videos; no private footage is
+  required or committed.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- No court calibration, detection, tracking, or product-service behavior is
+  implemented.
 
 ## Future milestones — not current
 
-1. Video ingestion
 2. Court calibration
 3. Person detection
 4. Primary-player isolation

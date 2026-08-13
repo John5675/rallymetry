@@ -5,9 +5,9 @@ doubles pickleball matches into inspectable, structured match data. The long-ter
 goal includes court and player tracking, ball trajectories, rally and shot events,
 match analytics, and AI-assisted coaching.
 
-This repository currently contains **Foundation only**. It establishes the
-monorepo boundaries, data contracts, Python tooling, configuration, structured
-logging, and CLI shell. It does not ingest video or run any vision model yet.
+The current milestone is **Video ingestion**. The local CLI can inspect video
+metadata, extract a source-resolution frame, and sample frames across a video. It
+does not run any vision model yet.
 
 ## Repository map
 
@@ -42,6 +42,22 @@ Run the Foundation health check:
 ```bash
 uv run pickleball-vision doctor
 ```
+
+Inspect and extract from a local video:
+
+```bash
+uv run pickleball-vision inspect /absolute/path/to/match.mp4
+uv run pickleball-vision extract-frame /absolute/path/to/match.mp4 \
+  --timestamp 30.5 \
+  --output ../../output/frame-at-30.5s.jpg
+uv run pickleball-vision sample-frames /absolute/path/to/match.mp4 \
+  --count 12 \
+  --output-dir ../../output/sample-frames
+```
+
+Command results are emitted as JSON on standard output. Diagnostic structured
+logs go to standard error. Video inputs keep their local provenance; do not put a
+private URL in the repository or CLI command history.
 
 Configuration uses environment variables prefixed with `PICKLEBALL_VISION_`:
 
