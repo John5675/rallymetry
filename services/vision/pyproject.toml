@@ -1,0 +1,49 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "pickleball-vision"
+version = "0.1.0"
+description = "Inspectable local computer-vision foundations for doubles pickleball"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "Proprietary" }
+authors = [{ name = "Pickleball Vision contributors" }]
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.15,<2",
+  "pytest>=8.3,<10",
+  "ruff>=0.11,<1",
+]
+
+[project.scripts]
+pickleball-vision = "pickleball_vision.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/pickleball_vision"]
+
+[tool.pytest.ini_options]
+addopts = "-ra --strict-config --strict-markers"
+testpaths = ["tests"]
+
+[tool.ruff]
+target-version = "py311"
+line-length = 100
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["B", "E", "F", "I", "LOG", "RUF", "SIM", "UP"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S101"]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unreachable = true
+pretty = true
+show_error_codes = true
+files = ["src", "tests"]

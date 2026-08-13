@@ -1,0 +1,66 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+.venv/
+venv/
+dist/
+build/
+
+# Editors and operating systems
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# Recorded media and private source lists
+*.avi
+*.m4v
+*.mkv
+*.mov
+*.mp4
+*.mpeg
+*.mpg
+*.webm
+*.youtube-url*
+
+# Model weights and large numerical artifacts
+*.ckpt
+*.engine
+*.joblib
+*.npy
+*.npz
+*.onnx
+*.pkl
+*.pt
+*.pth
+*.safetensors
+*.tflite
+
+# Local datasets; commit only the directory documentation
+ml/datasets/**
+!ml/datasets/README.md
+
+# Local sample inputs and generated outputs
+sample-data/**
+!sample-data/README.md
+output/**
+!output/README.md
+
+# Experiment products; commit source/configuration, not run artifacts
+**/runs/
+**/artifacts/
+**/checkpoints/
