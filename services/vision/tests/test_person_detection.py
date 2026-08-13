@@ -1,3 +1,4 @@
+import json
 from collections.abc import Callable
 from pathlib import Path
 
@@ -8,6 +9,7 @@ from pickleball_vision.person_detection import (
     DetectorMetadata,
     PersonDetection,
     PersonDetectionRun,
+    load_person_detection_run,
 )
 from pickleball_vision.video import VideoMetadata
 
@@ -74,6 +76,35 @@ def test_person_detection_serialization_retains_raw_observation_provenance() -> 
     ]
     assert "player_id" not in str(serialized)
     assert "court_position" not in str(serialized)
+
+
+def test_person_detection_json_round_trip_supports_downstream_isolation(
+    tmp_path: Path,
+) -> None:
+    run = PersonDetectionRun(
+        created_at_utc="2026-08-13T12:00:00+00:00",
+        source=VideoMetadata(
+            filename="match.mp4",
+            path=Path("/video/match.mp4"),
+            width=1920,
+            height=1080,
+            fps=29.97,
+            frame_count=100,
+            duration=100 / 29.97,
+            codec=None,
+        ),
+        calibration_path="/output/calibration.json",
+        calibration_schema_version=2,
+        detector=DetectorMetadata("test", "test", "cpu", "test", None),
+        configuration={"minimum_confidence": 0.2},
+        detections=(PersonDetection(BoundingBox(10, 20, 100, 200), 0.75, 4, 4 / 29.97),),
+    )
+    path = tmp_path / "detections.json"
+    path.write_text(json.dumps(run.as_dict()), encoding="utf-8")
+
+    loaded = load_person_detection_run(path)
+
+    assert loaded == run
 
 
 @pytest.mark.parametrize(

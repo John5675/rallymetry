@@ -43,6 +43,13 @@ orchestration owns video decoding and artifact persistence; observation dataclas
 own the stable JSON representation. This prevents a pretrained-model API from
 becoming the repository's domain contract.
 
+Primary-player isolation is a derived selection layer between raw observations and
+persistent tracking. `player-candidates.json` references raw detections and adds
+ground/court assessments plus ephemeral short-gap associations.
+`player-assignments.json` separately records four human logical roles. Neither
+artifact mutates detector evidence, and ephemeral candidate IDs must not become the
+persistent track IDs introduced by the next milestone.
+
 ## Execution model
 
 During the local-pipeline milestones, the CLI is the executable boundary.

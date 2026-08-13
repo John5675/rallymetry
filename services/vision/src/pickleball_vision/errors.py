@@ -12,12 +12,16 @@ class ErrorCode(StrEnum):
     CALIBRATION_IO = "calibration_io_error"
     CONFIGURATION = "configuration_error"
     DETECTION_INPUT = "detection_input_error"
+    DETECTION_IO = "detection_io_error"
     DETECTION_MODEL = "detection_model_error"
     FRAME_DECODE = "frame_decode_error"
     INTERNAL = "internal_error"
     INVALID_SAMPLE_COUNT = "invalid_sample_count"
     INVALID_TIMESTAMP = "invalid_timestamp"
     OUTPUT_WRITE = "output_write_error"
+    PLAYER_ASSIGNMENT_IO = "player_assignment_io_error"
+    PLAYER_ISOLATION_CANCELLED = "player_isolation_cancelled"
+    PLAYER_ISOLATION_INPUT = "player_isolation_input_error"
     VIDEO_NOT_FOUND = "video_not_found"
     VIDEO_UNREADABLE = "video_unreadable"
 
@@ -171,4 +175,47 @@ class DetectionModelError(PickleballVisionError):
             f"Person detector failed during {operation}: {reason}",
             code=ErrorCode.DETECTION_MODEL,
             details={"operation": operation, "reason": reason},
+        )
+
+
+class DetectionIoError(PickleballVisionError):
+    """Raised when persisted raw person detections cannot be loaded."""
+
+    def __init__(self, path: str, *, reason: str) -> None:
+        super().__init__(
+            f"Unable to load person detections {path}: {reason}",
+            code=ErrorCode.DETECTION_IO,
+            details={"path": path, "reason": reason},
+        )
+
+
+class PlayerIsolationInputError(PickleballVisionError):
+    """Raised when isolation inputs or derived assignments are invalid."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Invalid primary-player isolation input: {reason}",
+            code=ErrorCode.PLAYER_ISOLATION_INPUT,
+            details={"reason": reason},
+        )
+
+
+class PlayerIsolationCancelledError(PickleballVisionError):
+    """Raised when manual logical-player selection is cancelled."""
+
+    def __init__(self) -> None:
+        super().__init__(
+            "Primary-player selection was cancelled; no assignments were written",
+            code=ErrorCode.PLAYER_ISOLATION_CANCELLED,
+        )
+
+
+class PlayerAssignmentIoError(PickleballVisionError):
+    """Raised when logical-player assignments cannot be read or written."""
+
+    def __init__(self, path: str, *, reason: str) -> None:
+        super().__init__(
+            f"Unable to access logical-player assignments {path}: {reason}",
+            code=ErrorCode.PLAYER_ASSIGNMENT_IO,
+            details={"path": path, "reason": reason},
         )

@@ -16,6 +16,7 @@ from pickleball_vision.config import Settings
 from pickleball_vision.errors import ErrorCode, PickleballVisionError
 from pickleball_vision.logging import configure_logging
 from pickleball_vision.person_detection_pipeline import detect_people_in_video
+from pickleball_vision.player_isolation_workflow import isolate_primary_players
 from pickleball_vision.video import extract_frame, inspect_video, sample_frames
 
 EXIT_OK = 0
@@ -113,6 +114,41 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         required=True,
         help="directory for detections.json, annotated.mp4, and summary.json",
+    )
+
+    isolate_parser = subparsers.add_parser(
+        "isolate-players",
+        help="derive primary-court candidates and manually assign four logical players",
+    )
+    isolate_parser.add_argument("video", type=Path, help="path to the detected local video")
+    isolate_parser.add_argument(
+        "--detections",
+        type=Path,
+        required=True,
+        help="raw detections.json from detect-people",
+    )
+    isolate_parser.add_argument(
+        "--calibration",
+        type=Path,
+        required=True,
+        help="court calibration JSON for bottom-center ground-point projection",
+    )
+    isolate_parser.add_argument(
+        "--timestamp",
+        type=float,
+        required=True,
+        help="initial manual-selection timestamp in seconds",
+    )
+    isolate_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=True,
+        help="directory for candidates, assignments, debug video, and summary",
+    )
+    isolate_parser.add_argument(
+        "--assignments",
+        type=Path,
+        help="existing player-assignments.json to review or correct",
     )
     return parser
 
@@ -256,6 +292,40 @@ def _run_detect_people(
     return EXIT_OK
 
 
+def _run_isolate_players(
+    video_path: Path,
+    *,
+    detections_path: Path,
+    calibration_path: Path,
+    timestamp: float,
+    output_dir: Path,
+    assignments_path: Path | None,
+    settings: Settings,
+) -> int:
+    artifacts = isolate_primary_players(
+        video_path,
+        detections_path=detections_path,
+        calibration_path=calibration_path,
+        selection_timestamp_s=timestamp,
+        output_dir=output_dir,
+        settings=settings.player_isolation,
+        existing_assignments_path=assignments_path,
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "primary_players_isolated",
+        extra={
+            "context": {
+                "video": str(video_path.expanduser().resolve()),
+                "candidate_count": artifacts.candidate_count,
+                "eligible_candidate_count": artifacts.eligible_candidate_count,
+                "output_dir": str(output_dir.expanduser().resolve()),
+            }
+        },
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command and translate failures into stable process exit codes."""
 
@@ -295,6 +365,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                 cast(Path, args.video),
                 calibration_path=cast(Path, args.calibration),
                 output_dir=cast(Path, args.output_dir),
+                settings=settings,
+            )
+        if args.command == "isolate-players":
+            return _run_isolate_players(
+                cast(Path, args.video),
+                detections_path=cast(Path, args.detections),
+                calibration_path=cast(Path, args.calibration),
+                timestamp=cast(float, args.timestamp),
+                output_dir=cast(Path, args.output_dir),
+                assignments_path=cast(Path | None, args.assignments),
                 settings=settings,
             )
         parser.error(f"unsupported command: {args.command}")

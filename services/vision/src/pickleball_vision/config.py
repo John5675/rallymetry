@@ -143,6 +143,121 @@ class PersonDetectionSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class PlayerIsolationSettings:
+    """Validated geometry and short-gap candidate-selection settings."""
+
+    near_court_margin_m: float = 1.5
+    boundary_uncertainty_m: float = 0.25
+    side_uncertainty_m: float = 0.25
+    max_candidate_gap_s: float = 1.0
+    max_candidate_speed_mps: float = 8.0
+    min_candidate_observations: int = 15
+    min_court_support_ratio: float = 0.60
+
+    @classmethod
+    def from_env(
+        cls,
+        environ: Mapping[str, str] | None = None,
+    ) -> PlayerIsolationSettings:
+        """Load candidate selection settings from the shared environment boundary."""
+
+        source = os.environ if environ is None else environ
+        defaults = cls()
+        near_court_margin_m = _float_setting(
+            source,
+            "ISOLATION_NEAR_MARGIN_METERS",
+            defaults.near_court_margin_m,
+        )
+        boundary_uncertainty_m = _float_setting(
+            source,
+            "ISOLATION_BOUNDARY_UNCERTAINTY_METERS",
+            defaults.boundary_uncertainty_m,
+        )
+        side_uncertainty_m = _float_setting(
+            source,
+            "ISOLATION_SIDE_UNCERTAINTY_METERS",
+            defaults.side_uncertainty_m,
+        )
+        max_candidate_gap_s = _float_setting(
+            source,
+            "ISOLATION_MAX_CANDIDATE_GAP_SECONDS",
+            defaults.max_candidate_gap_s,
+        )
+        max_candidate_speed_mps = _float_setting(
+            source,
+            "ISOLATION_MAX_CANDIDATE_SPEED_MPS",
+            defaults.max_candidate_speed_mps,
+        )
+        min_candidate_observations = _int_setting(
+            source,
+            "ISOLATION_MIN_CANDIDATE_OBSERVATIONS",
+            defaults.min_candidate_observations,
+        )
+        min_court_support_ratio = _float_setting(
+            source,
+            "ISOLATION_MIN_COURT_SUPPORT_RATIO",
+            defaults.min_court_support_ratio,
+        )
+        validations = (
+            (near_court_margin_m > 0, "ISOLATION_NEAR_MARGIN_METERS", "must be positive"),
+            (
+                boundary_uncertainty_m > 0,
+                "ISOLATION_BOUNDARY_UNCERTAINTY_METERS",
+                "must be positive",
+            ),
+            (
+                side_uncertainty_m > 0,
+                "ISOLATION_SIDE_UNCERTAINTY_METERS",
+                "must be positive",
+            ),
+            (
+                max_candidate_gap_s > 0,
+                "ISOLATION_MAX_CANDIDATE_GAP_SECONDS",
+                "must be positive",
+            ),
+            (
+                max_candidate_speed_mps > 0,
+                "ISOLATION_MAX_CANDIDATE_SPEED_MPS",
+                "must be positive",
+            ),
+            (
+                min_candidate_observations >= 2,
+                "ISOLATION_MIN_CANDIDATE_OBSERVATIONS",
+                "must be at least 2",
+            ),
+            (
+                0 <= min_court_support_ratio <= 1,
+                "ISOLATION_MIN_COURT_SUPPORT_RATIO",
+                "must be between 0 and 1 inclusive",
+            ),
+        )
+        for valid, suffix, reason in validations:
+            if not valid:
+                setting = f"{ENV_PREFIX}{suffix}"
+                raise ConfigurationError(f"{setting} {reason}", setting=setting)
+        return cls(
+            near_court_margin_m=near_court_margin_m,
+            boundary_uncertainty_m=boundary_uncertainty_m,
+            side_uncertainty_m=side_uncertainty_m,
+            max_candidate_gap_s=max_candidate_gap_s,
+            max_candidate_speed_mps=max_candidate_speed_mps,
+            min_candidate_observations=min_candidate_observations,
+            min_court_support_ratio=min_court_support_ratio,
+        )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "near_court_margin_m": self.near_court_margin_m,
+            "boundary_uncertainty_m": self.boundary_uncertainty_m,
+            "side_uncertainty_m": self.side_uncertainty_m,
+            "max_candidate_gap_s": self.max_candidate_gap_s,
+            "max_candidate_speed_mps": self.max_candidate_speed_mps,
+            "min_candidate_observations": self.min_candidate_observations,
+            "min_court_support_ratio": self.min_court_support_ratio,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class Settings:
     """Validated settings loaded once at an executable boundary."""
 
@@ -151,6 +266,7 @@ class Settings:
     log_format: LogFormat = LogFormat.JSON
     output_dir: Path = Path("output")
     person_detection: PersonDetectionSettings = field(default_factory=PersonDetectionSettings)
+    player_isolation: PlayerIsolationSettings = field(default_factory=PlayerIsolationSettings)
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> Settings:
@@ -196,6 +312,7 @@ class Settings:
             log_format=log_format,
             output_dir=Path(output_dir_raw).expanduser(),
             person_detection=PersonDetectionSettings.from_env(source),
+            player_isolation=PlayerIsolationSettings.from_env(source),
         )
 
     def public_values(self) -> dict[str, object]:
@@ -207,4 +324,5 @@ class Settings:
             "log_format": self.log_format.value,
             "output_dir": str(self.output_dir),
             "person_detection": self.person_detection.as_dict(),
+            "player_isolation": self.player_isolation.as_dict(),
         }

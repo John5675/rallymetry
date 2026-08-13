@@ -6,6 +6,7 @@ from pickleball_vision.config import (
     Environment,
     LogFormat,
     PersonDetectionSettings,
+    PlayerIsolationSettings,
     Settings,
 )
 from pickleball_vision.errors import ConfigurationError, ErrorCode
@@ -19,6 +20,7 @@ def test_settings_have_safe_development_defaults() -> None:
     assert settings.log_format is LogFormat.JSON
     assert settings.output_dir == Path("output")
     assert settings.person_detection == PersonDetectionSettings()
+    assert settings.player_isolation == PlayerIsolationSettings()
 
 
 def test_settings_load_prefixed_environment_values() -> None:
@@ -34,6 +36,13 @@ def test_settings_load_prefixed_environment_values() -> None:
             "PICKLEBALL_VISION_PERSON_IMAGE_SIZE": "960",
             "PICKLEBALL_VISION_PERSON_IOU_THRESHOLD": "0.6",
             "PICKLEBALL_VISION_PERSON_MAX_DETECTIONS": "250",
+            "PICKLEBALL_VISION_ISOLATION_NEAR_MARGIN_METERS": "2.0",
+            "PICKLEBALL_VISION_ISOLATION_BOUNDARY_UNCERTAINTY_METERS": "0.3",
+            "PICKLEBALL_VISION_ISOLATION_SIDE_UNCERTAINTY_METERS": "0.4",
+            "PICKLEBALL_VISION_ISOLATION_MAX_CANDIDATE_GAP_SECONDS": "1.5",
+            "PICKLEBALL_VISION_ISOLATION_MAX_CANDIDATE_SPEED_MPS": "7.0",
+            "PICKLEBALL_VISION_ISOLATION_MIN_CANDIDATE_OBSERVATIONS": "20",
+            "PICKLEBALL_VISION_ISOLATION_MIN_COURT_SUPPORT_RATIO": "0.75",
         }
     )
 
@@ -48,6 +57,15 @@ def test_settings_load_prefixed_environment_values() -> None:
         image_size=960,
         iou_threshold=0.6,
         max_detections=250,
+    )
+    assert settings.player_isolation == PlayerIsolationSettings(
+        near_court_margin_m=2.0,
+        boundary_uncertainty_m=0.3,
+        side_uncertainty_m=0.4,
+        max_candidate_gap_s=1.5,
+        max_candidate_speed_mps=7.0,
+        min_candidate_observations=20,
+        min_court_support_ratio=0.75,
     )
 
 
@@ -75,6 +93,22 @@ def test_settings_load_prefixed_environment_values() -> None:
         (
             {"PICKLEBALL_VISION_PERSON_MAX_DETECTIONS": "0"},
             "PICKLEBALL_VISION_PERSON_MAX_DETECTIONS",
+        ),
+        (
+            {"PICKLEBALL_VISION_ISOLATION_NEAR_MARGIN_METERS": "0"},
+            "PICKLEBALL_VISION_ISOLATION_NEAR_MARGIN_METERS",
+        ),
+        (
+            {"PICKLEBALL_VISION_ISOLATION_MAX_CANDIDATE_GAP_SECONDS": "never"},
+            "PICKLEBALL_VISION_ISOLATION_MAX_CANDIDATE_GAP_SECONDS",
+        ),
+        (
+            {"PICKLEBALL_VISION_ISOLATION_MIN_CANDIDATE_OBSERVATIONS": "1"},
+            "PICKLEBALL_VISION_ISOLATION_MIN_CANDIDATE_OBSERVATIONS",
+        ),
+        (
+            {"PICKLEBALL_VISION_ISOLATION_MIN_COURT_SUPPORT_RATIO": "1.1"},
+            "PICKLEBALL_VISION_ISOLATION_MIN_COURT_SUPPORT_RATIO",
         ),
     ],
 )

@@ -6,9 +6,14 @@ import pytest
 
 from pickleball_vision.calibration import CalibrationCorrespondence
 from pickleball_vision.cli import EXIT_OK, EXIT_USAGE_ERROR, main
-from pickleball_vision.config import ENV_PREFIX, PersonDetectionSettings
+from pickleball_vision.config import (
+    ENV_PREFIX,
+    PersonDetectionSettings,
+    PlayerIsolationSettings,
+)
 from pickleball_vision.court import CourtDimensions, ImagePoint, court_landmarks
 from pickleball_vision.person_detection_pipeline import PersonDetectionArtifacts
+from pickleball_vision.player_isolation_workflow import PlayerIsolationArtifacts
 
 
 def _clear_settings(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -23,6 +28,13 @@ def _clear_settings(monkeypatch: pytest.MonkeyPatch) -> None:
         "PERSON_IMAGE_SIZE",
         "PERSON_IOU_THRESHOLD",
         "PERSON_MAX_DETECTIONS",
+        "ISOLATION_NEAR_MARGIN_METERS",
+        "ISOLATION_BOUNDARY_UNCERTAINTY_METERS",
+        "ISOLATION_SIDE_UNCERTAINTY_METERS",
+        "ISOLATION_MAX_CANDIDATE_GAP_SECONDS",
+        "ISOLATION_MAX_CANDIDATE_SPEED_MPS",
+        "ISOLATION_MIN_CANDIDATE_OBSERVATIONS",
+        "ISOLATION_MIN_COURT_SUPPORT_RATIO",
     ):
         monkeypatch.delenv(f"{ENV_PREFIX}{suffix}", raising=False)
 
@@ -302,3 +314,68 @@ def test_detect_people_command_dispatches_with_external_configuration(
     assert received["output_dir"] == output_dir
     received_settings = cast(PersonDetectionSettings, received["settings"])
     assert received_settings.min_confidence == pytest.approx(0.12)
+
+
+def test_isolate_players_command_dispatches_manual_workflow(
+    synthetic_video: Path,
+    synthetic_calibration: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _clear_settings(monkeypatch)
+    detections_path = tmp_path / "detections.json"
+    assignments_path = tmp_path / "existing-assignments.json"
+    output_dir = tmp_path / "isolation"
+    received: dict[str, object] = {}
+
+    def fake_isolate(
+        video_path: Path,
+        *,
+        detections_path: Path,
+        calibration_path: Path,
+        selection_timestamp_s: float,
+        output_dir: Path,
+        settings: PlayerIsolationSettings,
+        existing_assignments_path: Path | None,
+    ) -> PlayerIsolationArtifacts:
+        received.update(locals())
+        return PlayerIsolationArtifacts(
+            candidates_path=output_dir / "player-candidates.json",
+            assignments_path=output_dir / "player-assignments.json",
+            debug_video_path=output_dir / "primary-player-debug.mp4",
+            summary_path=output_dir / "primary-player-summary.json",
+            candidate_count=12,
+            eligible_candidate_count=6,
+        )
+
+    monkeypatch.setattr("pickleball_vision.cli.isolate_primary_players", fake_isolate)
+
+    exit_code = main(
+        [
+            "isolate-players",
+            str(synthetic_video),
+            "--detections",
+            str(detections_path),
+            "--calibration",
+            str(synthetic_calibration),
+            "--timestamp",
+            "0.5",
+            "--output-dir",
+            str(output_dir),
+            "--assignments",
+            str(assignments_path),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+    assert exit_code == EXIT_OK
+    assert report["candidate_count"] == 12
+    assert report["eligible_candidate_count"] == 6
+    assert received["video_path"] == synthetic_video
+    assert received["detections_path"] == detections_path
+    assert received["calibration_path"] == synthetic_calibration
+    assert received["selection_timestamp_s"] == pytest.approx(0.5)
+    assert received["output_dir"] == output_dir
+    assert received["existing_assignments_path"] == assignments_path

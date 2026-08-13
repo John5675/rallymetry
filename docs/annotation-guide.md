@@ -36,6 +36,12 @@ Stable player IDs are match-scoped anonymous identifiers such as `near_left` onl
 when side/role is known; otherwise use neutral identifiers. Side changes must not
 create a new physical identity.
 
+The local isolation workflow's `ME`, `PARTNER`, `OPPONENT_1`, and `OPPONENT_2`
+values are manually asserted logical roles, not detector classes or detector IDs.
+Their assignment anchor, observed side, and source candidate remain provenance.
+Correct a mistaken role in a new assignment record rather than editing raw person
+detections.
+
 ## Ball
 
 Label the visible ball center and an approximate extent when resolvable. Include

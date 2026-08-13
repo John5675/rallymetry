@@ -17,8 +17,9 @@ into Pickleball Vision observation records. Bounding boxes use source-frame pixe
 - frame numbers are zero-based, with timestamp `frame_number / fps`.
 
 No box is projected through the court homography. In particular, the center of a
-person box is not a physical court position. Ground-contact estimation begins in a
-later milestone and will initially use the bottom-center of a selected player box.
+person box is not a physical court position. The downstream primary-player
+isolation stage derives bottom-center ground estimates in a separate artifact;
+this raw detector output remains unchanged.
 
 The first model-backed run may download a `.pt` weight file. Weight files are
 ignored by Git and must never be committed.

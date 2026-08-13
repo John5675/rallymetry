@@ -23,6 +23,10 @@ y_px = bottom_px
 
 Never substitute the bounding-box center for this ground-contact estimate.
 
+If a detector box touches the bottom frame edge, its shoes may be cropped. The
+bottom-center then remains recorded as an image estimate but is not projected to
+the court; its court membership and side are ambiguous.
+
 ## Canonical court-plane coordinates
 
 The canonical doubles court uses meters:
@@ -44,6 +48,23 @@ these values rather than relying on implicit constants.
 “Near” and “far” are calibration labels relative to the source camera, not player
 identities. A calibration record must store the corner correspondence and units so
 orientation is recoverable.
+
+## Primary-court regions
+
+Primary-player isolation classifies a projected ground point against the explicit
+court rectangle:
+
+- `inside`: within the inclusive canonical court bounds;
+- `near`: outside the bounds but no more than the configured Euclidean margin from
+  the rectangle (default `1.5 m`);
+- `outside`: farther than that margin; and
+- `ambiguous`: a defensible court projection is unavailable.
+
+Points within the configured decision-boundary uncertainty (default `0.25 m`) keep
+their inside/near/outside state but also carry a boundary-ambiguity flag and reduced
+classification confidence. Near/far side uses the calibrated net y-coordinate;
+points within `0.25 m` of the net are side-ambiguous by default. These thresholds
+are selection heuristics, not pickleball rules or ground truth.
 
 ## Manual calibration landmarks
 

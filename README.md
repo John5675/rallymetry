@@ -5,11 +5,10 @@ doubles pickleball matches into inspectable, structured match data. The long-ter
 goal includes court and player tracking, ball trajectories, rally and shot events,
 match analytics, and AI-assisted coaching.
 
-The current milestone is **Person detection**. The local CLI can inspect video
-metadata, extract and sample source-resolution frames, manually fit a multi-point
-court-plane homography, and run broad pretrained person detection. Person
-detections are observations only; the pipeline does not decide which four people
-are match participants yet.
+The current milestone is **Primary-player isolation**. The local CLI can inspect
+video, calibrate the court, detect people broadly, derive court-aware candidates,
+and manually assign the four logical match roles. Raw person detections remain
+unchanged, and full persistent identity tracking is deliberately deferred.
 
 ## Repository map
 
@@ -61,6 +60,11 @@ uv run pickleball-vision calibrate /absolute/path/to/match.mp4 \
 uv run pickleball-vision detect-people /absolute/path/to/match.mp4 \
   --calibration ../../output/calibration.json \
   --output-dir ../../output/person-detection
+uv run pickleball-vision isolate-players /absolute/path/to/match.mp4 \
+  --detections ../../output/person-detection/detections.json \
+  --calibration ../../output/calibration.json \
+  --timestamp 30.5 \
+  --output-dir ../../output/player-isolation
 ```
 
 Command results are emitted as JSON on standard output. Diagnostic structured
@@ -87,6 +91,12 @@ Person inference is configured with `PERSON_MODEL`, `PERSON_DEVICE`,
 [the person-detection guide](docs/person-detection.md) for defaults and review
 guidance. Defaults are safe for local development. Do not put secrets in
 command-line arguments or committed configuration.
+
+Primary-player isolation uses `ISOLATION_*` geometry, short-gap association, and
+candidate eligibility settings documented in
+[the primary-player isolation guide](docs/primary-player-isolation.md). Its local
+window assigns `ME`, `PARTNER`, `OPPONENT_1`, and `OPPONENT_2`; pass the previous
+`player-assignments.json` with `--assignments` to review or correct those choices.
 
 ## Verify the setup
 

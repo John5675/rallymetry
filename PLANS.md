@@ -71,7 +71,7 @@ Exit criteria:
   persistence, and debug rendering with synthetic data.
 - No automatic court detection or later vision milestone is implemented.
 
-## 3. Person detection — current
+## 3. Person detection — complete
 
 Run a pretrained, model-adapted person detector over every source frame and retain
 broad image-space observations for every visible person. Neighboring-court people
@@ -99,9 +99,40 @@ Exit criteria:
 - No primary-player isolation, tracking, player-position estimation, ball
   detection, or product-service behavior is implemented.
 
+## 4. Primary-player isolation — current
+
+Derive court-aware person candidates from raw detections without mutating detector
+output or assuming that confidence identifies match participants. Use estimated
+shoe/court contact, calibrated geometry, limited temporal persistence, and manual
+four-role initialization to isolate the primary doubles court.
+
+Exit criteria:
+
+- Every raw person detection receives a derived bottom-center ground-contact point;
+  the person-box center is never used as a physical position.
+- Geometrically appropriate ground points are projected to canonical court meters
+  and classified as inside, near, or clearly outside the primary court, with
+  ambiguity and classification confidence retained.
+- Candidate selection uses court membership, near/far side, and short-gap temporal
+  persistence; detection confidence never becomes a top-four selection rule.
+- Lightweight candidate association survives isolated missed detections but is
+  explicitly not the persistent identity tracker planned for Milestone 5.
+- A local manual workflow assigns exactly four independent logical roles: `ME`,
+  `PARTNER`, `OPPONENT_1`, and `OPPONENT_2`.
+- Manual assignments are persisted separately from raw observations and ephemeral
+  candidate identifiers, and an existing assignment file can be corrected.
+- Debug output shows every raw person subtly, eligible primary-court candidates
+  distinctly, bottom-center ground points, court state, and assigned logical role.
+- Synthetic tests cover inside/near/outside/ambiguous court classification,
+  near/far side classification, missed-frame persistence, and independent manual
+  role serialization.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- No full persistent tracking, player movement analytics, ball detection, or later
+  product behavior is implemented.
+
 ## Future milestones — not current
 
-4. Primary-player isolation
 5. Persistent player tracking
 6. Player court-position analytics
 7. Ball dataset tooling

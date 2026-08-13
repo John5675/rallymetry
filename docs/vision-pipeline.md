@@ -2,8 +2,8 @@
 
 This document describes stable stage boundaries. A stage may be introduced only
 when its matching milestone is current. Video ingestion, manual court calibration,
-and broad person detection are currently implemented; all later stages remain
-contracts only.
+broad person detection, and primary-player isolation are currently implemented;
+all later stages remain contracts only.
 
 ## Intended flow
 
@@ -73,6 +73,27 @@ confidence, zero-based frame number, and timestamp. The calibration is validated
 and recorded as run provenance, but person boxes are not projected through its
 homography during this milestone. People on neighboring courts, spectators, and
 officials are intentionally not removed; that is primary-player isolation work.
+
+## Primary-player isolation contract
+
+Isolation derives, but never adds fields to, raw person observations. The initial
+ground-contact estimate is exactly the bottom-center of each person box. It is
+projected through the court homography only when the point is not clipped at the
+bottom frame edge. Derived records retain the image point, optional court point,
+projection status, inside/near/outside state, boundary ambiguity, court side, and
+confidence.
+
+Candidate selection combines court support with short-gap ground-point proximity
+and temporal persistence. These candidate IDs are ephemeral selection tracklets,
+not persistent physical identities. They may bridge a brief missed detection but
+cannot satisfy the persistent tracking contract in Milestone 5. Detection
+confidence is retained as evidence and is never a top-four selection rule.
+
+The four human-owned logical roles `ME`, `PARTNER`, `OPPONENT_1`, and
+`OPPONENT_2` are stored in a separate manual-assignment artifact. Logical roles are
+independent of raw detection indices and ephemeral candidate IDs, even though the
+assignment record links to both for provenance. Manual correction supersedes a
+prior assignment artifact; it does not rewrite detector observations.
 
 Ball records distinguish at minimum:
 
