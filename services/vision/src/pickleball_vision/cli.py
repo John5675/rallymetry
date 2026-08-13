@@ -15,6 +15,7 @@ from pickleball_vision.calibration_workflow import calibrate_video
 from pickleball_vision.config import Settings
 from pickleball_vision.errors import ErrorCode, PickleballVisionError
 from pickleball_vision.logging import configure_logging
+from pickleball_vision.person_detection_pipeline import detect_people_in_video
 from pickleball_vision.video import extract_frame, inspect_video, sample_frames
 
 EXIT_OK = 0
@@ -94,6 +95,24 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         required=True,
         help="output calibration JSON path",
+    )
+
+    detect_people_parser = subparsers.add_parser(
+        "detect-people",
+        help="detect every visible person without selecting match participants",
+    )
+    detect_people_parser.add_argument("video", type=Path, help="path to a local video file")
+    detect_people_parser.add_argument(
+        "--calibration",
+        type=Path,
+        required=True,
+        help="court calibration JSON used as validated run provenance",
+    )
+    detect_people_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=True,
+        help="directory for detections.json, annotated.mp4, and summary.json",
     )
     return parser
 
@@ -209,6 +228,34 @@ def _run_calibrate(video_path: Path, *, timestamp: float, output_path: Path) -> 
     return EXIT_OK
 
 
+def _run_detect_people(
+    video_path: Path,
+    *,
+    calibration_path: Path,
+    output_dir: Path,
+    settings: Settings,
+) -> int:
+    artifacts = detect_people_in_video(
+        video_path,
+        calibration_path=calibration_path,
+        output_dir=output_dir,
+        settings=settings.person_detection,
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "people_detected",
+        extra={
+            "context": {
+                "video": str(video_path.expanduser().resolve()),
+                "processed_frames": artifacts.processed_frame_count,
+                "detections": artifacts.detection_count,
+                "output_dir": str(output_dir.expanduser().resolve()),
+            }
+        },
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command and translate failures into stable process exit codes."""
 
@@ -242,6 +289,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 cast(Path, args.video),
                 timestamp=cast(float, args.timestamp),
                 output_path=cast(Path, args.output),
+            )
+        if args.command == "detect-people":
+            return _run_detect_people(
+                cast(Path, args.video),
+                calibration_path=cast(Path, args.calibration),
+                output_dir=cast(Path, args.output_dir),
+                settings=settings,
             )
         parser.error(f"unsupported command: {args.command}")
     except PickleballVisionError as error:

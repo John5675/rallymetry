@@ -37,6 +37,12 @@ Raw detections and derived events must remain separate even if a future optimize
 implementation computes them in one process. Persistent identifiers belong to the
 tracking layer, not to individual detections.
 
+The person detector is accessed through a model-independent protocol. Its
+Ultralytics implementation owns model loading and tensor translation; pipeline
+orchestration owns video decoding and artifact persistence; observation dataclasses
+own the stable JSON representation. This prevents a pretrained-model API from
+becoming the repository's domain contract.
+
 ## Execution model
 
 During the local-pipeline milestones, the CLI is the executable boundary.

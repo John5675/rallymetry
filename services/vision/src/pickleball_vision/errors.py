@@ -11,6 +11,8 @@ class ErrorCode(StrEnum):
     CALIBRATION_INVALID = "calibration_invalid"
     CALIBRATION_IO = "calibration_io_error"
     CONFIGURATION = "configuration_error"
+    DETECTION_INPUT = "detection_input_error"
+    DETECTION_MODEL = "detection_model_error"
     FRAME_DECODE = "frame_decode_error"
     INTERNAL = "internal_error"
     INVALID_SAMPLE_COUNT = "invalid_sample_count"
@@ -108,11 +110,11 @@ class FrameDecodeError(PickleballVisionError):
 
 
 class OutputWriteError(PickleballVisionError):
-    """Raised when an extracted frame cannot be written."""
+    """Raised when a generated artifact cannot be written."""
 
     def __init__(self, path: str, *, reason: str) -> None:
         super().__init__(
-            f"Unable to write frame image {path}: {reason}",
+            f"Unable to write output {path}: {reason}",
             code=ErrorCode.OUTPUT_WRITE,
             details={"path": path, "reason": reason},
         )
@@ -147,4 +149,26 @@ class CalibrationIoError(PickleballVisionError):
             f"Unable to access calibration {path}: {reason}",
             code=ErrorCode.CALIBRATION_IO,
             details={"path": path, "reason": reason},
+        )
+
+
+class DetectionInputError(PickleballVisionError):
+    """Raised when detection inputs are individually valid but incompatible."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Invalid person-detection input: {reason}",
+            code=ErrorCode.DETECTION_INPUT,
+            details={"reason": reason},
+        )
+
+
+class DetectionModelError(PickleballVisionError):
+    """Raised when a pretrained detector cannot load or infer safely."""
+
+    def __init__(self, reason: str, *, operation: str) -> None:
+        super().__init__(
+            f"Person detector failed during {operation}: {reason}",
+            code=ErrorCode.DETECTION_MODEL,
+            details={"operation": operation, "reason": reason},
         )

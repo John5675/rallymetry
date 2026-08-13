@@ -1,16 +1,29 @@
 import json
 from pathlib import Path
+from typing import cast
 
 import pytest
 
 from pickleball_vision.calibration import CalibrationCorrespondence
 from pickleball_vision.cli import EXIT_OK, EXIT_USAGE_ERROR, main
-from pickleball_vision.config import ENV_PREFIX
+from pickleball_vision.config import ENV_PREFIX, PersonDetectionSettings
 from pickleball_vision.court import CourtDimensions, ImagePoint, court_landmarks
+from pickleball_vision.person_detection_pipeline import PersonDetectionArtifacts
 
 
 def _clear_settings(monkeypatch: pytest.MonkeyPatch) -> None:
-    for suffix in ("ENVIRONMENT", "LOG_LEVEL", "LOG_FORMAT", "OUTPUT_DIR"):
+    for suffix in (
+        "ENVIRONMENT",
+        "LOG_LEVEL",
+        "LOG_FORMAT",
+        "OUTPUT_DIR",
+        "PERSON_MODEL",
+        "PERSON_DEVICE",
+        "PERSON_MIN_CONFIDENCE",
+        "PERSON_IMAGE_SIZE",
+        "PERSON_IOU_THRESHOLD",
+        "PERSON_MAX_DETECTIONS",
+    ):
         monkeypatch.delenv(f"{ENV_PREFIX}{suffix}", raising=False)
 
 
@@ -229,3 +242,63 @@ def test_calibrate_command_rejects_invalid_timestamp_before_opening_ui(
     assert exit_code == EXIT_USAGE_ERROR
     assert captured.out == ""
     assert "error [invalid_timestamp]" in captured.err
+
+
+def test_detect_people_command_dispatches_with_external_configuration(
+    synthetic_video: Path,
+    synthetic_calibration: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _clear_settings(monkeypatch)
+    monkeypatch.setenv("PICKLEBALL_VISION_PERSON_MIN_CONFIDENCE", "0.12")
+    output_dir = tmp_path / "detections"
+    received: dict[str, object] = {}
+
+    def fake_detect_people(
+        video_path: Path,
+        *,
+        calibration_path: Path,
+        output_dir: Path,
+        settings: PersonDetectionSettings,
+    ) -> PersonDetectionArtifacts:
+        received.update(
+            {
+                "video_path": video_path,
+                "calibration_path": calibration_path,
+                "output_dir": output_dir,
+                "settings": settings,
+            }
+        )
+        return PersonDetectionArtifacts(
+            detections_path=output_dir / "detections.json",
+            annotated_video_path=output_dir / "annotated.mp4",
+            summary_path=output_dir / "summary.json",
+            processed_frame_count=12,
+            detection_count=25,
+        )
+
+    monkeypatch.setattr("pickleball_vision.cli.detect_people_in_video", fake_detect_people)
+
+    exit_code = main(
+        [
+            "detect-people",
+            str(synthetic_video),
+            "--calibration",
+            str(synthetic_calibration),
+            "--output-dir",
+            str(output_dir),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+    assert exit_code == EXIT_OK
+    assert report["processed_frame_count"] == 12
+    assert report["detection_count"] == 25
+    assert received["video_path"] == synthetic_video
+    assert received["calibration_path"] == synthetic_calibration
+    assert received["output_dir"] == output_dir
+    received_settings = cast(PersonDetectionSettings, received["settings"])
+    assert received_settings.min_confidence == pytest.approx(0.12)

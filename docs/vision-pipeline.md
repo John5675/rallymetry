@@ -1,8 +1,9 @@
 # Vision Pipeline Contract
 
 This document describes stable stage boundaries. A stage may be introduced only
-when its matching milestone is current. Video ingestion and manual court
-calibration are currently implemented; all later stages remain contracts only.
+when its matching milestone is current. Video ingestion, manual court calibration,
+and broad person detection are currently implemented; all later stages remain
+contracts only.
 
 ## Intended flow
 
@@ -65,6 +66,13 @@ estimate is the bottom-center ground-contact point of the selected bounding box.
 The bounding-box center is never a physical court position. Selecting primary
 players requires temporal and court-aware evidence; taking the four highest person
 confidences is not a valid algorithm.
+
+The person-detection baseline stores every accepted COCO `person` observation in
+the original source-frame pixel coordinate system. Each observation retains its
+confidence, zero-based frame number, and timestamp. The calibration is validated
+and recorded as run provenance, but person boxes are not projected through its
+homography during this milestone. People on neighboring courts, spectators, and
+officials are intentionally not removed; that is primary-player isolation work.
 
 Ball records distinguish at minimum:
 

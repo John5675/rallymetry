@@ -267,6 +267,33 @@ def decode_video_frame(path: Path, *, timestamp_seconds: float) -> DecodedVideoF
         )
 
 
+def iter_video_frames(path: Path) -> Iterator[DecodedVideoFrame]:
+    """Decode every source frame sequentially with zero-based time provenance."""
+
+    with _open_video(path) as (capture, metadata):
+        capture.set(cv2.CAP_PROP_POS_FRAMES, 0.0)
+        for frame_index in range(metadata.frame_count):
+            try:
+                success, decoded_frame = capture.read()
+            except cv2.error as error:
+                raise FrameDecodeError(str(metadata.path), frame_index=frame_index) from error
+            if not success or decoded_frame is None:
+                raise FrameDecodeError(str(metadata.path), frame_index=frame_index)
+            frame = np.asarray(decoded_frame)
+            if (
+                frame.dtype != np.uint8
+                or frame.ndim != 3
+                or frame.shape[:2] != (metadata.height, metadata.width)
+            ):
+                raise FrameDecodeError(str(metadata.path), frame_index=frame_index)
+            yield DecodedVideoFrame(
+                metadata=metadata,
+                frame_index=frame_index,
+                timestamp=frame_index / metadata.fps,
+                image=cast(Image, frame),
+            )
+
+
 def sample_frame_indices(*, frame_count: int, count: int) -> tuple[int, ...]:
     """Choose unique frame indices uniformly over the inclusive source span."""
 

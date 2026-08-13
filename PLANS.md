@@ -42,7 +42,7 @@ Exit criteria:
 - No court calibration, detection, tracking, or product-service behavior was
   implemented by this milestone.
 
-## 2. Court calibration — current
+## 2. Court calibration — complete
 
 Manually associate at least four visible image points with named canonical
 pickleball court landmarks, fit an image/court-plane homography using all valid
@@ -71,9 +71,36 @@ Exit criteria:
   persistence, and debug rendering with synthetic data.
 - No automatic court detection or later vision milestone is implemented.
 
+## 3. Person detection — current
+
+Run a pretrained, model-adapted person detector over every source frame and retain
+broad image-space observations for every visible person. Neighboring-court people
+remain valid detections at this stage; participant selection is a later milestone.
+
+Exit criteria:
+
+- `pickleball-vision detect-people <video> --calibration <json> --output-dir <dir>`
+  validates its local inputs and processes the source video without resizing the
+  output coordinate system.
+- A detector protocol keeps model-independent observation records and pipeline
+  logic separate from the Ultralytics adapter.
+- CPU inference works, while automatic or explicit CUDA/MPS acceleration remains
+  optional and externally configured.
+- Every detection retains a source-pixel bounding box, confidence, zero-based
+  frame number, and timestamp; no player identity or court position is inferred.
+- Minimum confidence and inference settings are validated, externalized, and
+  included in output provenance.
+- `detections.json`, `annotated.mp4`, and `summary.json` are inspectable artifacts;
+  summary statistics describe detections, not match participants or match events.
+- Tests cover serialization, configuration filtering, adapter translation, and a
+  synthetic-video pipeline without downloading weights or using private footage.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- No primary-player isolation, tracking, player-position estimation, ball
+  detection, or product-service behavior is implemented.
+
 ## Future milestones — not current
 
-3. Person detection
 4. Primary-player isolation
 5. Persistent player tracking
 6. Player court-position analytics

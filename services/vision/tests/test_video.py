@@ -16,6 +16,7 @@ from pickleball_vision.video import (
     decode_video_frame,
     extract_frame,
     inspect_video,
+    iter_video_frames,
     sample_frame_indices,
     sample_frames,
 )
@@ -80,6 +81,16 @@ def test_decode_video_frame_returns_source_provenance(synthetic_video: Path) -> 
     assert decoded.frame_index == 6
     assert decoded.timestamp == pytest.approx(0.8)
     assert decoded.image.shape[:2] == (SYNTHETIC_HEIGHT, SYNTHETIC_WIDTH)
+
+
+def test_iter_video_frames_decodes_every_frame_with_non_integer_fps(
+    synthetic_video: Path,
+) -> None:
+    frames = tuple(iter_video_frames(synthetic_video))
+
+    assert tuple(frame.frame_index for frame in frames) == tuple(range(SYNTHETIC_FRAME_COUNT))
+    assert frames[-1].timestamp == pytest.approx((SYNTHETIC_FRAME_COUNT - 1) / SYNTHETIC_FPS)
+    assert all(frame.image.shape[:2] == (SYNTHETIC_HEIGHT, SYNTHETIC_WIDTH) for frame in frames)
 
 
 @pytest.mark.parametrize("timestamp", [-0.1, math.nan, 1.6, math.inf])

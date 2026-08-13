@@ -4,6 +4,15 @@ import cv2
 import numpy as np
 import pytest
 
+from pickleball_vision.calibration import (
+    CalibrationCorrespondence,
+    CalibrationSource,
+    fit_calibration,
+    save_calibration,
+)
+from pickleball_vision.court import CourtDimensions, ImagePoint, court_landmarks
+from pickleball_vision.video import inspect_video
+
 SYNTHETIC_WIDTH = 96
 SYNTHETIC_HEIGHT = 64
 SYNTHETIC_FPS = 7.5
@@ -47,3 +56,41 @@ def synthetic_video(tmp_path: Path) -> Path:
     if not video_path.is_file() or video_path.stat().st_size == 0:
         pytest.fail("OpenCV did not create the synthetic test video")
     return video_path
+
+
+@pytest.fixture
+def synthetic_calibration(synthetic_video: Path, tmp_path: Path) -> Path:
+    """Fit a valid four-corner calibration for the generated test video."""
+
+    metadata = inspect_video(synthetic_video)
+    landmarks = court_landmarks(CourtDimensions())
+    selected_landmarks = (landmarks[0], landmarks[1], landmarks[8], landmarks[9])
+    image_points = (
+        ImagePoint(5, 58),
+        ImagePoint(91, 58),
+        ImagePoint(30, 5),
+        ImagePoint(66, 5),
+    )
+    correspondences = tuple(
+        CalibrationCorrespondence(
+            landmark=landmark.name,
+            label=landmark.label,
+            image_point=image_point,
+            court_point=landmark.court_point,
+        )
+        for landmark, image_point in zip(selected_landmarks, image_points, strict=True)
+    )
+    calibration = fit_calibration(
+        source=CalibrationSource(
+            video_path=metadata.path,
+            requested_timestamp_s=0.0,
+            frame_index=0,
+            frame_timestamp_s=0.0,
+            frame_width_px=metadata.width,
+            frame_height_px=metadata.height,
+            fps=metadata.fps,
+        ),
+        court=CourtDimensions(),
+        correspondences=correspondences,
+    )
+    return save_calibration(calibration, tmp_path / "calibration.json")

@@ -5,9 +5,11 @@ doubles pickleball matches into inspectable, structured match data. The long-ter
 goal includes court and player tracking, ball trajectories, rally and shot events,
 match analytics, and AI-assisted coaching.
 
-The current milestone is **Court calibration**. The local CLI can inspect video
-metadata, extract and sample source-resolution frames, and manually fit a
-multi-point court-plane homography. It does not run any detection model yet.
+The current milestone is **Person detection**. The local CLI can inspect video
+metadata, extract and sample source-resolution frames, manually fit a multi-point
+court-plane homography, and run broad pretrained person detection. Person
+detections are observations only; the pipeline does not decide which four people
+are match participants yet.
 
 ## Repository map
 
@@ -56,6 +58,9 @@ uv run pickleball-vision sample-frames /absolute/path/to/match.mp4 \
 uv run pickleball-vision calibrate /absolute/path/to/match.mp4 \
   --timestamp 30.5 \
   --output ../../output/calibration.json
+uv run pickleball-vision detect-people /absolute/path/to/match.mp4 \
+  --calibration ../../output/calibration.json \
+  --output-dir ../../output/person-detection
 ```
 
 Command results are emitted as JSON on standard output. Diagnostic structured
@@ -76,8 +81,11 @@ PICKLEBALL_VISION_OUTPUT_DIR=../../output \
 uv run pickleball-vision doctor
 ```
 
-Supported settings are `ENVIRONMENT`, `LOG_LEVEL`, `LOG_FORMAT`, and
-`OUTPUT_DIR`. Defaults are safe for local development. Do not put secrets in
+Person inference is configured with `PERSON_MODEL`, `PERSON_DEVICE`,
+`PERSON_MIN_CONFIDENCE`, `PERSON_IMAGE_SIZE`, `PERSON_IOU_THRESHOLD`, and
+`PERSON_MAX_DETECTIONS`, under the same prefix. See
+[the person-detection guide](docs/person-detection.md) for defaults and review
+guidance. Defaults are safe for local development. Do not put secrets in
 command-line arguments or committed configuration.
 
 ## Verify the setup
