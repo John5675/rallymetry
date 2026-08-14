@@ -5,11 +5,12 @@ doubles pickleball matches into inspectable, structured match data. The long-ter
 goal includes court and player tracking, ball trajectories, rally and shot events,
 match analytics, and AI-assisted coaching.
 
-The current milestone is the **Audio-aware media foundation retrofit**. The local
+The current milestone is **Persistent player tracking**. The local
 CLI can inspect video plus optional synchronized audio, extract lossless analysis
 audio, calibrate the court, detect people broadly, derive court-aware candidates,
-and manually assign the four logical match roles. Raw observations remain separate
-from derived events, and full persistent identity tracking is deliberately deferred.
+manually assign the four logical match roles, and track those identities separately
+from transient ByteTrack IDs. Raw observations remain separate from derived logical
+tracks and later events.
 
 ## Repository map
 
@@ -71,6 +72,9 @@ uv run pickleball-vision isolate-players /absolute/path/to/match.mp4 \
   --calibration ../../output/calibration.json \
   --timestamp 30.5 \
   --output-dir ../../output/player-isolation
+uv run pickleball-vision track-players /absolute/path/to/match.mp4 \
+  --calibration ../../output/calibration/calibration.json \
+  --output-dir ../../output/player-tracking
 ```
 
 Command results are emitted as JSON on standard output. Diagnostic structured
@@ -119,6 +123,15 @@ candidate eligibility settings documented in
 [the primary-player isolation guide](docs/primary-player-isolation.md). Its local
 window assigns `ME`, `PARTNER`, `OPPONENT_1`, and `OPPONENT_2`; pass the previous
 `player-assignments.json` with `--assignments` to review or correct those choices.
+
+Persistent tracking uses ByteTrack as transient motion evidence, then independently
+resolves the four logical roles with the manual anchors, court side, court membership,
+movement plausibility, clothing appearance, and conservative gap reacquisition. An
+optional sibling `player-names.json` maps the four stable roles to display names; use
+`--player-names` for a custom location. See
+[the persistent-player tracking guide](docs/player-tracking.md). The standard command
+finds detections through `player-assignments.json`; `--assignments` and `--detections`
+remain available for nonstandard artifact locations.
 
 ## Verify the setup
 

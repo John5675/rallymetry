@@ -8,6 +8,7 @@ from pickleball_vision.config import (
     MediaSettings,
     PersonDetectionSettings,
     PlayerIsolationSettings,
+    PlayerTrackingSettings,
     Settings,
 )
 from pickleball_vision.errors import ConfigurationError, ErrorCode
@@ -23,6 +24,7 @@ def test_settings_have_safe_development_defaults() -> None:
     assert settings.media == MediaSettings()
     assert settings.person_detection == PersonDetectionSettings()
     assert settings.player_isolation == PlayerIsolationSettings()
+    assert settings.player_tracking == PlayerTrackingSettings()
 
 
 def test_settings_load_prefixed_environment_values() -> None:
@@ -46,6 +48,10 @@ def test_settings_load_prefixed_environment_values() -> None:
             "PICKLEBALL_VISION_ISOLATION_MAX_CANDIDATE_SPEED_MPS": "7.0",
             "PICKLEBALL_VISION_ISOLATION_MIN_CANDIDATE_OBSERVATIONS": "20",
             "PICKLEBALL_VISION_ISOLATION_MIN_COURT_SUPPORT_RATIO": "0.75",
+            "PICKLEBALL_VISION_TRACKING_BUFFER_SECONDS": "1.5",
+            "PICKLEBALL_VISION_TRACKING_MAX_IDENTITY_GAP_SECONDS": "2.5",
+            "PICKLEBALL_VISION_TRACKING_LONG_GAP_APPEARANCE_SIMILARITY": "0.8",
+            "PICKLEBALL_VISION_TRACKING_LONG_GAP_MINIMUM_APPEARANCE_MARGIN": "0.1",
         }
     )
 
@@ -70,6 +76,12 @@ def test_settings_load_prefixed_environment_values() -> None:
         max_candidate_speed_mps=7.0,
         min_candidate_observations=20,
         min_court_support_ratio=0.75,
+    )
+    assert settings.player_tracking == PlayerTrackingSettings(
+        track_buffer_seconds=1.5,
+        max_identity_gap_seconds=2.5,
+        long_gap_appearance_similarity=0.8,
+        long_gap_minimum_appearance_margin=0.1,
     )
 
 
@@ -117,6 +129,17 @@ def test_settings_load_prefixed_environment_values() -> None:
         (
             {"PICKLEBALL_VISION_ISOLATION_MIN_COURT_SUPPORT_RATIO": "1.1"},
             "PICKLEBALL_VISION_ISOLATION_MIN_COURT_SUPPORT_RATIO",
+        ),
+        (
+            {
+                "PICKLEBALL_VISION_TRACKING_LOW_THRESHOLD": "0.8",
+                "PICKLEBALL_VISION_TRACKING_HIGH_THRESHOLD": "0.2",
+            },
+            "PICKLEBALL_VISION_TRACKING_LOW_THRESHOLD",
+        ),
+        (
+            {"PICKLEBALL_VISION_TRACKING_LONG_GAP_APPEARANCE_SIMILARITY": "1.1"},
+            "PICKLEBALL_VISION_TRACKING_LONG_GAP_APPEARANCE_SIMILARITY",
         ),
     ],
 )

@@ -49,7 +49,17 @@ persistent tracking. `player-candidates.json` references raw detections and adds
 ground/court assessments plus ephemeral short-gap associations.
 `player-assignments.json` separately records four human logical roles. Neither
 artifact mutates detector evidence, and ephemeral candidate IDs must not become the
-persistent track IDs introduced by the next milestone.
+persistent logical identity.
+
+Persistent player tracking has two further layers. `tracks.json` first records raw
+ByteTrack observations linked to raw detection indices. A separate resolver uses
+manual anchors, calibrated court membership/side, plausible motion, and temporal
+continuity to produce per-frame logical states. Recording-local appearance evidence
+from the manual anchors helps distinguish same-side players through tracker-ID
+changes; it remains derived evidence rather than a biometric identity. `ME`,
+`PARTNER`, `OPPONENT_1`, and `OPPONENT_2` therefore do not change merely because
+ByteTrack creates a new ID. Questionable transitions are review events, not silently
+trusted relabeling.
 
 ## Execution model
 

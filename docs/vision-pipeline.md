@@ -2,8 +2,9 @@
 
 This document describes stable stage boundaries. A stage may be introduced only
 when its matching milestone is current. Audio-aware media ingestion, manual court
-calibration, broad person detection, and primary-player isolation are currently
-implemented; all later stages remain contracts only.
+calibration, broad person detection, primary-player isolation, and persistent
+logical-player tracking are currently implemented; all later stages remain
+contracts only.
 
 ## Intended flow
 
@@ -133,6 +134,28 @@ The four human-owned logical roles `ME`, `PARTNER`, `OPPONENT_1`, and
 independent of raw detection indices and ephemeral candidate IDs, even though the
 assignment record links to both for provenance. Manual correction supersedes a
 prior assignment artifact; it does not rewrite detector observations.
+
+## Persistent-player tracking contract
+
+The tracker boundary consumes persisted person detections, not model tensors.
+ByteTrack produces transient motion associations linked to immutable raw detection
+indices. Its IDs are evidence only: they are neither logical player names nor match
+statistics.
+
+Logical identity resolution begins at the four manual assignment anchors and runs
+both earlier and later in the clip. It accepts an observation only when court
+membership, expected near/far side, elapsed time, movement distance, and one-to-one
+use are defensible. Recording-local clothing appearance and its margin over the
+same-side teammate provide additional identity evidence, with stricter thresholds
+for reacquisition after long gaps. A player may be temporarily missing and later
+reacquired. An immediate or weakly supported tracker-ID transition is stored as a
+suspected switch for human review. Clearly outside-court people cannot acquire a
+logical identity, even when their detector confidence is high.
+
+`tracks.json` keeps the raw tracker and logical identity layers separate.
+`tracking-summary.json` reports coverage, suspected switches, longest missing gaps,
+and reacquisition counts per role. `annotated.mp4` is a review aid, not structured
+truth.
 
 Ball records distinguish at minimum:
 

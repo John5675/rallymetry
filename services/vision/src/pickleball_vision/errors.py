@@ -26,6 +26,7 @@ class ErrorCode(StrEnum):
     PLAYER_ASSIGNMENT_IO = "player_assignment_io_error"
     PLAYER_ISOLATION_CANCELLED = "player_isolation_cancelled"
     PLAYER_ISOLATION_INPUT = "player_isolation_input_error"
+    PLAYER_TRACKING_INPUT = "player_tracking_input_error"
     VIDEO_NOT_FOUND = "video_not_found"
     VIDEO_UNREADABLE = "video_unreadable"
 
@@ -266,4 +267,15 @@ class PlayerAssignmentIoError(PickleballVisionError):
             f"Unable to access logical-player assignments {path}: {reason}",
             code=ErrorCode.PLAYER_ASSIGNMENT_IO,
             details={"path": path, "reason": reason},
+        )
+
+
+class PlayerTrackingInputError(PickleballVisionError):
+    """Raised when tracking artifacts are missing, incompatible, or unusable."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Invalid persistent-player tracking input: {reason}",
+            code=ErrorCode.PLAYER_TRACKING_INPUT,
+            details={"reason": reason},
         )

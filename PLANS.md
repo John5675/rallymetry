@@ -131,7 +131,7 @@ Exit criteria:
 - No full persistent tracking, player movement analytics, ball detection, or later
   product behavior is implemented.
 
-## 4A. Audio-aware media foundation retrofit — current
+## 4A. Audio-aware media foundation retrofit — complete
 
 Extend local media ingestion with optional synchronized-audio metadata, a canonical
 source-media timeline, and lossless analysis-audio extraction without coupling raw
@@ -156,9 +156,44 @@ Exit criteria:
   pass.
 - No audio-event detection, bounce/contact fusion, or later milestone is implemented.
 
+## 5. Persistent player tracking — current
+
+Associate raw person detections with an established multi-object tracker, then
+resolve the four manually initialized logical player identities independently of
+transient tracker identifiers. Use court geometry, court side, temporal continuity,
+plausible movement, recording-local appearance evidence, and conservative occlusion
+handling to prevent unrelated neighboring-court people from stealing an identity.
+
+Exit criteria:
+
+- `pickleball-vision track-players <video> --calibration <json> --output-dir <dir>`
+  consumes the existing raw detections and four-role manual assignments.
+- An established tracker is isolated behind a project-owned adapter, and its raw
+  observations remain separately inspectable from logical identity resolution.
+- `ME`, `PARTNER`, `OPPONENT_1`, and `OPPONENT_2` remain independent of tracker IDs;
+  tracker-ID changes can be conservatively reacquired without renaming a player.
+- Court membership, expected near/far side, plausible motion, and one-to-one
+  assignment guard against identity theft by adjacent-court detections.
+- Same-side appearance comparison supports tracker-ID changes, and long-gap
+  reacquisition requires stronger appearance evidence than ordinary continuity.
+- Every frame retains an observed, reacquired, temporarily missing, or suspected
+  switch state with identity confidence; one missed detection never permanently
+  removes a logical player.
+- Suspected identity switches are surfaced as explicit review events rather than
+  silently accepted.
+- `tracks.json`, `annotated.mp4`, and `tracking-summary.json` retain provenance and
+  report coverage, suspected switches, longest missing intervals, and reacquisition
+  counts for all four roles.
+- Synthetic tests exercise tracker adaptation, tracker-ID changes, occlusion,
+  court/side filtering, neighboring-player rejection, serialization, and summary
+  metrics without private footage or downloaded model weights.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- No player movement analytics, ball tracking, or audio-event analysis is
+  implemented.
+
 ## Future milestones — not current
 
-5. Persistent player tracking
 6. Player court-position analytics
 7. Ball dataset tooling
 8. Ball detector

@@ -3,8 +3,9 @@
 This Python package is the local computer-vision pipeline. It currently provides
 typed executable infrastructure, audio-aware FFmpeg/OpenCV media ingestion,
 lossless analysis-audio extraction, manual multi-point court calibration,
-pretrained person detection, and court-aware manual primary-player isolation. Full
-persistent tracking, audio-event detection, and analytics remain unimplemented.
+pretrained person detection, court-aware manual primary-player isolation, and
+persistent logical-player tracking. Audio-event detection and analytics remain
+unimplemented.
 
 ```bash
 uv sync --locked --extra dev
@@ -23,6 +24,9 @@ uv run pickleball-vision isolate-players /absolute/path/to/match.mp4 \
   --calibration ../../output/calibration.json \
   --timestamp 30.5 \
   --output-dir ../../output/player-isolation
+uv run pickleball-vision track-players /absolute/path/to/match.mp4 \
+  --calibration ../../output/calibration/calibration.json \
+  --output-dir ../../output/player-tracking
 ```
 
 Calibration uses a local OpenCV window. See `docs/court-calibration.md` from the
@@ -30,6 +34,10 @@ repository root for landmark definitions and interaction controls.
 Primary-player assignment also uses a local OpenCV window; see
 `docs/primary-player-isolation.md` for controls, uncertainty, and artifact
 contracts.
+Persistent tracking consumes those assignments, learns recording-local clothing
+appearance at the manual anchors, and writes raw transient tracker evidence
+separately from logical roles. An optional `player-names.json` supplies display names;
+see `docs/player-tracking.md`.
 
 Audio is optional. Extraction preserves source sample rate and channels by default
 and writes a timing/conversion sidecar next to the PCM WAV. See

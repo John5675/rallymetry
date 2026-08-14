@@ -23,6 +23,7 @@ from pickleball_vision.media import (
 )
 from pickleball_vision.person_detection_pipeline import detect_people_in_video
 from pickleball_vision.player_isolation_workflow import isolate_primary_players
+from pickleball_vision.player_tracking_workflow import track_players_in_video
 from pickleball_vision.video import extract_frame, sample_frames
 
 EXIT_OK = 0
@@ -178,6 +179,45 @@ def build_parser() -> argparse.ArgumentParser:
         "--assignments",
         type=Path,
         help="existing player-assignments.json to review or correct",
+    )
+
+    track_parser = subparsers.add_parser(
+        "track-players",
+        help="persist the four manually assigned logical players across the video",
+    )
+    track_parser.add_argument("video", type=Path, help="path to the detected local video")
+    track_parser.add_argument(
+        "--calibration",
+        type=Path,
+        required=True,
+        help="court calibration JSON for court-aware identity resolution",
+    )
+    track_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=True,
+        help="directory for tracks.json, annotated.mp4, and tracking-summary.json",
+    )
+    track_parser.add_argument(
+        "--detections",
+        type=Path,
+        help="raw detections.json; defaults to the path recorded by assignments",
+    )
+    track_parser.add_argument(
+        "--assignments",
+        type=Path,
+        help=(
+            "manual player-assignments.json; defaults to the sibling "
+            "player-isolation output directory"
+        ),
+    )
+    track_parser.add_argument(
+        "--player-names",
+        type=Path,
+        help=(
+            "optional JSON mapping ME/PARTNER/OPPONENT_1/OPPONENT_2 to display names; "
+            "defaults to player-names.json beside assignments when present"
+        ),
     )
     return parser
 
@@ -393,6 +433,42 @@ def _run_isolate_players(
     return EXIT_OK
 
 
+def _run_track_players(
+    video_path: Path,
+    *,
+    calibration_path: Path,
+    output_dir: Path,
+    detections_path: Path | None,
+    assignments_path: Path | None,
+    player_names_path: Path | None,
+    settings: Settings,
+) -> int:
+    artifacts = track_players_in_video(
+        video_path,
+        calibration_path=calibration_path,
+        output_dir=output_dir,
+        tracking_settings=settings.player_tracking,
+        isolation_settings=settings.player_isolation,
+        detections_path=detections_path,
+        assignments_path=assignments_path,
+        player_names_path=player_names_path,
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "logical_players_tracked",
+        extra={
+            "context": {
+                "video": str(video_path.expanduser().resolve()),
+                "frames_processed": artifacts.frames_processed,
+                "raw_tracker_observations": artifacts.raw_tracker_observation_count,
+                "suspected_identity_switches": artifacts.suspected_identity_switch_count,
+                "output_dir": str(output_dir.expanduser().resolve()),
+            }
+        },
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command and translate failures into stable process exit codes."""
 
@@ -450,6 +526,16 @@ def main(argv: Sequence[str] | None = None) -> int:
                 timestamp=cast(float, args.timestamp),
                 output_dir=cast(Path, args.output_dir),
                 assignments_path=cast(Path | None, args.assignments),
+                settings=settings,
+            )
+        if args.command == "track-players":
+            return _run_track_players(
+                cast(Path, args.video),
+                calibration_path=cast(Path, args.calibration),
+                output_dir=cast(Path, args.output_dir),
+                detections_path=cast(Path | None, args.detections),
+                assignments_path=cast(Path | None, args.assignments),
+                player_names_path=cast(Path | None, args.player_names),
                 settings=settings,
             )
         parser.error(f"unsupported command: {args.command}")

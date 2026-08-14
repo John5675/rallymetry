@@ -282,6 +282,159 @@ class PlayerIsolationSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class PlayerTrackingSettings:
+    """Validated ByteTrack and conservative logical-identity settings."""
+
+    track_high_threshold: float = 0.25
+    track_low_threshold: float = 0.10
+    new_track_threshold: float = 0.25
+    match_threshold: float = 0.80
+    track_buffer_seconds: float = 1.0
+    max_identity_gap_seconds: float = 3.0
+    max_player_speed_mps: float = 8.0
+    minimum_identity_score: float = 0.45
+    suspected_switch_score: float = 0.65
+    appearance_weight: float = 0.47
+    minimum_appearance_similarity: float = 0.55
+    minimum_appearance_margin: float = -0.05
+    appearance_prototype_window_seconds: float = 3.0
+    long_gap_appearance_similarity: float = 0.70
+    long_gap_minimum_appearance_margin: float = 0.03
+
+    @classmethod
+    def from_env(
+        cls,
+        environ: Mapping[str, str] | None = None,
+    ) -> PlayerTrackingSettings:
+        """Load tracker and resolver settings from the shared environment boundary."""
+
+        source = os.environ if environ is None else environ
+        defaults = cls()
+        values = {
+            "track_high_threshold": _float_setting(
+                source, "TRACKING_HIGH_THRESHOLD", defaults.track_high_threshold
+            ),
+            "track_low_threshold": _float_setting(
+                source, "TRACKING_LOW_THRESHOLD", defaults.track_low_threshold
+            ),
+            "new_track_threshold": _float_setting(
+                source, "TRACKING_NEW_THRESHOLD", defaults.new_track_threshold
+            ),
+            "match_threshold": _float_setting(
+                source, "TRACKING_MATCH_THRESHOLD", defaults.match_threshold
+            ),
+            "track_buffer_seconds": _float_setting(
+                source, "TRACKING_BUFFER_SECONDS", defaults.track_buffer_seconds
+            ),
+            "max_identity_gap_seconds": _float_setting(
+                source, "TRACKING_MAX_IDENTITY_GAP_SECONDS", defaults.max_identity_gap_seconds
+            ),
+            "max_player_speed_mps": _float_setting(
+                source, "TRACKING_MAX_PLAYER_SPEED_MPS", defaults.max_player_speed_mps
+            ),
+            "minimum_identity_score": _float_setting(
+                source, "TRACKING_MINIMUM_IDENTITY_SCORE", defaults.minimum_identity_score
+            ),
+            "suspected_switch_score": _float_setting(
+                source, "TRACKING_SUSPECTED_SWITCH_SCORE", defaults.suspected_switch_score
+            ),
+            "appearance_weight": _float_setting(
+                source, "TRACKING_APPEARANCE_WEIGHT", defaults.appearance_weight
+            ),
+            "minimum_appearance_similarity": _float_setting(
+                source,
+                "TRACKING_MINIMUM_APPEARANCE_SIMILARITY",
+                defaults.minimum_appearance_similarity,
+            ),
+            "minimum_appearance_margin": _float_setting(
+                source,
+                "TRACKING_MINIMUM_APPEARANCE_MARGIN",
+                defaults.minimum_appearance_margin,
+            ),
+            "appearance_prototype_window_seconds": _float_setting(
+                source,
+                "TRACKING_APPEARANCE_PROTOTYPE_WINDOW_SECONDS",
+                defaults.appearance_prototype_window_seconds,
+            ),
+            "long_gap_appearance_similarity": _float_setting(
+                source,
+                "TRACKING_LONG_GAP_APPEARANCE_SIMILARITY",
+                defaults.long_gap_appearance_similarity,
+            ),
+            "long_gap_minimum_appearance_margin": _float_setting(
+                source,
+                "TRACKING_LONG_GAP_MINIMUM_APPEARANCE_MARGIN",
+                defaults.long_gap_minimum_appearance_margin,
+            ),
+        }
+        validations = (
+            (0 <= values["track_low_threshold"] <= 1, "TRACKING_LOW_THRESHOLD"),
+            (0 <= values["track_high_threshold"] <= 1, "TRACKING_HIGH_THRESHOLD"),
+            (0 <= values["new_track_threshold"] <= 1, "TRACKING_NEW_THRESHOLD"),
+            (0 <= values["match_threshold"] <= 1, "TRACKING_MATCH_THRESHOLD"),
+            (values["track_buffer_seconds"] > 0, "TRACKING_BUFFER_SECONDS"),
+            (values["max_identity_gap_seconds"] > 0, "TRACKING_MAX_IDENTITY_GAP_SECONDS"),
+            (values["max_player_speed_mps"] > 0, "TRACKING_MAX_PLAYER_SPEED_MPS"),
+            (0 <= values["minimum_identity_score"] <= 1, "TRACKING_MINIMUM_IDENTITY_SCORE"),
+            (0 <= values["suspected_switch_score"] <= 1, "TRACKING_SUSPECTED_SWITCH_SCORE"),
+            (0 <= values["appearance_weight"] <= 1, "TRACKING_APPEARANCE_WEIGHT"),
+            (
+                0 <= values["minimum_appearance_similarity"] <= 1,
+                "TRACKING_MINIMUM_APPEARANCE_SIMILARITY",
+            ),
+            (
+                -1 <= values["minimum_appearance_margin"] <= 1,
+                "TRACKING_MINIMUM_APPEARANCE_MARGIN",
+            ),
+            (
+                values["appearance_prototype_window_seconds"] > 0,
+                "TRACKING_APPEARANCE_PROTOTYPE_WINDOW_SECONDS",
+            ),
+            (
+                0 <= values["long_gap_appearance_similarity"] <= 1,
+                "TRACKING_LONG_GAP_APPEARANCE_SIMILARITY",
+            ),
+            (
+                -1 <= values["long_gap_minimum_appearance_margin"] <= 1,
+                "TRACKING_LONG_GAP_MINIMUM_APPEARANCE_MARGIN",
+            ),
+        )
+        for valid, suffix in validations:
+            if not valid:
+                setting = f"{ENV_PREFIX}{suffix}"
+                raise ConfigurationError(
+                    f"{setting} must be positive or between 0 and 1 as appropriate",
+                    setting=setting,
+                )
+        if values["track_low_threshold"] > values["track_high_threshold"]:
+            setting = f"{ENV_PREFIX}TRACKING_LOW_THRESHOLD"
+            raise ConfigurationError(
+                f"{setting} must not exceed {ENV_PREFIX}TRACKING_HIGH_THRESHOLD",
+                setting=setting,
+            )
+        return cls(**values)
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "track_high_threshold": self.track_high_threshold,
+            "track_low_threshold": self.track_low_threshold,
+            "new_track_threshold": self.new_track_threshold,
+            "match_threshold": self.match_threshold,
+            "track_buffer_seconds": self.track_buffer_seconds,
+            "max_identity_gap_seconds": self.max_identity_gap_seconds,
+            "max_player_speed_mps": self.max_player_speed_mps,
+            "minimum_identity_score": self.minimum_identity_score,
+            "suspected_switch_score": self.suspected_switch_score,
+            "appearance_weight": self.appearance_weight,
+            "minimum_appearance_similarity": self.minimum_appearance_similarity,
+            "minimum_appearance_margin": self.minimum_appearance_margin,
+            "appearance_prototype_window_seconds": self.appearance_prototype_window_seconds,
+            "long_gap_appearance_similarity": self.long_gap_appearance_similarity,
+            "long_gap_minimum_appearance_margin": self.long_gap_minimum_appearance_margin,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class Settings:
     """Validated settings loaded once at an executable boundary."""
 
@@ -292,6 +445,7 @@ class Settings:
     media: MediaSettings = field(default_factory=MediaSettings)
     person_detection: PersonDetectionSettings = field(default_factory=PersonDetectionSettings)
     player_isolation: PlayerIsolationSettings = field(default_factory=PlayerIsolationSettings)
+    player_tracking: PlayerTrackingSettings = field(default_factory=PlayerTrackingSettings)
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> Settings:
@@ -339,6 +493,7 @@ class Settings:
             media=MediaSettings.from_env(source),
             person_detection=PersonDetectionSettings.from_env(source),
             player_isolation=PlayerIsolationSettings.from_env(source),
+            player_tracking=PlayerTrackingSettings.from_env(source),
         )
 
     def public_values(self) -> dict[str, object]:
@@ -352,4 +507,5 @@ class Settings:
             "media": self.media.as_dict(),
             "person_detection": self.person_detection.as_dict(),
             "player_isolation": self.player_isolation.as_dict(),
+            "player_tracking": self.player_tracking.as_dict(),
         }

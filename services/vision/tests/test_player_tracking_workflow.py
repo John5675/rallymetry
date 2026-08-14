@@ -1,0 +1,185 @@
+import json
+from pathlib import Path
+
+import cv2
+
+from pickleball_vision.calibration import load_calibration
+from pickleball_vision.config import PlayerIsolationSettings, PlayerTrackingSettings
+from pickleball_vision.court import CourtPoint
+from pickleball_vision.person_detection import (
+    BoundingBox,
+    DetectorMetadata,
+    PersonDetection,
+    PersonDetectionRun,
+)
+from pickleball_vision.player_isolation import (
+    LOGICAL_PLAYER_ROLES,
+    LogicalPlayerAssignments,
+    ManualPlayerAssignment,
+    assess_ground_contact,
+    save_player_assignments,
+)
+from pickleball_vision.player_tracking import (
+    IndexedDetection,
+    RawTrackerObservation,
+    TrackerMetadata,
+)
+from pickleball_vision.player_tracking_workflow import track_players_in_video
+from pickleball_vision.video import inspect_video
+
+
+class _DeterministicTracker:
+    def __init__(self) -> None:
+        self._metadata = TrackerMetadata("test_tracker", "test", "test", "1", {})
+
+    @property
+    def metadata(self) -> TrackerMetadata:
+        return self._metadata
+
+    def update(
+        self,
+        *,
+        frame_number: int,
+        timestamp_s: float,
+        detections: tuple[IndexedDetection, ...],
+        frame_width_px: int,
+        frame_height_px: int,
+    ) -> tuple[RawTrackerObservation, ...]:
+        del frame_width_px, frame_height_px
+        return tuple(
+            RawTrackerObservation(
+                f"raw-{frame_number}-{item.raw_detection_index}",
+                item.raw_detection_index % 4 + 1,
+                item.raw_detection_index,
+                frame_number,
+                timestamp_s,
+                item.detection.bounding_box,
+                item.detection.confidence,
+                item.detection.confidence,
+            )
+            for item in detections
+        )
+
+
+def test_tracking_workflow_writes_separate_raw_and_logical_artifacts(
+    synthetic_video: Path,
+    synthetic_calibration: Path,
+    tmp_path: Path,
+) -> None:
+    source = inspect_video(synthetic_video)
+    calibration = load_calibration(synthetic_calibration)
+    points = (CourtPoint(1, 2), CourtPoint(5, 2), CourtPoint(1, 11), CourtPoint(5, 11))
+    detections: list[PersonDetection] = []
+    for frame_number in range(source.frame_count):
+        for point in points:
+            image = calibration.court_to_image(point)
+            detections.append(
+                PersonDetection(
+                    BoundingBox(
+                        image.x_px - 3,
+                        max(0, image.y_px - 10),
+                        image.x_px + 3,
+                        image.y_px,
+                    ),
+                    0.9,
+                    frame_number,
+                    frame_number / source.fps,
+                )
+            )
+    run = PersonDetectionRun(
+        "2026-08-14T00:00:00+00:00",
+        source,
+        str(synthetic_calibration),
+        calibration.schema_version,
+        DetectorMetadata("test", "test", "cpu", "test", "1"),
+        {},
+        tuple(detections),
+    )
+    detections_path = tmp_path / "detections.json"
+    detections_path.write_text(json.dumps(run.as_dict()), encoding="utf-8")
+    candidates_path = tmp_path / "candidates.json"
+    candidates_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "record_type": "primary_player_candidates",
+                "inputs": {"raw_person_detections": str(detections_path)},
+                "candidates": [
+                    {
+                        "candidate_id": f"candidate-{role_index}",
+                        "observations": [
+                            {"raw_detection": {"index": frame * 4 + role_index}}
+                            for frame in range(source.frame_count)
+                        ],
+                    }
+                    for role_index in range(4)
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    anchor_frame = 5
+    isolation_settings = PlayerIsolationSettings(min_candidate_observations=2)
+    assignments = LogicalPlayerAssignments(
+        "2026-08-14T00:00:00+00:00",
+        str(candidates_path),
+        str(detections_path),
+        tuple(
+            ManualPlayerAssignment(
+                role,
+                f"candidate-{index}",
+                anchor_frame * 4 + index,
+                anchor_frame,
+                anchor_frame / source.fps,
+                assess_ground_contact(
+                    detections[anchor_frame * 4 + index],
+                    calibration=calibration,
+                    frame_height_px=source.height,
+                    settings=isolation_settings,
+                ).side,
+            )
+            for index, role in enumerate(LOGICAL_PLAYER_ROLES)
+        ),
+    )
+    assignments_path = save_player_assignments(assignments, tmp_path / "assignments.json")
+    (tmp_path / "player-names.json").write_text(
+        json.dumps(
+            {
+                "ME": "John",
+                "PARTNER": "Denny",
+                "OPPONENT_1": "Oksana",
+                "OPPONENT_2": "Diana",
+            }
+        ),
+        encoding="utf-8",
+    )
+    original_detections = detections_path.read_bytes()
+
+    artifacts = track_players_in_video(
+        synthetic_video,
+        calibration_path=synthetic_calibration,
+        output_dir=tmp_path / "tracking",
+        tracking_settings=PlayerTrackingSettings(),
+        isolation_settings=isolation_settings,
+        detections_path=detections_path,
+        assignments_path=assignments_path,
+        tracker=_DeterministicTracker(),
+    )
+
+    assert detections_path.read_bytes() == original_detections
+    assert artifacts.tracks_path.is_file()
+    assert artifacts.annotated_video_path.is_file()
+    assert artifacts.summary_path.is_file()
+    tracks = json.loads(artifacts.tracks_path.read_text(encoding="utf-8"))
+    assert tracks["raw_tracker_layer"]["record_type"] == "raw_transient_tracker_observations"
+    assert set(tracks["logical_identity_layer"]) == {role.value for role in LOGICAL_PLAYER_ROLES}
+    assert tracks["player_names"]["ME"] == "John"
+    summary = json.loads(artifacts.summary_path.read_text(encoding="utf-8"))
+    assert summary["frames_processed"] == source.frame_count
+    assert summary["players"]["OPPONENT_1"]["display_name"] == "Oksana"
+    capture = cv2.VideoCapture(str(artifacts.annotated_video_path))
+    try:
+        assert capture.isOpened()
+        assert round(capture.get(cv2.CAP_PROP_FRAME_COUNT)) == source.frame_count
+    finally:
+        capture.release()
