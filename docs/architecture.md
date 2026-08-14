@@ -22,7 +22,8 @@ deferred until the vision pipeline is useful and measurable.
 The system should evolve around explicit, versioned records rather than an opaque
 end-to-end result:
 
-1. **Source metadata** describes a video and its time base without modifying it.
+1. **Source metadata** describes video plus optional synchronized audio streams and
+   their canonical source-media timeline without modifying the recording.
 2. **Calibration** records image-space court landmarks and plane transforms.
 3. **Observations** record model detections as produced, including confidence and
    provenance.

@@ -18,6 +18,10 @@ class ErrorCode(StrEnum):
     INTERNAL = "internal_error"
     INVALID_SAMPLE_COUNT = "invalid_sample_count"
     INVALID_TIMESTAMP = "invalid_timestamp"
+    MEDIA_INSPECTION = "media_inspection_error"
+    AUDIO_STREAM_NOT_FOUND = "audio_stream_not_found"
+    AUDIO_EXTRACTION = "audio_extraction_error"
+    AUDIO_CONVERSION_INVALID = "audio_conversion_invalid"
     OUTPUT_WRITE = "output_write_error"
     PLAYER_ASSIGNMENT_IO = "player_assignment_io_error"
     PLAYER_ISOLATION_CANCELLED = "player_isolation_cancelled"
@@ -70,6 +74,50 @@ class VideoUnreadableError(PickleballVisionError):
         super().__init__(
             f"Unable to read video {path}: {reason}",
             code=ErrorCode.VIDEO_UNREADABLE,
+            details={"path": path, "reason": reason},
+        )
+
+
+class MediaInspectionError(PickleballVisionError):
+    """Raised when the FFmpeg media boundary cannot inspect source streams."""
+
+    def __init__(self, path: str, *, reason: str) -> None:
+        super().__init__(
+            f"Unable to inspect media streams in {path}: {reason}",
+            code=ErrorCode.MEDIA_INSPECTION,
+            details={"path": path, "reason": reason},
+        )
+
+
+class AudioStreamNotFoundError(PickleballVisionError):
+    """Raised when audio is requested from valid video-only media."""
+
+    def __init__(self, path: str) -> None:
+        super().__init__(
+            f"Media file has no audio stream: {path}",
+            code=ErrorCode.AUDIO_STREAM_NOT_FOUND,
+            details={"path": path},
+        )
+
+
+class InvalidAudioConversionError(PickleballVisionError):
+    """Raised when an explicit audio conversion request is unsupported."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Invalid audio conversion: {reason}",
+            code=ErrorCode.AUDIO_CONVERSION_INVALID,
+            details={"reason": reason},
+        )
+
+
+class AudioExtractionError(PickleballVisionError):
+    """Raised when synchronized PCM audio cannot be extracted or recorded."""
+
+    def __init__(self, path: str, *, reason: str) -> None:
+        super().__init__(
+            f"Unable to extract audio to {path}: {reason}",
+            code=ErrorCode.AUDIO_EXTRACTION,
             details={"path": path, "reason": reason},
         )
 

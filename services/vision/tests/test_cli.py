@@ -22,6 +22,7 @@ def _clear_settings(monkeypatch: pytest.MonkeyPatch) -> None:
         "LOG_LEVEL",
         "LOG_FORMAT",
         "OUTPUT_DIR",
+        "AUDIO_VIDEO_OFFSET_MS",
         "PERSON_MODEL",
         "PERSON_DEVICE",
         "PERSON_MIN_CONFIDENCE",
@@ -101,7 +102,79 @@ def test_inspect_command_outputs_video_metadata(
     assert report["frame_count"] == 12
     assert report["duration"] == pytest.approx(1.6)
     assert "codec" in report
+    assert report["hasAudio"] is False
+    assert report["audioCodec"] is None
+    assert report["audioSampleRate"] is None
+    assert report["audioChannels"] is None
+    assert report["audioDuration"] is None
+    assert report["audioStartTime"] is None
+    assert "videoStartTime" in report
+    assert report["audioVideoOffsetMs"] == 0.0
     assert log_record["event"] == "video_inspected"
+
+
+def test_inspect_and_extract_audio_commands_report_synchronized_metadata(
+    synthetic_media_with_audio: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _clear_settings(monkeypatch)
+    monkeypatch.setenv("PICKLEBALL_VISION_AUDIO_VIDEO_OFFSET_MS", "25")
+
+    inspect_exit = main(["inspect", str(synthetic_media_with_audio)])
+    inspect_capture = capsys.readouterr()
+    inspect_report = json.loads(inspect_capture.out)
+    assert inspect_exit == EXIT_OK
+    assert inspect_report["hasAudio"] is True
+    assert inspect_report["audioSampleRate"] == 48000
+    assert inspect_report["audioChannels"] == 1
+    assert inspect_report["audioVideoOffsetMs"] == 25.0
+
+    output = tmp_path / "audio" / "analysis.wav"
+    extract_exit = main(
+        [
+            "extract-audio",
+            str(synthetic_media_with_audio),
+            "--output",
+            str(output),
+            "--sample-rate",
+            "24000",
+            "--channels",
+            "2",
+        ]
+    )
+    extract_capture = capsys.readouterr()
+    extract_report = json.loads(extract_capture.out)
+    assert extract_exit == EXIT_OK
+    assert output.is_file()
+    assert Path(extract_report["metadataPath"]).is_file()
+    assert extract_report["analysisAudio"]["sampleRate"] == 24000
+    assert extract_report["analysisAudio"]["channels"] == 2
+    assert extract_report["timeline"]["audioVideoOffsetMs"] == 25.0
+
+
+def test_extract_audio_command_reports_video_without_audio(
+    synthetic_video: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _clear_settings(monkeypatch)
+
+    exit_code = main(
+        [
+            "extract-audio",
+            str(synthetic_video),
+            "--output",
+            str(tmp_path / "audio.wav"),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    assert exit_code == EXIT_USAGE_ERROR
+    assert captured.out == ""
+    assert "error [audio_stream_not_found]" in captured.err
 
 
 def test_extract_frame_command_writes_requested_image(

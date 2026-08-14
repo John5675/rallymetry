@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import os
 import re
 from collections.abc import Mapping
@@ -29,6 +30,29 @@ class LogFormat(StrEnum):
 
     JSON = "json"
     CONSOLE = "console"
+
+
+@dataclass(frozen=True, slots=True)
+class MediaSettings:
+    """Canonical media-timeline settings shared by future A/V fusion stages."""
+
+    audio_video_offset_ms: float = 0.0
+
+    @classmethod
+    def from_env(cls, environ: Mapping[str, str] | None = None) -> MediaSettings:
+        """Load the configured correction applied to audio timestamps."""
+
+        source = os.environ if environ is None else environ
+        offset_ms = _float_setting(source, "AUDIO_VIDEO_OFFSET_MS", cls().audio_video_offset_ms)
+        if not math.isfinite(offset_ms):
+            setting = f"{ENV_PREFIX}AUDIO_VIDEO_OFFSET_MS"
+            raise ConfigurationError(f"{setting} must be finite", setting=setting)
+        return cls(audio_video_offset_ms=offset_ms)
+
+    def as_dict(self) -> dict[str, object]:
+        """Return non-secret timing configuration for provenance."""
+
+        return {"audioVideoOffsetMs": self.audio_video_offset_ms}
 
 
 def _float_setting(source: Mapping[str, str], suffix: str, default: float) -> float:
@@ -265,6 +289,7 @@ class Settings:
     log_level: str = "INFO"
     log_format: LogFormat = LogFormat.JSON
     output_dir: Path = Path("output")
+    media: MediaSettings = field(default_factory=MediaSettings)
     person_detection: PersonDetectionSettings = field(default_factory=PersonDetectionSettings)
     player_isolation: PlayerIsolationSettings = field(default_factory=PlayerIsolationSettings)
 
@@ -311,6 +336,7 @@ class Settings:
             log_level=log_level,
             log_format=log_format,
             output_dir=Path(output_dir_raw).expanduser(),
+            media=MediaSettings.from_env(source),
             person_detection=PersonDetectionSettings.from_env(source),
             player_isolation=PlayerIsolationSettings.from_env(source),
         )
@@ -323,6 +349,7 @@ class Settings:
             "log_level": self.log_level,
             "log_format": self.log_format.value,
             "output_dir": str(self.output_dir),
+            "media": self.media.as_dict(),
             "person_detection": self.person_detection.as_dict(),
             "player_isolation": self.player_isolation.as_dict(),
         }

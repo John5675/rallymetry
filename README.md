@@ -5,10 +5,11 @@ doubles pickleball matches into inspectable, structured match data. The long-ter
 goal includes court and player tracking, ball trajectories, rally and shot events,
 match analytics, and AI-assisted coaching.
 
-The current milestone is **Primary-player isolation**. The local CLI can inspect
-video, calibrate the court, detect people broadly, derive court-aware candidates,
-and manually assign the four logical match roles. Raw person detections remain
-unchanged, and full persistent identity tracking is deliberately deferred.
+The current milestone is the **Audio-aware media foundation retrofit**. The local
+CLI can inspect video plus optional synchronized audio, extract lossless analysis
+audio, calibrate the court, detect people broadly, derive court-aware candidates,
+and manually assign the four logical match roles. Raw observations remain separate
+from derived events, and full persistent identity tracking is deliberately deferred.
 
 ## Repository map
 
@@ -29,6 +30,9 @@ only after the local computer-vision pipeline is proven.
 - Python 3.11 or newer
 - [uv](https://docs.astral.sh/uv/) (recommended)
 
+The locked Python environment supplies the FFmpeg libraries and extraction binary;
+a separate system FFmpeg installation is not required.
+
 ## Set up the vision service
 
 From the repository root:
@@ -48,6 +52,8 @@ Inspect and extract from a local video:
 
 ```bash
 uv run pickleball-vision inspect /absolute/path/to/match.mp4
+uv run pickleball-vision extract-audio /absolute/path/to/match.mp4 \
+  --output ../../output/match-audio.wav
 uv run pickleball-vision extract-frame /absolute/path/to/match.mp4 \
   --timestamp 30.5 \
   --output ../../output/frame-at-30.5s.jpg
@@ -71,6 +77,18 @@ Command results are emitted as JSON on standard output. Diagnostic structured
 logs go to standard error. Video inputs keep their local provenance; do not put a
 private URL in the repository or CLI command history.
 
+`inspect` includes optional audio codec/rate/channel/duration and available stream
+start times. `extract-audio` preserves source rate and channels by default, writes
+PCM WAV, and records conversion and sample-to-source-time mapping in
+`match-audio.wav.metadata.json`. Explicit conversion is available when needed:
+
+```bash
+uv run pickleball-vision extract-audio /absolute/path/to/match.mp4 \
+  --output ../../output/match-audio-mono-16khz.wav \
+  --sample-rate 16000 \
+  --channels 1
+```
+
 The calibration command opens a local window for named court-landmark clicks and
 writes `calibration.json`, `calibration-overlay.jpg`, and `court-topdown.jpg`.
 See [the manual calibration guide](docs/court-calibration.md) for controls and
@@ -84,6 +102,10 @@ PICKLEBALL_VISION_LOG_FORMAT=console \
 PICKLEBALL_VISION_OUTPUT_DIR=../../output \
 uv run pickleball-vision doctor
 ```
+
+Set `PICKLEBALL_VISION_AUDIO_VIDEO_OFFSET_MS` to a finite positive or negative
+correction when measured evidence shows a source A/V offset; its default is zero.
+See [the media timeline contract](docs/media-timeline.md).
 
 Person inference is configured with `PERSON_MODEL`, `PERSON_DEVICE`,
 `PERSON_MIN_CONFIDENCE`, `PERSON_IMAGE_SIZE`, `PERSON_IOU_THRESHOLD`, and

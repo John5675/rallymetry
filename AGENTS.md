@@ -22,6 +22,20 @@ and the relevant design document before changing code.
 - LLMs must never invent match statistics.
 - Analytics should operate on structured match data rather than raw model
   outputs.
+- Audio is optional.
+- The vision pipeline must work when audio is missing.
+- Preserve audio/video synchronization.
+- Keep raw audio observations separate from semantic pickleball events.
+- Never infer a paddle contact or bounce solely from an audio transient.
+- Neighboring courts may create unrelated pickleball sounds.
+- Audio may increase or decrease confidence in a visually plausible event.
+- Audio should not override contradictory visual evidence.
+- Preserve original source media.
+- Do not destructively modify source recordings.
+- Preserve original channel information where practical.
+- Record any resampling/channel conversion performed for analysis.
+- Event fusion must support a configurable A/V timing offset and tolerance.
+- All audio-dependent downstream stages must support a vision-only fallback.
 - Videos, private YouTube URLs, secrets, large datasets, and trained model weights
   must not be committed.
 - Add or update tests for behavior-changing work.

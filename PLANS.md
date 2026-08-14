@@ -99,7 +99,7 @@ Exit criteria:
 - No primary-player isolation, tracking, player-position estimation, ball
   detection, or product-service behavior is implemented.
 
-## 4. Primary-player isolation — current
+## 4. Primary-player isolation — complete
 
 Derive court-aware person candidates from raw detections without mutating detector
 output or assuming that confidence identifies match participants. Use estimated
@@ -131,6 +131,31 @@ Exit criteria:
 - No full persistent tracking, player movement analytics, ball detection, or later
   product behavior is implemented.
 
+## 4A. Audio-aware media foundation retrofit — current
+
+Extend local media ingestion with optional synchronized-audio metadata, a canonical
+source-media timeline, and lossless analysis-audio extraction without coupling raw
+audio to computer-vision observations or semantic pickleball events.
+
+Exit criteria:
+
+- Existing OpenCV video ingestion and all completed CV milestones remain compatible.
+- `pickleball-vision inspect` retains its existing video fields and adds audio
+  presence, codec, sample rate, channels, duration, and available stream start times.
+- FFmpeg-specific probing and extraction details remain behind a reusable media
+  boundary rather than leaking into CV or domain-event code.
+- `pickleball-vision extract-audio` writes synchronized PCM WAV without changing the
+  source; source rate and channels are preserved unless conversion is explicit.
+- A durable sidecar records source/output audio properties, conversion details,
+  source-time mapping, and the configured `audioVideoOffsetMs`.
+- Audio-free video remains a supported vision input and produces a useful typed
+  error only when audio extraction is explicitly requested.
+- Synthetic tests cover A/V media, video-only media, invalid media, stream parsing,
+  extraction, duration consistency, timestamp conversion, and non-zero A/V offset.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- No audio-event detection, bounce/contact fusion, or later milestone is implemented.
+
 ## Future milestones — not current
 
 5. Persistent player tracking
@@ -138,18 +163,20 @@ Exit criteria:
 7. Ball dataset tooling
 8. Ball detector
 9. Ball trajectory reconstruction
-10. Rally annotation
-11. Rally segmentation
-12. Bounce detection
-13. Contact detection
-14. Hitter identification
-15. Shot classification
-16. Analytics engine
-17. Backend productization
-18. Async processing
-19. Web dashboard
-20. Human correction
-21. AI coach
+10. Audio event extraction
+11. Manual event annotation
+12. Rally segmentation
+13. Multimodal bounce detection
+14. Multimodal contact detection
+15. Hitter identification
+16. Shot reconstruction/classification
+17. Analytics
+18. Backend
+19. Async processing
+20. Web dashboard
+21. Human corrections
+22. AI coach
+23. Final audit
 
 Moving a milestone to current should add measurable entry and exit criteria while
 preserving completed milestone history. Do not bundle later milestones into the

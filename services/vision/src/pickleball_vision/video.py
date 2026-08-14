@@ -178,6 +178,22 @@ def _read_frame(capture: cv2.VideoCapture, metadata: VideoMetadata, frame_index:
     except cv2.error as error:
         raise FrameDecodeError(str(metadata.path), frame_index=frame_index) from error
 
+    # Some inter-frame codecs cannot satisfy a random seek very near the end of
+    # a file even though sequential decoding reaches the requested frame. Retry
+    # from roughly one second earlier so OpenCV can decode through a preceding
+    # keyframe while still returning the exact requested source frame.
+    if not success or decoded_frame is None:
+        fallback_index = max(0, frame_index - math.ceil(metadata.fps))
+        if fallback_index < frame_index:
+            capture.set(cv2.CAP_PROP_POS_FRAMES, float(fallback_index))
+            try:
+                for _ in range(fallback_index, frame_index + 1):
+                    success, decoded_frame = capture.read()
+                    if not success or decoded_frame is None:
+                        break
+            except cv2.error as error:
+                raise FrameDecodeError(str(metadata.path), frame_index=frame_index) from error
+
     if not success or decoded_frame is None:
         raise FrameDecodeError(str(metadata.path), frame_index=frame_index)
 

@@ -15,9 +15,15 @@ from pickleball_vision.calibration_workflow import calibrate_video
 from pickleball_vision.config import Settings
 from pickleball_vision.errors import ErrorCode, PickleballVisionError
 from pickleball_vision.logging import configure_logging
+from pickleball_vision.media import (
+    AudioExtractionOptions,
+    MediaTimeline,
+    extract_audio,
+    inspect_media,
+)
 from pickleball_vision.person_detection_pipeline import detect_people_in_video
 from pickleball_vision.player_isolation_workflow import isolate_primary_players
-from pickleball_vision.video import extract_frame, inspect_video, sample_frames
+from pickleball_vision.video import extract_frame, sample_frames
 
 EXIT_OK = 0
 EXIT_INTERNAL_ERROR = 1
@@ -60,6 +66,29 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         required=True,
         help="output image path (.jpg, .png, .webp, .bmp, or .tiff)",
+    )
+
+    extract_audio_parser = subparsers.add_parser(
+        "extract-audio",
+        help="extract synchronized lossless PCM WAV analysis audio",
+    )
+    extract_audio_parser.add_argument("video", type=Path, help="path to a local video file")
+    extract_audio_parser.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+        help="output PCM WAV path; a .metadata.json timing sidecar is also written",
+    )
+    extract_audio_parser.add_argument(
+        "--sample-rate",
+        type=int,
+        help="optional explicit output sample rate in Hz (source rate is preserved by default)",
+    )
+    extract_audio_parser.add_argument(
+        "--channels",
+        type=int,
+        choices=(1, 2),
+        help="optional explicit mono/stereo conversion (source channels are preserved by default)",
     )
 
     sample_parser = subparsers.add_parser(
@@ -173,11 +202,20 @@ def _print_json(value: object) -> None:
     print(json.dumps(value, sort_keys=True))
 
 
-def _run_inspect(video_path: Path) -> int:
-    metadata = inspect_video(video_path)
+def _media_timeline(settings: Settings) -> MediaTimeline:
+    return MediaTimeline(audio_video_offset_ms=settings.media.audio_video_offset_ms)
+
+
+def _run_inspect(video_path: Path, *, settings: Settings) -> int:
+    metadata = inspect_media(video_path, timeline=_media_timeline(settings))
     logging.getLogger("pickleball_vision.cli").info(
         "video_inspected",
-        extra={"context": {"path": str(metadata.path)}},
+        extra={
+            "context": {
+                "path": str(metadata.video.path),
+                "has_audio": metadata.audio is not None,
+            }
+        },
     )
     _print_json(metadata.as_dict())
     return EXIT_OK
@@ -206,6 +244,35 @@ def _run_extract_frame(video_path: Path, *, timestamp: float, output_path: Path)
             "frame": artifact.as_dict(),
         }
     )
+    return EXIT_OK
+
+
+def _run_extract_audio(
+    video_path: Path,
+    *,
+    output_path: Path,
+    sample_rate_hz: int | None,
+    channels: int | None,
+    settings: Settings,
+) -> int:
+    artifact = extract_audio(
+        video_path,
+        output_path=output_path,
+        options=AudioExtractionOptions(sample_rate_hz=sample_rate_hz, channels=channels),
+        timeline=_media_timeline(settings),
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "audio_extracted",
+        extra={
+            "context": {
+                "video": str(artifact.source_path),
+                "output_path": str(artifact.output_path),
+                "sample_rate_hz": artifact.output_audio.sample_rate_hz,
+                "channels": artifact.output_audio.channels,
+            }
+        },
+    )
+    _print_json(artifact.as_dict())
     return EXIT_OK
 
 
@@ -341,12 +408,20 @@ def main(argv: Sequence[str] | None = None) -> int:
         if args.command == "doctor":
             return _run_doctor(settings)
         if args.command == "inspect":
-            return _run_inspect(cast(Path, args.video))
+            return _run_inspect(cast(Path, args.video), settings=settings)
         if args.command == "extract-frame":
             return _run_extract_frame(
                 cast(Path, args.video),
                 timestamp=cast(float, args.timestamp),
                 output_path=cast(Path, args.output),
+            )
+        if args.command == "extract-audio":
+            return _run_extract_audio(
+                cast(Path, args.video),
+                output_path=cast(Path, args.output),
+                sample_rate_hz=cast(int | None, args.sample_rate),
+                channels=cast(int | None, args.channels),
+                settings=settings,
             )
         if args.command == "sample-frames":
             return _run_sample_frames(

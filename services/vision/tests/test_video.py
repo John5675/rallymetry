@@ -1,5 +1,6 @@
 import math
 from pathlib import Path
+from typing import cast
 
 import cv2
 import numpy as np
@@ -13,6 +14,8 @@ from pickleball_vision.errors import (
     VideoUnreadableError,
 )
 from pickleball_vision.video import (
+    VideoMetadata,
+    _read_frame,
     decode_video_frame,
     extract_frame,
     inspect_video,
@@ -143,3 +146,46 @@ def test_sample_frames_writes_full_resolution_images_across_source(
     assert all(artifact.output_path.is_file() for artifact in artifacts)
     assert all(artifact.width == SYNTHETIC_WIDTH for artifact in artifacts)
     assert all(artifact.height == SYNTHETIC_HEIGHT for artifact in artifacts)
+
+
+def test_random_frame_read_retries_sequentially_from_an_earlier_keyframe(
+    tmp_path: Path,
+) -> None:
+    target_index = 11
+
+    class SeekSensitiveCapture:
+        def __init__(self) -> None:
+            self.position = 0
+            self.fail_next_read = False
+
+        def set(self, _property_id: int, value: float) -> bool:
+            self.position = int(value)
+            self.fail_next_read = self.position == target_index
+            return True
+
+        def read(self) -> tuple[bool, np.ndarray | None]:
+            if self.fail_next_read:
+                self.fail_next_read = False
+                return False, None
+            frame_index = self.position
+            self.position += 1
+            return True, np.full((2, 2, 3), frame_index, dtype=np.uint8)
+
+    metadata = VideoMetadata(
+        filename="seek-sensitive.mp4",
+        path=tmp_path / "seek-sensitive.mp4",
+        width=2,
+        height=2,
+        fps=7.5,
+        frame_count=12,
+        duration=1.6,
+        codec="h264",
+    )
+
+    frame = _read_frame(
+        cast(cv2.VideoCapture, SeekSensitiveCapture()),
+        metadata,
+        target_index,
+    )
+
+    assert np.all(frame == target_index)

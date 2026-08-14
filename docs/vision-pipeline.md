@@ -1,20 +1,21 @@
 # Vision Pipeline Contract
 
 This document describes stable stage boundaries. A stage may be introduced only
-when its matching milestone is current. Video ingestion, manual court calibration,
-broad person detection, and primary-player isolation are currently implemented;
-all later stages remain contracts only.
+when its matching milestone is current. Audio-aware media ingestion, manual court
+calibration, broad person detection, and primary-player isolation are currently
+implemented; all later stages remain contracts only.
 
 ## Intended flow
 
 ```text
-video metadata
+source media metadata (video + optional audio)
   -> court calibration
   -> person and ball observations
   -> primary-player isolation
   -> persistent player tracks
   -> observed/interpolated ball track segments
-  -> rally, bounce, contact, hitter, and shot events
+  -> optional raw audio observations
+  -> rally and multimodal bounce/contact/hitter/shot events
   -> structured match data
   -> analytics
 ```
@@ -26,16 +27,54 @@ object-store download, or a separately performed download from an unlisted
 source—is outside the vision service. Private source URLs and credentials never
 enter pipeline output or source control.
 
-Video metadata records the resolved path, pixel dimensions, OpenCV-reported FPS
-as a floating-point value, frame count, duration in seconds, and codec FourCC when
-available. Duration is `frame_count / fps`; it is an OpenCV/container estimate,
-not a promise of constant-frame-rate presentation timestamps.
+Media metadata records the resolved path, pixel dimensions, OpenCV-reported FPS as
+a floating-point value, frame count, duration in seconds, and codec FourCC when
+available. It combines those decoded-video facts with FFmpeg-reported audio
+presence, codec, rate, channels, duration, and available audio/video stream start
+times. Audio is optional and no CV stage may require it.
+
+Duration reported in the existing `duration` field remains `frame_count / fps`; it
+is an OpenCV/container estimate, not a promise of constant-frame-rate presentation
+timestamps. `audioDuration` uses the audio-stream duration when available and the
+container duration as a metadata fallback.
 
 Timestamp extraction maps a valid timestamp in `[0, duration)` to the containing
 zero-based frame index using the reported FPS. Frames are decoded and written at
 their source pixel dimensions. Uniform sampling selects unique indices over the
 inclusive range from the first to the last frame; a one-frame sample uses the
 middle frame.
+
+## Canonical media timeline contract
+
+The canonical timeline is source-media presentation time in seconds. Existing
+video frame timestamps remain relative to the first decoded video frame and map as:
+
+```text
+mediaTime = (videoStartTime or 0) + videoFrameTimestamp
+```
+
+Extracted WAV sample timestamps are zero-based (`sampleIndex / sampleRate`). They
+map back to source-media time as:
+
+```text
+mediaTime = (audioStartTime or 0)
+          + sampleIndex / sampleRate
+          + audioVideoOffsetMs / 1000
+```
+
+`audioVideoOffsetMs` defaults to zero and is a configured correction for downstream
+fusion; stream start times remain separately visible evidence. A positive offset
+makes an audio observation later on the canonical timeline. Every future fusion
+stage must also use an explicit timing tolerance and provide a vision-only fallback.
+
+Audio extraction decodes the selected source stream into PCM WAV, preserves source
+sample rate and channels by default, and never rewrites the source recording.
+Explicit rate/channel conversion is allowed and recorded. The adjacent
+`.wav.metadata.json` sidecar stores source and analysis stream properties,
+conversion flags, backend provenance, and the sample-to-source-time mapping. Raw
+audio timestamp discontinuities are normalized in the WAV with inserted/dropped
+samples and that operation is recorded. Raw audio and later raw audio observations
+are evidence, not bounce/contact events.
 
 ## Court calibration contract
 
