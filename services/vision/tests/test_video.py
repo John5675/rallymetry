@@ -7,6 +7,7 @@ import numpy as np
 import pytest
 
 from pickleball_vision.errors import (
+    InvalidFrameIndexError,
     InvalidSampleCountError,
     InvalidTimestampError,
     OutputWriteError,
@@ -19,6 +20,7 @@ from pickleball_vision.video import (
     decode_video_frame,
     extract_frame,
     inspect_video,
+    iter_selected_video_frames,
     iter_video_frames,
     sample_frame_indices,
     sample_frames,
@@ -94,6 +96,18 @@ def test_iter_video_frames_decodes_every_frame_with_non_integer_fps(
     assert tuple(frame.frame_index for frame in frames) == tuple(range(SYNTHETIC_FRAME_COUNT))
     assert frames[-1].timestamp == pytest.approx((SYNTHETIC_FRAME_COUNT - 1) / SYNTHETIC_FPS)
     assert all(frame.image.shape[:2] == (SYNTHETIC_HEIGHT, SYNTHETIC_WIDTH) for frame in frames)
+
+
+def test_iter_selected_video_frames_decodes_sorted_unique_indices(
+    synthetic_video: Path,
+) -> None:
+    frames = tuple(iter_selected_video_frames(synthetic_video, (0, 5, 11)))
+
+    assert tuple(frame.frame_index for frame in frames) == (0, 5, 11)
+    with pytest.raises(InvalidFrameIndexError, match="sorted and unique"):
+        tuple(iter_selected_video_frames(synthetic_video, (5, 0)))
+    with pytest.raises(InvalidFrameIndexError, match="must be in"):
+        tuple(iter_selected_video_frames(synthetic_video, (12,)))
 
 
 @pytest.mark.parametrize("timestamp", [-0.1, math.nan, 1.6, math.inf])

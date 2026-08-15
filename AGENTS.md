@@ -22,6 +22,11 @@ and the relevant design document before changing code.
 - LLMs must never invent match statistics.
 - Analytics should operate on structured match data rather than raw model
   outputs.
+- Never split individual neighboring video frames randomly across dataset
+  partitions. Split by whole video, explicit clip, or rally/group.
+- An unlabeled dataset frame is not a negative example.
+- A visible neighboring-court pickleball remains a pickleball annotation with
+  explicit scope; do not turn it into a visual negative.
 - Audio is optional.
 - The vision pipeline must work when audio is missing.
 - Preserve audio/video synchronization.

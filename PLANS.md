@@ -192,7 +192,7 @@ Exit criteria:
 - No player movement analytics, ball tracking, or audio-event analysis is
   implemented.
 
-## 6. Player court-position analytics — current (Release 0.1)
+## 6. Player court-position analytics — complete (Release 0.1)
 
 Derive inspectable player ground trajectories and aggregate movement/position
 analytics from the four logical tracking records. Preserve raw image ground points
@@ -225,9 +225,39 @@ Exit criteria:
 - Release 0.1 stops at player position analytics. No ball tracking, audio-event
   analysis, rally inference, or product-service behavior is implemented.
 
+## 7. Ball dataset tooling — current
+
+Create inspectable, model-free tooling for extracting ball-annotation frames and
+clips from local source videos, preserving source/frame provenance, organizing
+positive/negative/unlabeled examples, and assigning leakage-safe dataset splits.
+
+Exit criteria:
+
+- `pickleball-vision dataset extract-frames <video> --output-dir <dir> --every
+  <frames>` extracts full-resolution frames at a deterministic cadence.
+- Random sampling is reproducible from an explicit seed and time-range bounds are
+  validated against the source duration.
+- Named clip ranges can scope frame extraction and produce source-preserving clip
+  artifacts without modifying the original recording.
+- A versioned dataset manifest records source metadata, content identity, selection
+  method, frame indices, timestamps, clip/rally groups, label group, and relative
+  artifact paths.
+- Extracted examples are organized as `positive`, `negative`, or `unlabeled` without
+  claiming that a bright object is a pickleball.
+- Split tooling assigns whole videos, clips, or rally/groups to train, validation,
+  and test; frames from the same selected unit can never cross splits.
+- Annotation guidance defines visible, partial, blurred, ambiguous,
+  neighboring-court, fully occluded, and multiple-ball behavior.
+- Synthetic tests cover cadence/random/range/clip extraction, metadata and grouping,
+  validation failures, deterministic split assignment, and neighboring-frame
+  leakage prevention.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- No ball detector training, inference, trajectory reconstruction, or pickleball
+  event inference is implemented.
+
 ## Future milestones — not current
 
-7. Ball dataset tooling
 8. Ball detector
 9. Ball trajectory reconstruction
 10. Audio event extraction

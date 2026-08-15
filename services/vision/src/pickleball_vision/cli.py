@@ -13,6 +13,16 @@ from typing import cast
 from pickleball_vision import __version__
 from pickleball_vision.calibration_workflow import calibrate_video
 from pickleball_vision.config import Settings
+from pickleball_vision.dataset import (
+    DatasetLabelGroup,
+    FrameSelectionSettings,
+    SplitRatios,
+    SplitUnit,
+)
+from pickleball_vision.dataset_workflow import (
+    extract_ball_dataset_frames,
+    split_ball_dataset,
+)
 from pickleball_vision.errors import ErrorCode, PickleballVisionError
 from pickleball_vision.logging import configure_logging
 from pickleball_vision.media import (
@@ -251,6 +261,98 @@ def build_parser() -> argparse.ArgumentParser:
             "player-position-corrections.json beside tracks.json when present"
         ),
     )
+
+    dataset_parser = subparsers.add_parser(
+        "dataset",
+        help="extract and split local ball-annotation datasets without training a model",
+    )
+    dataset_subparsers = dataset_parser.add_subparsers(dest="dataset_command")
+    dataset_extract_parser = dataset_subparsers.add_parser(
+        "extract-frames",
+        help="extract source-resolution frames with dataset provenance",
+    )
+    dataset_extract_parser.add_argument("video", type=Path, help="path to a local video file")
+    dataset_extract_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=True,
+        help="new dataset run directory for images, clips, and dataset-manifest.json",
+    )
+    sampling_group = dataset_extract_parser.add_mutually_exclusive_group(required=True)
+    sampling_group.add_argument(
+        "--every",
+        dest="every_frames",
+        type=int,
+        help="extract the first eligible frame and then every N source frames",
+    )
+    sampling_group.add_argument(
+        "--random-count",
+        type=int,
+        help="extract N unique eligible frames using the configured seed",
+    )
+    dataset_extract_parser.add_argument(
+        "--seed",
+        type=int,
+        default=0,
+        help="random sampling seed (default: 0)",
+    )
+    dataset_extract_parser.add_argument(
+        "--start-time",
+        type=float,
+        help="inclusive source-video start time in seconds (default: 0)",
+    )
+    dataset_extract_parser.add_argument(
+        "--end-time",
+        type=float,
+        help="exclusive source-video end time in seconds (default: source duration)",
+    )
+    dataset_extract_parser.add_argument(
+        "--clips",
+        type=Path,
+        help="named clip/group JSON; cannot be combined with start/end time",
+    )
+    dataset_extract_parser.add_argument(
+        "--write-clips",
+        action="store_true",
+        help="also write lossless synchronized MKV review clips for selected ranges",
+    )
+    dataset_extract_parser.add_argument(
+        "--label-group",
+        choices=tuple(group.value for group in DatasetLabelGroup),
+        default=DatasetLabelGroup.UNLABELED.value,
+        help="default human-curation bucket for extracted frames",
+    )
+    dataset_extract_parser.add_argument(
+        "--group-id",
+        help="optional rally/group ID used as an indivisible split unit",
+    )
+
+    dataset_split_parser = dataset_subparsers.add_parser(
+        "split",
+        help="assign whole videos, clips, or groups to leakage-safe dataset splits",
+    )
+    dataset_split_parser.add_argument(
+        "manifests",
+        type=Path,
+        nargs="+",
+        help="one or more dataset-manifest.json files",
+    )
+    dataset_split_parser.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+        help="output split-assignment JSON path",
+    )
+    dataset_split_parser.add_argument(
+        "--by",
+        choices=tuple(unit.value for unit in SplitUnit),
+        default=SplitUnit.VIDEO.value,
+        help="indivisible split unit (default: video)",
+    )
+    dataset_split_parser.add_argument("--train", type=float, default=0.70)
+    dataset_split_parser.add_argument("--validation", type=float, default=0.15)
+    dataset_split_parser.add_argument("--test", type=float, default=0.15)
+    dataset_split_parser.add_argument("--seed", type=int, default=0)
     return parser
 
 
@@ -533,6 +635,87 @@ def _run_analyze_players(
     return EXIT_OK
 
 
+def _run_dataset_extract_frames(
+    video_path: Path,
+    *,
+    output_dir: Path,
+    every_frames: int | None,
+    random_count: int | None,
+    random_seed: int,
+    start_time_s: float | None,
+    end_time_s: float | None,
+    clips_path: Path | None,
+    write_clips: bool,
+    label_group: str,
+    group_id: str | None,
+    settings: Settings,
+) -> int:
+    artifacts = extract_ball_dataset_frames(
+        video_path,
+        output_dir=output_dir,
+        selection=FrameSelectionSettings(
+            every_frames=every_frames,
+            random_count=random_count,
+            random_seed=random_seed,
+        ),
+        label_group=DatasetLabelGroup(label_group),
+        start_time_s=start_time_s,
+        end_time_s=end_time_s,
+        clip_definitions_path=clips_path,
+        group_id=group_id,
+        write_clips=write_clips,
+        timeline=_media_timeline(settings),
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "ball_dataset_frames_extracted",
+        extra={
+            "context": {
+                "video": str(video_path.expanduser().resolve()),
+                "frame_count": artifacts.frame_count,
+                "written_clip_count": artifacts.written_clip_count,
+                "output_dir": str(artifacts.output_dir),
+            }
+        },
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
+def _run_dataset_split(
+    manifest_paths: tuple[Path, ...],
+    *,
+    output_path: Path,
+    split_by: str,
+    train_ratio: float,
+    validation_ratio: float,
+    test_ratio: float,
+    random_seed: int,
+) -> int:
+    artifact = split_ball_dataset(
+        manifest_paths,
+        output_path=output_path,
+        split_by=SplitUnit(split_by),
+        ratios=SplitRatios(
+            train=train_ratio,
+            validation=validation_ratio,
+            test=test_ratio,
+        ),
+        random_seed=random_seed,
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "ball_dataset_split_created",
+        extra={
+            "context": {
+                "frame_count": artifact.frame_count,
+                "unit_count": artifact.unit_count,
+                "output_path": str(artifact.output_path),
+            }
+        },
+    )
+    _print_json(artifact.as_dict())
+    return EXIT_OK
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command and translate failures into stable process exit codes."""
 
@@ -611,6 +794,34 @@ def main(argv: Sequence[str] | None = None) -> int:
                 position_corrections_path=cast(Path | None, args.position_corrections),
                 settings=settings,
             )
+        if args.command == "dataset":
+            if args.dataset_command == "extract-frames":
+                return _run_dataset_extract_frames(
+                    cast(Path, args.video),
+                    output_dir=cast(Path, args.output_dir),
+                    every_frames=cast(int | None, args.every_frames),
+                    random_count=cast(int | None, args.random_count),
+                    random_seed=cast(int, args.seed),
+                    start_time_s=cast(float | None, args.start_time),
+                    end_time_s=cast(float | None, args.end_time),
+                    clips_path=cast(Path | None, args.clips),
+                    write_clips=cast(bool, args.write_clips),
+                    label_group=cast(str, args.label_group),
+                    group_id=cast(str | None, args.group_id),
+                    settings=settings,
+                )
+            if args.dataset_command == "split":
+                return _run_dataset_split(
+                    tuple(cast(list[Path], args.manifests)),
+                    output_path=cast(Path, args.output),
+                    split_by=cast(str, args.by),
+                    train_ratio=cast(float, args.train),
+                    validation_ratio=cast(float, args.validation),
+                    test_ratio=cast(float, args.test),
+                    random_seed=cast(int, args.seed),
+                )
+            parser.print_help()
+            return EXIT_OK
         parser.error(f"unsupported command: {args.command}")
     except PickleballVisionError as error:
         print(f"error [{error.code}]: {error}", file=sys.stderr)

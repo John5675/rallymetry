@@ -25,13 +25,16 @@ end-to-end result:
 1. **Source metadata** describes video plus optional synchronized audio streams and
    their canonical source-media timeline without modifying the recording.
 2. **Calibration** records image-space court landmarks and plane transforms.
-3. **Observations** record model detections as produced, including confidence and
+3. **Annotation datasets** retain source hashes, frame/time provenance, human label
+   groups, object annotations, and leakage-safe split units independently of model
+   output.
+4. **Observations** record model detections as produced, including confidence and
    provenance.
-4. **Tracks** associate observations over time without rewriting their evidence.
-5. **Events** infer pickleball meaning such as bounces or contacts, with confidence
+5. **Tracks** associate observations over time without rewriting their evidence.
+6. **Events** infer pickleball meaning such as bounces or contacts, with confidence
    and links to supporting observations.
-6. **Analytics** consume structured tracks and events, never raw detector tensors.
-7. **Presentation** explains structured results and uncertainty; it does not
+7. **Analytics** consume structured tracks and events, never raw detector tensors.
+8. **Presentation** explains structured results and uncertainty; it does not
    manufacture facts.
 
 Raw detections and derived events must remain separate even if a future optimized
@@ -68,6 +71,12 @@ manual court-position correction, and then adds a separate bounded smoothing res
 `summary.json` consumes these structured position records rather than detector output.
 Missing frames and suspected identity switches remain gaps in trajectories and
 metrics.
+
+Ball dataset tooling is an offline curation boundary. It reads local source media,
+writes full-resolution frame images and optional lossless review clips, and records
+content hashes plus frame/time provenance in `dataset-manifest.json`. Split manifests
+reference those immutable records without copying or moving images. `positive`,
+`negative`, and `unlabeled` are human curation states, never detector predictions.
 
 ## Execution model
 

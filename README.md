@@ -5,13 +5,14 @@ doubles pickleball matches into inspectable, structured match data. The long-ter
 goal includes court and player tracking, ball trajectories, rally and shot events,
 match analytics, and AI-assisted coaching.
 
-The current milestone is **Player court-position analytics (Release 0.1)**. The local
+The current milestone is **Ball dataset tooling**. The local
 CLI can inspect video plus optional synchronized audio, extract lossless analysis
 audio, calibrate the court, detect people broadly, derive court-aware candidates,
 manually assign the four logical match roles, and track those identities separately
 from transient ByteTrack IDs. It can now derive separate raw/smoothed court positions,
-movement metrics, heatmaps, and top-down review video. Raw observations remain
-separate from derived positions and later events.
+movement metrics, heatmaps, and top-down review video. It can also extract
+full-resolution ball-annotation frames and lossless review clips, then assign
+leakage-safe dataset splits. No ball detector is trained or run.
 
 ## Repository map
 
@@ -80,6 +81,10 @@ uv run pickleball-vision analyze-players /absolute/path/to/match.mp4 \
   --calibration ../../output/calibration/calibration.json \
   --output-dir ../../output/player-analysis \
   --position-corrections ../../output/player-tracking/player-position-corrections.json
+uv run pickleball-vision dataset extract-frames /absolute/path/to/match.mp4 \
+  --output-dir ../../ml/datasets/match-unlabeled \
+  --every 30 \
+  --label-group unlabeled
 ```
 
 Command results are emitted as JSON on standard output. Diagnostic structured
@@ -144,6 +149,13 @@ court-plane corrections and bounded smoothed coordinates. It generates
 movement/occupancy metrics, per-player heatmaps, a source overlay, and a top-down
 animation. See [the analytics definitions](docs/analytics-definitions.md) for exact
 formulas, region boundaries, quality gates, correction format, and limitations.
+
+Ball dataset extraction supports deterministic cadence, seeded random sampling,
+half-open time ranges, named clip/rally groups, optional synchronized lossless review
+clips, and positive/negative/unlabeled curation queues. Dataset splits keep whole
+videos, clips, or groups together. See
+[the ball dataset tooling guide](docs/ball-dataset-tooling.md) and
+[annotation policy](docs/annotation-guide.md).
 
 ## Verify the setup
 

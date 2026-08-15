@@ -5,6 +5,7 @@ import pytest
 
 from pickleball_vision.errors import (
     AudioStreamNotFoundError,
+    ClipExtractionError,
     InvalidAudioConversionError,
     VideoUnreadableError,
 )
@@ -15,6 +16,7 @@ from pickleball_vision.media import (
     MediaStreamProbe,
     MediaTimeline,
     extract_audio,
+    extract_lossless_clip,
     inspect_media,
 )
 
@@ -192,3 +194,49 @@ def test_ffmpeg_backend_reports_version(synthetic_video: Path) -> None:
 
     assert probe.backend_name == "ffmpeg-pyav"
     assert probe.backend_version
+
+
+def test_lossless_clip_preserves_source_resolution_and_optional_audio(
+    synthetic_media_with_audio: Path,
+    tmp_path: Path,
+) -> None:
+    source_bytes = synthetic_media_with_audio.read_bytes()
+
+    artifact = extract_lossless_clip(
+        synthetic_media_with_audio,
+        output_path=tmp_path / "clip.mkv",
+        start_time_s=0.2,
+        end_time_s=1.2,
+    )
+
+    assert synthetic_media_with_audio.read_bytes() == source_bytes
+    assert artifact.output.video.width == artifact.source.video.width
+    assert artifact.output.video.height == artifact.source.video.height
+    assert artifact.output.audio is not None
+    report = artifact.as_dict()
+    assert report["source_preserved"] is True
+    assert report["conversion"]["video_lossless"] is True  # type: ignore[index]
+    assert report["timeline"]["clip_time_zero_source_video_time_s"] == pytest.approx(  # type: ignore[index]
+        0.2
+    )
+
+
+def test_lossless_clip_supports_video_only_and_rejects_invalid_range(
+    synthetic_video: Path,
+    tmp_path: Path,
+) -> None:
+    artifact = extract_lossless_clip(
+        synthetic_video,
+        output_path=tmp_path / "video-only.mkv",
+        start_time_s=0.0,
+        end_time_s=0.8,
+    )
+
+    assert artifact.output.audio is None
+    with pytest.raises(ClipExtractionError, match="clip range"):
+        extract_lossless_clip(
+            synthetic_video,
+            output_path=tmp_path / "invalid.mkv",
+            start_time_s=1.0,
+            end_time_s=0.5,
+        )

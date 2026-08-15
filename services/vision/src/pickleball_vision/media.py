@@ -15,6 +15,7 @@ import imageio_ffmpeg  # type: ignore[import-untyped]
 from pickleball_vision.errors import (
     AudioExtractionError,
     AudioStreamNotFoundError,
+    ClipExtractionError,
     InvalidAudioConversionError,
     MediaInspectionError,
 )
@@ -77,6 +78,21 @@ class MediaBackend(Protocol):
         channels: int | None,
     ) -> None:
         """Decode one audio stream into a lossless PCM WAV representation."""
+
+
+class ClipMediaBackend(Protocol):
+    """Boundary for synchronized, lossless dataset review-clip extraction."""
+
+    def extract_lossless_clip(
+        self,
+        source_path: Path,
+        *,
+        output_path: Path,
+        start_time_s: float,
+        duration_s: float,
+        include_audio: bool,
+    ) -> None:
+        """Trim video and optional audio onto a zero-based clip timeline."""
 
 
 def _probe_int(record: dict[str, object], key: str, *, optional: bool = False) -> int | None:
@@ -218,6 +234,72 @@ class FFmpegMediaBackend:
             output_path.unlink(missing_ok=True)
             reason = completed.stderr.strip() or f"FFmpeg exited with status {completed.returncode}"
             raise AudioExtractionError(str(output_path), reason=reason)
+
+
+class FFmpegClipMediaBackend:
+    """Bundled-FFmpeg implementation for lossless Matroska review clips."""
+
+    def extract_lossless_clip(
+        self,
+        source_path: Path,
+        *,
+        output_path: Path,
+        start_time_s: float,
+        duration_s: float,
+        include_audio: bool,
+    ) -> None:
+        try:
+            executable = imageio_ffmpeg.get_ffmpeg_exe()
+        except RuntimeError as error:
+            raise ClipExtractionError(str(output_path), reason=str(error)) from error
+
+        command = [
+            executable,
+            "-nostdin",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-y",
+            "-i",
+            str(source_path),
+            "-ss",
+            f"{start_time_s:.9f}",
+            "-t",
+            f"{duration_s:.9f}",
+            "-map",
+            "0:v:0",
+            "-vf",
+            "setpts=PTS-STARTPTS",
+            "-c:v",
+            "ffv1",
+            "-level",
+            "3",
+        ]
+        if include_audio:
+            command.extend(
+                (
+                    "-map",
+                    "0:a:0",
+                    "-af",
+                    "asetpts=PTS-STARTPTS,aresample=async=1:first_pts=0",
+                    "-c:a",
+                    PCM_WAV_CODEC,
+                )
+            )
+        command.extend(("-f", "matroska", str(output_path)))
+        try:
+            completed = subprocess.run(
+                command,
+                check=False,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
+                text=True,
+            )
+        except OSError as error:
+            raise ClipExtractionError(str(output_path), reason=str(error)) from error
+        if completed.returncode != 0:
+            reason = completed.stderr.strip() or f"FFmpeg exited with status {completed.returncode}"
+            raise ClipExtractionError(str(output_path), reason=reason)
 
 
 @dataclass(frozen=True, slots=True)
@@ -399,6 +481,58 @@ class AudioExtractionArtifact:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class MediaClipArtifact:
+    """Lossless review clip with source-time and conversion provenance."""
+
+    source_path: Path
+    output_path: Path
+    start_time_s: float
+    end_time_s: float
+    source: MediaMetadata
+    output: MediaMetadata
+
+    def as_dict(self) -> dict[str, object]:
+        source_audio = self.source.audio
+        output_audio = self.output.audio
+        return {
+            "source_media": str(self.source_path),
+            "output_path": str(self.output_path),
+            "source_preserved": True,
+            "requested_range": {
+                "start_time_s": self.start_time_s,
+                "end_time_s": self.end_time_s,
+                "duration_s": self.end_time_s - self.start_time_s,
+                "end_exclusive": True,
+            },
+            "timeline": {
+                "clip_time_zero_source_video_time_s": self.start_time_s,
+                "mapping": "sourceVideoTime = clipVideoTimestamp + startTime",
+                "audio_video_synchronization_preserved": True,
+            },
+            "conversion": {
+                "container": "matroska",
+                "video_codec": "ffv1",
+                "video_lossless": True,
+                "audio_codec": PCM_WAV_CODEC if source_audio is not None else None,
+                "audio_lossless": source_audio is not None,
+                "source_audio_channels": (
+                    source_audio.channels if source_audio is not None else None
+                ),
+                "output_audio_channels": (
+                    output_audio.channels if output_audio is not None else None
+                ),
+                "source_audio_sample_rate_hz": (
+                    source_audio.sample_rate_hz if source_audio is not None else None
+                ),
+                "output_audio_sample_rate_hz": (
+                    output_audio.sample_rate_hz if output_audio is not None else None
+                ),
+            },
+            "output_media": self.output.as_dict(),
+        }
+
+
 def _resolve_audio_output(source_path: Path, output_path: Path) -> tuple[Path, Path]:
     resolved_output = output_path.expanduser().resolve()
     if resolved_output.suffix.lower() != ".wav":
@@ -472,3 +606,96 @@ def extract_audio(
     )
     _write_audio_metadata(artifact)
     return artifact
+
+
+def extract_lossless_clip(
+    path: Path,
+    *,
+    output_path: Path,
+    start_time_s: float,
+    end_time_s: float,
+    timeline: MediaTimeline | None = None,
+    backend: ClipMediaBackend | None = None,
+) -> MediaClipArtifact:
+    """Create a synchronized lossless MKV review clip without changing its source."""
+
+    selected_timeline = timeline or MediaTimeline()
+    source = inspect_media(path, timeline=selected_timeline)
+    if (
+        not math.isfinite(start_time_s)
+        or not math.isfinite(end_time_s)
+        or start_time_s < 0
+        or end_time_s <= start_time_s
+        or end_time_s > source.video.duration
+    ):
+        raise ClipExtractionError(
+            str(output_path.expanduser().resolve()),
+            reason=(
+                "clip range must be finite and satisfy "
+                f"0 <= start < end <= {source.video.duration:.6f} seconds"
+            ),
+        )
+
+    resolved_output = output_path.expanduser().resolve()
+    if resolved_output.suffix.lower() != ".mkv":
+        raise ClipExtractionError(str(resolved_output), reason="output must use a .mkv extension")
+    if resolved_output == source.video.path:
+        raise ClipExtractionError(
+            str(resolved_output),
+            reason="output would destructively overwrite the source media",
+        )
+    if resolved_output.exists():
+        raise ClipExtractionError(str(resolved_output), reason="output already exists")
+    try:
+        resolved_output.parent.mkdir(parents=True, exist_ok=True)
+    except OSError as error:
+        raise ClipExtractionError(str(resolved_output), reason=str(error)) from error
+
+    temporary = resolved_output.with_name(f".{resolved_output.stem}.tmp.mkv")
+    temporary.unlink(missing_ok=True)
+    selected_backend = FFmpegClipMediaBackend() if backend is None else backend
+    try:
+        selected_backend.extract_lossless_clip(
+            source.video.path,
+            output_path=temporary,
+            start_time_s=start_time_s,
+            duration_s=end_time_s - start_time_s,
+            include_audio=source.audio is not None,
+        )
+        if not temporary.is_file() or temporary.stat().st_size == 0:
+            raise ClipExtractionError(str(resolved_output), reason="FFmpeg wrote no clip data")
+        temporary.replace(resolved_output)
+        output = inspect_media(resolved_output, timeline=selected_timeline)
+        if (source.audio is None) != (output.audio is None):
+            raise ClipExtractionError(
+                str(resolved_output),
+                reason="output audio presence does not match the source clip",
+            )
+        if source.audio is not None and output.audio is not None:
+            if source.audio.channels != output.audio.channels:
+                raise ClipExtractionError(
+                    str(resolved_output),
+                    reason="output audio channel count does not match the source",
+                )
+            if source.audio.sample_rate_hz != output.audio.sample_rate_hz:
+                raise ClipExtractionError(
+                    str(resolved_output),
+                    reason="output audio sample rate does not match the source",
+                )
+        if output.video.width != source.video.width or output.video.height != source.video.height:
+            raise ClipExtractionError(
+                str(resolved_output),
+                reason="output resolution does not match the source video",
+            )
+    except (OSError, ClipExtractionError):
+        temporary.unlink(missing_ok=True)
+        resolved_output.unlink(missing_ok=True)
+        raise
+    return MediaClipArtifact(
+        source_path=source.video.path,
+        output_path=resolved_output,
+        start_time_s=start_time_s,
+        end_time_s=end_time_s,
+        source=source,
+        output=output,
+    )

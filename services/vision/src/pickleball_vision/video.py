@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import math
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from pathlib import Path
@@ -15,6 +15,7 @@ from numpy.typing import NDArray
 
 from pickleball_vision.errors import (
     FrameDecodeError,
+    InvalidFrameIndexError,
     InvalidSampleCountError,
     InvalidTimestampError,
     OutputWriteError,
@@ -307,6 +308,30 @@ def iter_video_frames(path: Path) -> Iterator[DecodedVideoFrame]:
                 frame_index=frame_index,
                 timestamp=frame_index / metadata.fps,
                 image=cast(Image, frame),
+            )
+
+
+def iter_selected_video_frames(
+    path: Path,
+    frame_indices: Iterable[int],
+) -> Iterator[DecodedVideoFrame]:
+    """Decode sorted, unique source-frame indices without resizing the images."""
+
+    requested = tuple(frame_indices)
+    if requested != tuple(sorted(set(requested))):
+        raise InvalidFrameIndexError("frame indices must be sorted and unique")
+    with _open_video(path) as (capture, metadata):
+        for frame_index in requested:
+            if frame_index < 0 or frame_index >= metadata.frame_count:
+                raise InvalidFrameIndexError(
+                    f"frame index must be in [0, {metadata.frame_count}); received {frame_index}"
+                )
+            frame = _read_frame(capture, metadata, frame_index)
+            yield DecodedVideoFrame(
+                metadata=metadata,
+                frame_index=frame_index,
+                timestamp=frame_index / metadata.fps,
+                image=frame,
             )
 
 

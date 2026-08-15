@@ -5,7 +5,9 @@ typed executable infrastructure, audio-aware FFmpeg/OpenCV media ingestion,
 lossless analysis-audio extraction, manual multi-point court calibration,
 pretrained person detection, court-aware manual primary-player isolation,
 persistent logical-player tracking, and Release 0.1 player court-position analytics.
-Audio-event detection and later match analytics remain unimplemented.
+It also provides model-free ball dataset extraction, review clips, and leakage-safe
+split assignment. Ball detection, audio-event detection, and later match analytics
+remain unimplemented.
 
 ```bash
 uv sync --locked --extra dev
@@ -31,6 +33,10 @@ uv run pickleball-vision analyze-players /absolute/path/to/match.mp4 \
   --calibration ../../output/calibration/calibration.json \
   --output-dir ../../output/player-analysis \
   --position-corrections ../../output/player-tracking/player-position-corrections.json
+uv run pickleball-vision dataset extract-frames /absolute/path/to/match.mp4 \
+  --output-dir ../../ml/datasets/match-unlabeled \
+  --every 30 \
+  --label-group unlabeled
 ```
 
 Calibration uses a local OpenCV window. See `docs/court-calibration.md` from the
@@ -45,6 +51,10 @@ see `docs/player-tracking.md`.
 Release 0.1 player analysis preserves raw, manually corrected, and smoothed court
 positions separately and writes qualified metrics plus heatmaps and review videos; see
 `docs/analytics-definitions.md`.
+Ball dataset tooling never loads a model. It preserves source/frame provenance and
+keeps neighboring frames together during video/clip/group splitting; see the
+[dataset guide](../../docs/ball-dataset-tooling.md) and
+[annotation policy](../../docs/annotation-guide.md).
 
 Audio is optional. Extraction preserves source sample rate and channels by default
 and writes a timing/conversion sidecar next to the PCM WAV. See

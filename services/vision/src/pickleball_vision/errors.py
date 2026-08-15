@@ -11,12 +11,16 @@ class ErrorCode(StrEnum):
     CALIBRATION_INVALID = "calibration_invalid"
     CALIBRATION_IO = "calibration_io_error"
     CONFIGURATION = "configuration_error"
+    DATASET_INPUT = "dataset_input_error"
+    DATASET_IO = "dataset_io_error"
     DETECTION_INPUT = "detection_input_error"
     DETECTION_IO = "detection_io_error"
     DETECTION_MODEL = "detection_model_error"
     FRAME_DECODE = "frame_decode_error"
+    CLIP_EXTRACTION = "clip_extraction_error"
     INTERNAL = "internal_error"
     INVALID_SAMPLE_COUNT = "invalid_sample_count"
+    INVALID_FRAME_INDEX = "invalid_frame_index"
     INVALID_TIMESTAMP = "invalid_timestamp"
     MEDIA_INSPECTION = "media_inspection_error"
     AUDIO_STREAM_NOT_FOUND = "audio_stream_not_found"
@@ -124,6 +128,17 @@ class AudioExtractionError(PickleballVisionError):
         )
 
 
+class ClipExtractionError(PickleballVisionError):
+    """Raised when a synchronized review clip cannot be created safely."""
+
+    def __init__(self, path: str, *, reason: str) -> None:
+        super().__init__(
+            f"Unable to extract media clip to {path}: {reason}",
+            code=ErrorCode.CLIP_EXTRACTION,
+            details={"path": path, "reason": reason},
+        )
+
+
 class InvalidTimestampError(PickleballVisionError):
     """Raised when a timestamp is outside a video's valid time span."""
 
@@ -152,6 +167,17 @@ class InvalidSampleCountError(PickleballVisionError):
         )
 
 
+class InvalidFrameIndexError(PickleballVisionError):
+    """Raised when requested source-frame indices are invalid or unordered."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Invalid frame index selection: {reason}",
+            code=ErrorCode.INVALID_FRAME_INDEX,
+            details={"reason": reason},
+        )
+
+
 class FrameDecodeError(PickleballVisionError):
     """Raised when OpenCV cannot decode a requested frame."""
 
@@ -160,6 +186,28 @@ class FrameDecodeError(PickleballVisionError):
             f"Unable to decode frame {frame_index} from video: {path}",
             code=ErrorCode.FRAME_DECODE,
             details={"path": path, "frame_index": frame_index},
+        )
+
+
+class DatasetInputError(PickleballVisionError):
+    """Raised when dataset selection, clip, or split inputs are invalid."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Invalid dataset input: {reason}",
+            code=ErrorCode.DATASET_INPUT,
+            details={"reason": reason},
+        )
+
+
+class DatasetIoError(PickleballVisionError):
+    """Raised when a dataset artifact or manifest cannot be read or written."""
+
+    def __init__(self, path: str, *, reason: str) -> None:
+        super().__init__(
+            f"Unable to access dataset artifact {path}: {reason}",
+            code=ErrorCode.DATASET_IO,
+            details={"path": path, "reason": reason},
         )
 
 

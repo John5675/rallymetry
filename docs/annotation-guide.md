@@ -1,7 +1,8 @@
 # Annotation Guide
 
-This is the durable labeling policy for future dataset milestones. No annotation
-tooling is implemented during Foundation.
+This is the durable labeling policy for dataset and evaluation milestones. Ball
+dataset extraction and leakage-safe split tooling are implemented; detector
+training and model-generated annotations are not.
 
 ## General rules
 
@@ -44,12 +45,58 @@ detections.
 
 ## Ball
 
-Label the visible ball center and an approximate extent when resolvable. Include
-visibility (`clear`, `blurred`, `occluded`, `out_of_frame`, `not_found`) and an
-annotation confidence. Do not label an interpolated point as an observed ball.
+The object class is exactly `pickleball`. Label every visible pickleball with a
+tight image-space extent around visible evidence and a center when the center is
+defensible. Preserve source pixels; do not project an airborne ball through court
+homography. Each object should retain:
+
+- source ID, frame number, and timestamp;
+- image-space center when defensible and visible extent;
+- visibility: `clear`, `partial`, `blurred`, or `ambiguous`;
+- truncation and occlusion flags;
+- scope: `primary_match`, `neighboring_court`, or `unknown`;
+- annotation confidence and annotator/review state; and
+- a stable within-clip object reference only when visually supportable.
+
+Use these case rules:
+
+- **Partially visible ball:** annotate only the visible pixels with
+  `visibility=partial` and `truncated=true` when cropped by the frame. Do not invent
+  the hidden extent. Store a center only when the full-ball center is defensible;
+  otherwise leave it unknown and require review.
+- **Blurred ball:** annotate the tight blur footprint, not an idealized circular
+  ball. Use `visibility=blurred`, lower confidence as appropriate, and retain the
+  blur direction only as optional descriptive evidence—not as a trajectory.
+- **Ambiguous ball:** do not force a positive or negative label. Keep the frame in
+  `unlabeled`, add an `ambiguous` review record, and adjudicate it later. Lights,
+  shoes, court marks, fence holes, clothing, and other bright objects are common
+  ambiguities.
+- **Neighboring-court ball:** annotate it as class `pickleball` with
+  `scope=neighboring_court`. It is a positive visual example for a generic ball
+  detector, even though it is not the primary-match ball. Never put it in the
+  negative bucket merely because it belongs to another court.
+- **Fully occluded ball:** draw no observed ball box or center. A temporal review
+  record may say `not_visible`/fully occluded, but it is not an observed positive
+  annotation and its expected location must not be guessed.
+- **Multiple balls:** annotate every separately visible pickleball as its own
+  object. Set scope independently for each. If the primary-match ball cannot be
+  distinguished, use `scope=unknown`; do not select one by proximity or confidence
+  alone.
 
 Interpolation is a derived artifact, never hand-authored ground truth. Missing
 intervals remain missing unless image evidence supports an annotation.
+
+### Dataset grouping
+
+- `positive` means a human has confirmed at least one visible pickleball annotation.
+- `negative` means a human has reviewed the frame and confirmed that no pickleball
+  is visible. Hard negatives should deliberately include lights, shoes, markings,
+  paddles, net/fence patterns, bright clothing, sky, and court backgrounds.
+- `unlabeled` means annotation is incomplete, absent, or ambiguous. It must never be
+  consumed as a negative class automatically.
+
+Positive/negative directories are curation queues. The annotation record remains
+the source of truth, especially for multiple balls and neighboring-court scope.
 
 ## Events
 
@@ -60,6 +107,8 @@ valid; guessing is not.
 
 ## Quality control
 
-Maintain train/validation/test separation at the source-match level to avoid frame
-leakage. Double-label a representative subset, adjudicate disagreements without
+Prefer train/validation/test separation at the whole-video level. Clip or rally/group
+splitting is allowed only when those ranges are explicit, non-overlapping, and treated
+as indivisible units. Never assign individual neighboring frames independently across
+splits. Double-label a representative subset, adjudicate disagreements without
 discarding the original labels, and report agreement alongside model metrics.

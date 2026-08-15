@@ -3,22 +3,24 @@
 This document describes stable stage boundaries. A stage may be introduced only
 when its matching milestone is current. Audio-aware media ingestion, manual court
 calibration, broad person detection, primary-player isolation, and persistent
-logical-player tracking are currently implemented; all later stages remain
-contracts only.
+logical-player tracking are implemented. Ball dataset extraction and split tooling
+are also implemented as an offline annotation branch; ball inference and all later
+event stages remain contracts only.
 
 ## Intended flow
 
 ```text
 source media metadata (video + optional audio)
-  -> court calibration
-  -> person and ball observations
-  -> primary-player isolation
-  -> persistent player tracks
-  -> observed/interpolated ball track segments
-  -> optional raw audio observations
-  -> rally and multimodal bounce/contact/hitter/shot events
-  -> structured match data
-  -> analytics
+  +-> ball annotation frame/clip datasets (offline branch; no inference)
+  +-> court calibration
+      -> person and ball observations
+      -> primary-player isolation
+      -> persistent player tracks
+      -> observed/interpolated ball track segments
+      -> optional raw audio observations
+      -> rally and multimodal bounce/contact/hitter/shot events
+      -> structured match data
+      -> analytics
 ```
 
 ## Video source contract
@@ -113,6 +115,24 @@ confidence, zero-based frame number, and timestamp. The calibration is validated
 and recorded as run provenance, but person boxes are not projected through its
 homography during this milestone. People on neighboring courts, spectators, and
 officials are intentionally not removed; that is primary-player isolation work.
+
+## Ball dataset contract
+
+Dataset extraction preserves source resolution and records the content SHA-256,
+source stream metadata, frame index, timestamp/FPS time base, selection method,
+label group, and optional clip/rally group. Cadence sampling is deterministic;
+random sampling is unique and seed-reproducible. Named ranges are half-open
+`[start_time_s, end_time_s)` intervals and may optionally produce synchronized,
+lossless MKV review clips without modifying the source recording.
+
+The three frame directories are human curation queues. `positive` means a reviewer
+confirmed a visible pickleball, `negative` means a reviewer confirmed none is
+visible, and `unlabeled` includes untouched and ambiguous frames. A neighboring-court
+ball is still a positive pickleball observation with separate scope metadata.
+
+Split assignment operates on whole source videos, named clips, or rally/group IDs.
+It writes references only and never independently randomizes neighboring frames.
+This stage contains no detector, model weights, predictions, trajectories, or events.
 
 ## Primary-player isolation contract
 

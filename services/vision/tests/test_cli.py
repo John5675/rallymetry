@@ -541,3 +541,59 @@ def test_analyze_players_command_dispatches_release_workflow(
     assert received["position_corrections_path"] == corrections_path
     received_settings = cast(PlayerAnalysisSettings, received["settings"])
     assert received_settings.smoothing_window_frames == 7
+
+
+def test_dataset_commands_extract_and_split_without_model_inference(
+    synthetic_video: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _clear_settings(monkeypatch)
+    output_dir = tmp_path / "dataset"
+
+    extract_exit = main(
+        [
+            "dataset",
+            "extract-frames",
+            str(synthetic_video),
+            "--output-dir",
+            str(output_dir),
+            "--every",
+            "4",
+            "--label-group",
+            "positive",
+            "--group-id",
+            "rally-001",
+        ]
+    )
+
+    extract_report = json.loads(capsys.readouterr().out)
+    assert extract_exit == EXIT_OK
+    assert extract_report["frame_count"] == 3
+    assert extract_report["label_group_counts"]["positive"] == 3
+
+    split_path = tmp_path / "split.json"
+    split_exit = main(
+        [
+            "dataset",
+            "split",
+            str(output_dir / "dataset-manifest.json"),
+            "--output",
+            str(split_path),
+            "--by",
+            "group",
+            "--train",
+            "1",
+            "--validation",
+            "0",
+            "--test",
+            "0",
+        ]
+    )
+
+    split_report = json.loads(capsys.readouterr().out)
+    assert split_exit == EXIT_OK
+    assert split_report["frame_count"] == 3
+    assert split_report["unit_count"] == 1
+    assert split_report["split_counts"] == {"test": 0, "train": 3, "validation": 0}
