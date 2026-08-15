@@ -61,6 +61,14 @@ changes; it remains derived evidence rather than a biometric identity. `ME`,
 ByteTrack creates a new ID. Questionable transitions are review events, not silently
 trusted relabeling.
 
+Player-position analytics is a further derived layer. `player_positions.json`
+consumes only the structured logical identity layer, retains each raw bottom-center
+image point and raw court projection, optionally adds an explicit recording-local
+manual court-position correction, and then adds a separate bounded smoothing result.
+`summary.json` consumes these structured position records rather than detector output.
+Missing frames and suspected identity switches remain gaps in trajectories and
+metrics.
+
 ## Execution model
 
 During the local-pipeline milestones, the CLI is the executable boundary.

@@ -435,6 +435,133 @@ class PlayerTrackingSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class PlayerAnalysisSettings:
+    """Validated Release 0.1 smoothing and metric quality gates."""
+
+    minimum_tracking_confidence: float = 0.45
+    smoothing_window_frames: int = 5
+    maximum_smoothing_adjustment_m: float = 0.30
+    maximum_step_gap_seconds: float = 0.20
+    maximum_step_speed_mps: float = 8.0
+    transition_zone_depth_m: float = 2.1336
+    topdown_trail_seconds: float = 2.0
+
+    @classmethod
+    def from_env(
+        cls,
+        environ: Mapping[str, str] | None = None,
+    ) -> PlayerAnalysisSettings:
+        """Load player-position analysis settings from prefixed variables."""
+
+        source = os.environ if environ is None else environ
+        defaults = cls()
+        values: dict[str, float | int] = {
+            "minimum_tracking_confidence": _float_setting(
+                source,
+                "ANALYSIS_MINIMUM_TRACKING_CONFIDENCE",
+                defaults.minimum_tracking_confidence,
+            ),
+            "smoothing_window_frames": _int_setting(
+                source,
+                "ANALYSIS_SMOOTHING_WINDOW_FRAMES",
+                defaults.smoothing_window_frames,
+            ),
+            "maximum_smoothing_adjustment_m": _float_setting(
+                source,
+                "ANALYSIS_MAXIMUM_SMOOTHING_ADJUSTMENT_METERS",
+                defaults.maximum_smoothing_adjustment_m,
+            ),
+            "maximum_step_gap_seconds": _float_setting(
+                source,
+                "ANALYSIS_MAXIMUM_STEP_GAP_SECONDS",
+                defaults.maximum_step_gap_seconds,
+            ),
+            "maximum_step_speed_mps": _float_setting(
+                source,
+                "ANALYSIS_MAXIMUM_STEP_SPEED_MPS",
+                defaults.maximum_step_speed_mps,
+            ),
+            "transition_zone_depth_m": _float_setting(
+                source,
+                "ANALYSIS_TRANSITION_ZONE_DEPTH_METERS",
+                defaults.transition_zone_depth_m,
+            ),
+            "topdown_trail_seconds": _float_setting(
+                source,
+                "ANALYSIS_TOPDOWN_TRAIL_SECONDS",
+                defaults.topdown_trail_seconds,
+            ),
+        }
+        confidence = float(values["minimum_tracking_confidence"])
+        window = int(values["smoothing_window_frames"])
+        validations = (
+            (
+                0 <= confidence <= 1,
+                "ANALYSIS_MINIMUM_TRACKING_CONFIDENCE",
+                "must be between 0 and 1 inclusive",
+            ),
+            (
+                window >= 3 and window % 2 == 1,
+                "ANALYSIS_SMOOTHING_WINDOW_FRAMES",
+                "must be an odd integer of at least 3",
+            ),
+            (
+                float(values["maximum_smoothing_adjustment_m"]) > 0,
+                "ANALYSIS_MAXIMUM_SMOOTHING_ADJUSTMENT_METERS",
+                "must be positive",
+            ),
+            (
+                float(values["maximum_step_gap_seconds"]) > 0,
+                "ANALYSIS_MAXIMUM_STEP_GAP_SECONDS",
+                "must be positive",
+            ),
+            (
+                float(values["maximum_step_speed_mps"]) > 0,
+                "ANALYSIS_MAXIMUM_STEP_SPEED_MPS",
+                "must be positive",
+            ),
+            (
+                float(values["transition_zone_depth_m"]) > 0,
+                "ANALYSIS_TRANSITION_ZONE_DEPTH_METERS",
+                "must be positive",
+            ),
+            (
+                float(values["topdown_trail_seconds"]) > 0,
+                "ANALYSIS_TOPDOWN_TRAIL_SECONDS",
+                "must be positive",
+            ),
+        )
+        for valid, suffix, reason in validations:
+            if not valid:
+                setting = f"{ENV_PREFIX}{suffix}"
+                raise ConfigurationError(f"{setting} {reason}", setting=setting)
+        return cls(
+            minimum_tracking_confidence=confidence,
+            smoothing_window_frames=window,
+            maximum_smoothing_adjustment_m=float(values["maximum_smoothing_adjustment_m"]),
+            maximum_step_gap_seconds=float(values["maximum_step_gap_seconds"]),
+            maximum_step_speed_mps=float(values["maximum_step_speed_mps"]),
+            transition_zone_depth_m=float(values["transition_zone_depth_m"]),
+            topdown_trail_seconds=float(values["topdown_trail_seconds"]),
+        )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "minimum_tracking_confidence": self.minimum_tracking_confidence,
+            "smoothing": {
+                "method": "centered_confidence_weighted_component_median",
+                "window_frames": self.smoothing_window_frames,
+                "maximum_adjustment_m": self.maximum_smoothing_adjustment_m,
+                "interpolates_missing_frames": False,
+            },
+            "maximum_step_gap_seconds": self.maximum_step_gap_seconds,
+            "maximum_step_speed_mps": self.maximum_step_speed_mps,
+            "transition_zone_depth_m": self.transition_zone_depth_m,
+            "topdown_trail_seconds": self.topdown_trail_seconds,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class Settings:
     """Validated settings loaded once at an executable boundary."""
 
@@ -446,6 +573,7 @@ class Settings:
     person_detection: PersonDetectionSettings = field(default_factory=PersonDetectionSettings)
     player_isolation: PlayerIsolationSettings = field(default_factory=PlayerIsolationSettings)
     player_tracking: PlayerTrackingSettings = field(default_factory=PlayerTrackingSettings)
+    player_analysis: PlayerAnalysisSettings = field(default_factory=PlayerAnalysisSettings)
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> Settings:
@@ -494,6 +622,7 @@ class Settings:
             person_detection=PersonDetectionSettings.from_env(source),
             player_isolation=PlayerIsolationSettings.from_env(source),
             player_tracking=PlayerTrackingSettings.from_env(source),
+            player_analysis=PlayerAnalysisSettings.from_env(source),
         )
 
     def public_values(self) -> dict[str, object]:
@@ -508,4 +637,5 @@ class Settings:
             "person_detection": self.person_detection.as_dict(),
             "player_isolation": self.player_isolation.as_dict(),
             "player_tracking": self.player_tracking.as_dict(),
+            "player_analysis": self.player_analysis.as_dict(),
         }

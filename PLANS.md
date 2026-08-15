@@ -156,7 +156,7 @@ Exit criteria:
   pass.
 - No audio-event detection, bounce/contact fusion, or later milestone is implemented.
 
-## 5. Persistent player tracking — current
+## 5. Persistent player tracking — complete
 
 Associate raw person detections with an established multi-object tracker, then
 resolve the four manually initialized logical player identities independently of
@@ -192,9 +192,41 @@ Exit criteria:
 - No player movement analytics, ball tracking, or audio-event analysis is
   implemented.
 
+## 6. Player court-position analytics — current (Release 0.1)
+
+Derive inspectable player ground trajectories and aggregate movement/position
+analytics from the four logical tracking records. Preserve raw image ground points
+and raw homography coordinates, keep recording-local manual position corrections in
+an explicit intermediate layer, add conservative bounded smoothing as a separate
+layer, and qualify every metric by its contributing coverage.
+
+Exit criteria:
+
+- `pickleball-vision analyze-players <video> --calibration <json> --output-dir <dir>`
+  consumes the persisted logical player tracks rather than detector tensors.
+- Every logical player/frame retains frame number, timestamp, raw image-space
+  bottom-center ground point, raw court coordinate, separate smoothed court
+  coordinate, and confidence; missing positions remain explicit.
+- Optional bounded per-role court-plane corrections are persisted separately from
+  raw evidence and recorded in analysis provenance.
+- Smoothing never overwrites raw observations, never bridges long gaps, and records
+  its method and parameters.
+- Approximate distance traveled, kitchen/transition/backcourt occupancy, average
+  distance from the kitchen, average partner spacing, and lateral-movement metrics
+  have precise versioned definitions and data-quality coverage.
+- `player_positions.json`, `summary.json`, four per-role heatmaps, a source-space
+  `annotated.mp4`, and a `topdown.mp4` are generated with input/configuration
+  provenance.
+- Synthetic tests cover raw preservation, ground-point use, smoothing boundaries,
+  region metrics, spacing, distance, lateral movement, serialization, and rendering
+  without private footage.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- Release 0.1 stops at player position analytics. No ball tracking, audio-event
+  analysis, rally inference, or product-service behavior is implemented.
+
 ## Future milestones — not current
 
-6. Player court-position analytics
 7. Ball dataset tooling
 8. Ball detector
 9. Ball trajectory reconstruction

@@ -26,6 +26,7 @@ class ErrorCode(StrEnum):
     PLAYER_ASSIGNMENT_IO = "player_assignment_io_error"
     PLAYER_ISOLATION_CANCELLED = "player_isolation_cancelled"
     PLAYER_ISOLATION_INPUT = "player_isolation_input_error"
+    PLAYER_ANALYSIS_INPUT = "player_analysis_input_error"
     PLAYER_TRACKING_INPUT = "player_tracking_input_error"
     VIDEO_NOT_FOUND = "video_not_found"
     VIDEO_UNREADABLE = "video_unreadable"
@@ -277,5 +278,16 @@ class PlayerTrackingInputError(PickleballVisionError):
         super().__init__(
             f"Invalid persistent-player tracking input: {reason}",
             code=ErrorCode.PLAYER_TRACKING_INPUT,
+            details={"reason": reason},
+        )
+
+
+class PlayerAnalysisInputError(PickleballVisionError):
+    """Raised when player-position analysis inputs are incompatible or unusable."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Invalid player-position analysis input: {reason}",
+            code=ErrorCode.PLAYER_ANALYSIS_INPUT,
             details={"reason": reason},
         )

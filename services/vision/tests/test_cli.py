@@ -9,10 +9,13 @@ from pickleball_vision.cli import EXIT_OK, EXIT_USAGE_ERROR, main
 from pickleball_vision.config import (
     ENV_PREFIX,
     PersonDetectionSettings,
+    PlayerAnalysisSettings,
     PlayerIsolationSettings,
 )
 from pickleball_vision.court import CourtDimensions, ImagePoint, court_landmarks
 from pickleball_vision.person_detection_pipeline import PersonDetectionArtifacts
+from pickleball_vision.player_analysis_workflow import PlayerAnalysisArtifacts
+from pickleball_vision.player_isolation import LOGICAL_PLAYER_ROLES
 from pickleball_vision.player_isolation_workflow import PlayerIsolationArtifacts
 
 
@@ -51,6 +54,13 @@ def _clear_settings(monkeypatch: pytest.MonkeyPatch) -> None:
         "TRACKING_APPEARANCE_PROTOTYPE_WINDOW_SECONDS",
         "TRACKING_LONG_GAP_APPEARANCE_SIMILARITY",
         "TRACKING_LONG_GAP_MINIMUM_APPEARANCE_MARGIN",
+        "ANALYSIS_MINIMUM_TRACKING_CONFIDENCE",
+        "ANALYSIS_SMOOTHING_WINDOW_FRAMES",
+        "ANALYSIS_MAXIMUM_SMOOTHING_ADJUSTMENT_METERS",
+        "ANALYSIS_MAXIMUM_STEP_GAP_SECONDS",
+        "ANALYSIS_MAXIMUM_STEP_SPEED_MPS",
+        "ANALYSIS_TRANSITION_ZONE_DEPTH_METERS",
+        "ANALYSIS_TOPDOWN_TRAIL_SECONDS",
     ):
         monkeypatch.delenv(f"{ENV_PREFIX}{suffix}", raising=False)
 
@@ -467,3 +477,67 @@ def test_isolate_players_command_dispatches_manual_workflow(
     assert received["selection_timestamp_s"] == pytest.approx(0.5)
     assert received["output_dir"] == output_dir
     assert received["existing_assignments_path"] == assignments_path
+
+
+def test_analyze_players_command_dispatches_release_workflow(
+    synthetic_video: Path,
+    synthetic_calibration: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _clear_settings(monkeypatch)
+    monkeypatch.setenv("PICKLEBALL_VISION_ANALYSIS_SMOOTHING_WINDOW_FRAMES", "7")
+    tracks_path = tmp_path / "tracks.json"
+    corrections_path = tmp_path / "player-position-corrections.json"
+    output_dir = tmp_path / "analysis"
+    received: dict[str, object] = {}
+
+    def fake_analyze(
+        video_path: Path,
+        *,
+        calibration_path: Path,
+        output_dir: Path,
+        settings: PlayerAnalysisSettings,
+        tracks_path: Path | None,
+        position_corrections_path: Path | None,
+    ) -> PlayerAnalysisArtifacts:
+        received.update(locals())
+        return PlayerAnalysisArtifacts(
+            output_dir / "player_positions.json",
+            output_dir / "summary.json",
+            output_dir / "annotated.mp4",
+            output_dir / "topdown.mp4",
+            {role: output_dir / f"heatmap-{role.value}.png" for role in LOGICAL_PLAYER_ROLES},
+            12,
+        )
+
+    monkeypatch.setattr("pickleball_vision.cli.analyze_players_in_video", fake_analyze)
+
+    exit_code = main(
+        [
+            "analyze-players",
+            str(synthetic_video),
+            "--calibration",
+            str(synthetic_calibration),
+            "--output-dir",
+            str(output_dir),
+            "--tracks",
+            str(tracks_path),
+            "--position-corrections",
+            str(corrections_path),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+    assert exit_code == EXIT_OK
+    assert report["frames_processed"] == 12
+    assert report["release_version"] == "0.1"
+    assert received["video_path"] == synthetic_video
+    assert received["calibration_path"] == synthetic_calibration
+    assert received["output_dir"] == output_dir
+    assert received["tracks_path"] == tracks_path
+    assert received["position_corrections_path"] == corrections_path
+    received_settings = cast(PlayerAnalysisSettings, received["settings"])
+    assert received_settings.smoothing_window_frames == 7

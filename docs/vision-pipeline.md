@@ -157,6 +157,20 @@ logical identity, even when their detector confidence is high.
 and reacquisition counts per role. `annotated.mp4` is a review aid, not structured
 truth.
 
+## Player-position analytics contract
+
+Release 0.1 consumes `tracks.json`, not raw detector tensors. For every player and
+source frame, it retains the image-space bottom-center ground estimate, raw court
+projection, optional separately recorded manual court-plane correction, separate
+conservative smoothed court coordinate, tracking confidence, frame number, and
+timestamp. Correction and smoothing never replace raw data or fill a missing frame.
+
+Position metrics operate only on quality-gated structured position records. Each
+metric retains calculation version, unit, population, coverage, and contributing
+frame ranges. Heatmaps and animations are debug/presentation artifacts; computed JSON
+remains the analytics source of truth. Exact formulas and court-region boundaries are
+defined in `analytics-definitions.md`.
+
 Ball records distinguish at minimum:
 
 - `observed`: supported directly by image evidence;

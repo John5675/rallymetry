@@ -22,6 +22,7 @@ from pickleball_vision.media import (
     inspect_media,
 )
 from pickleball_vision.person_detection_pipeline import detect_people_in_video
+from pickleball_vision.player_analysis_workflow import analyze_players_in_video
 from pickleball_vision.player_isolation_workflow import isolate_primary_players
 from pickleball_vision.player_tracking_workflow import track_players_in_video
 from pickleball_vision.video import extract_frame, sample_frames
@@ -217,6 +218,37 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "optional JSON mapping ME/PARTNER/OPPONENT_1/OPPONENT_2 to display names; "
             "defaults to player-names.json beside assignments when present"
+        ),
+    )
+
+    analyze_parser = subparsers.add_parser(
+        "analyze-players",
+        help="derive Release 0.1 player positions, movement metrics, and visualizations",
+    )
+    analyze_parser.add_argument("video", type=Path, help="path to the tracked local video")
+    analyze_parser.add_argument(
+        "--calibration",
+        type=Path,
+        required=True,
+        help="court calibration JSON recorded by persistent tracking",
+    )
+    analyze_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=True,
+        help="directory for Release 0.1 player-position analysis artifacts",
+    )
+    analyze_parser.add_argument(
+        "--tracks",
+        type=Path,
+        help="tracks.json; defaults to the sibling player-tracking output directory",
+    )
+    analyze_parser.add_argument(
+        "--position-corrections",
+        type=Path,
+        help=(
+            "optional recording-local court-position correction JSON; defaults to "
+            "player-position-corrections.json beside tracks.json when present"
         ),
     )
     return parser
@@ -469,6 +501,38 @@ def _run_track_players(
     return EXIT_OK
 
 
+def _run_analyze_players(
+    video_path: Path,
+    *,
+    calibration_path: Path,
+    output_dir: Path,
+    tracks_path: Path | None,
+    position_corrections_path: Path | None,
+    settings: Settings,
+) -> int:
+    artifacts = analyze_players_in_video(
+        video_path,
+        calibration_path=calibration_path,
+        output_dir=output_dir,
+        settings=settings.player_analysis,
+        tracks_path=tracks_path,
+        position_corrections_path=position_corrections_path,
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "logical_player_positions_analyzed",
+        extra={
+            "context": {
+                "video": str(video_path.expanduser().resolve()),
+                "frames_processed": artifacts.frames_processed,
+                "release_version": "0.1",
+                "output_dir": str(output_dir.expanduser().resolve()),
+            }
+        },
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command and translate failures into stable process exit codes."""
 
@@ -536,6 +600,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 detections_path=cast(Path | None, args.detections),
                 assignments_path=cast(Path | None, args.assignments),
                 player_names_path=cast(Path | None, args.player_names),
+                settings=settings,
+            )
+        if args.command == "analyze-players":
+            return _run_analyze_players(
+                cast(Path, args.video),
+                calibration_path=cast(Path, args.calibration),
+                output_dir=cast(Path, args.output_dir),
+                tracks_path=cast(Path | None, args.tracks),
+                position_corrections_path=cast(Path | None, args.position_corrections),
                 settings=settings,
             )
         parser.error(f"unsupported command: {args.command}")

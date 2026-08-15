@@ -7,6 +7,7 @@ from pickleball_vision.config import (
     LogFormat,
     MediaSettings,
     PersonDetectionSettings,
+    PlayerAnalysisSettings,
     PlayerIsolationSettings,
     PlayerTrackingSettings,
     Settings,
@@ -25,6 +26,7 @@ def test_settings_have_safe_development_defaults() -> None:
     assert settings.person_detection == PersonDetectionSettings()
     assert settings.player_isolation == PlayerIsolationSettings()
     assert settings.player_tracking == PlayerTrackingSettings()
+    assert settings.player_analysis == PlayerAnalysisSettings()
 
 
 def test_settings_load_prefixed_environment_values() -> None:
@@ -52,6 +54,9 @@ def test_settings_load_prefixed_environment_values() -> None:
             "PICKLEBALL_VISION_TRACKING_MAX_IDENTITY_GAP_SECONDS": "2.5",
             "PICKLEBALL_VISION_TRACKING_LONG_GAP_APPEARANCE_SIMILARITY": "0.8",
             "PICKLEBALL_VISION_TRACKING_LONG_GAP_MINIMUM_APPEARANCE_MARGIN": "0.1",
+            "PICKLEBALL_VISION_ANALYSIS_MINIMUM_TRACKING_CONFIDENCE": "0.6",
+            "PICKLEBALL_VISION_ANALYSIS_SMOOTHING_WINDOW_FRAMES": "7",
+            "PICKLEBALL_VISION_ANALYSIS_MAXIMUM_STEP_GAP_SECONDS": "0.3",
         }
     )
 
@@ -82,6 +87,11 @@ def test_settings_load_prefixed_environment_values() -> None:
         max_identity_gap_seconds=2.5,
         long_gap_appearance_similarity=0.8,
         long_gap_minimum_appearance_margin=0.1,
+    )
+    assert settings.player_analysis == PlayerAnalysisSettings(
+        minimum_tracking_confidence=0.6,
+        smoothing_window_frames=7,
+        maximum_step_gap_seconds=0.3,
     )
 
 
@@ -140,6 +150,10 @@ def test_settings_load_prefixed_environment_values() -> None:
         (
             {"PICKLEBALL_VISION_TRACKING_LONG_GAP_APPEARANCE_SIMILARITY": "1.1"},
             "PICKLEBALL_VISION_TRACKING_LONG_GAP_APPEARANCE_SIMILARITY",
+        ),
+        (
+            {"PICKLEBALL_VISION_ANALYSIS_SMOOTHING_WINDOW_FRAMES": "4"},
+            "PICKLEBALL_VISION_ANALYSIS_SMOOTHING_WINDOW_FRAMES",
         ),
     ],
 )

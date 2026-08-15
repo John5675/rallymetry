@@ -3,9 +3,9 @@
 This Python package is the local computer-vision pipeline. It currently provides
 typed executable infrastructure, audio-aware FFmpeg/OpenCV media ingestion,
 lossless analysis-audio extraction, manual multi-point court calibration,
-pretrained person detection, court-aware manual primary-player isolation, and
-persistent logical-player tracking. Audio-event detection and analytics remain
-unimplemented.
+pretrained person detection, court-aware manual primary-player isolation,
+persistent logical-player tracking, and Release 0.1 player court-position analytics.
+Audio-event detection and later match analytics remain unimplemented.
 
 ```bash
 uv sync --locked --extra dev
@@ -27,6 +27,10 @@ uv run pickleball-vision isolate-players /absolute/path/to/match.mp4 \
 uv run pickleball-vision track-players /absolute/path/to/match.mp4 \
   --calibration ../../output/calibration/calibration.json \
   --output-dir ../../output/player-tracking
+uv run pickleball-vision analyze-players /absolute/path/to/match.mp4 \
+  --calibration ../../output/calibration/calibration.json \
+  --output-dir ../../output/player-analysis \
+  --position-corrections ../../output/player-tracking/player-position-corrections.json
 ```
 
 Calibration uses a local OpenCV window. See `docs/court-calibration.md` from the
@@ -38,6 +42,9 @@ Persistent tracking consumes those assignments, learns recording-local clothing
 appearance at the manual anchors, and writes raw transient tracker evidence
 separately from logical roles. An optional `player-names.json` supplies display names;
 see `docs/player-tracking.md`.
+Release 0.1 player analysis preserves raw, manually corrected, and smoothed court
+positions separately and writes qualified metrics plus heatmaps and review videos; see
+`docs/analytics-definitions.md`.
 
 Audio is optional. Extraction preserves source sample rate and channels by default
 and writes a timing/conversion sidecar next to the PCM WAV. See

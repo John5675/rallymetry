@@ -5,12 +5,13 @@ doubles pickleball matches into inspectable, structured match data. The long-ter
 goal includes court and player tracking, ball trajectories, rally and shot events,
 match analytics, and AI-assisted coaching.
 
-The current milestone is **Persistent player tracking**. The local
+The current milestone is **Player court-position analytics (Release 0.1)**. The local
 CLI can inspect video plus optional synchronized audio, extract lossless analysis
 audio, calibrate the court, detect people broadly, derive court-aware candidates,
 manually assign the four logical match roles, and track those identities separately
-from transient ByteTrack IDs. Raw observations remain separate from derived logical
-tracks and later events.
+from transient ByteTrack IDs. It can now derive separate raw/smoothed court positions,
+movement metrics, heatmaps, and top-down review video. Raw observations remain
+separate from derived positions and later events.
 
 ## Repository map
 
@@ -75,6 +76,10 @@ uv run pickleball-vision isolate-players /absolute/path/to/match.mp4 \
 uv run pickleball-vision track-players /absolute/path/to/match.mp4 \
   --calibration ../../output/calibration/calibration.json \
   --output-dir ../../output/player-tracking
+uv run pickleball-vision analyze-players /absolute/path/to/match.mp4 \
+  --calibration ../../output/calibration/calibration.json \
+  --output-dir ../../output/player-analysis \
+  --position-corrections ../../output/player-tracking/player-position-corrections.json
 ```
 
 Command results are emitted as JSON on standard output. Diagnostic structured
@@ -132,6 +137,13 @@ optional sibling `player-names.json` maps the four stable roles to display names
 [the persistent-player tracking guide](docs/player-tracking.md). The standard command
 finds detections through `player-assignments.json`; `--assignments` and `--detections`
 remain available for nonstandard artifact locations.
+
+Release 0.1 player analysis consumes the structured `tracks.json` artifact and
+retains raw bottom-center ground points separately from optional bounded manual
+court-plane corrections and bounded smoothed coordinates. It generates
+movement/occupancy metrics, per-player heatmaps, a source overlay, and a top-down
+animation. See [the analytics definitions](docs/analytics-definitions.md) for exact
+formulas, region boundaries, quality gates, correction format, and limitations.
 
 ## Verify the setup
 
