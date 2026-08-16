@@ -5,7 +5,7 @@ doubles pickleball matches into inspectable, structured match data. The long-ter
 goal includes court and player tracking, ball trajectories, rally and shot events,
 match analytics, and AI-assisted coaching.
 
-The current milestone is **Automatic rally segmentation**. Milestones 0–12 are
+The current milestone is **Multimodal bounce detection**. Milestones 0–13 are
 complete. The local
 CLI can inspect video plus optional synchronized audio, extract lossless analysis
 audio, calibrate the court, detect people broadly, derive court-aware candidates,
@@ -24,8 +24,10 @@ winner, shot-type, and optional audio-context annotations. Structured automatic
 rally segmentation now combines primary-ball activity, sustained motion, gaps,
 serve-like onsets, adjacent-burst dead-ball handoff rejection, and optional
 player/audio confidence support, then evaluates
-against human rally boundaries. Automatic paddle-contact and bounce inference
-remain unimplemented.
+against human rally boundaries. Visual-first bounce candidates now combine local
+trajectory reversal, continuity, and optional synchronized audio support while
+gating court projection behind plane-contact plausibility. Automatic paddle-contact
+inference remains unimplemented.
 
 ## Repository map
 
@@ -123,6 +125,13 @@ uv run pickleball-vision segment-rallies /absolute/path/to/match.mp4 \
   --audio-events ../../output/audio-analysis/audio-events.json \
   --annotations ../../output/match-annotations.json \
   --output-dir ../../output/rally-segmentation
+uv run pickleball-vision detect-bounces /absolute/path/to/match.mp4 \
+  --ball-tracks ../../output/ball-tracking/ball_tracks.json \
+  --calibration ../../output/calibration/calibration.json \
+  --rallies ../../output/rally-segmentation/rallies.json \
+  --audio-events ../../output/audio-analysis/audio-events.json \
+  --annotations ../../output/match-annotations.json \
+  --output-dir ../../output/bounce-detection
 ```
 
 Command results are emitted as JSON on standard output. Diagnostic structured
@@ -227,6 +236,13 @@ retained as inspectable rejected candidates instead of being reported as rallies
 Human annotations are isolated to post-inference evaluation, and sparse annotation
 files do not make unreviewed video time negative. See
 [the rally segmentation guide](docs/rally-segmentation.md).
+
+Multimodal bounce detection requires visual direction reversal, local trajectory
+shape, and continuity before optional audio can increase confidence. Audio alone
+creates no candidate. Court coordinates remain null unless the visual candidate is
+plausibly on the plane and inside the projected court image; no 3D position or line
+call is inferred. Evaluation compares visual-only and fused thresholds over the
+same candidate set. See [the bounce detection guide](docs/bounce-detection.md).
 
 ## Verify the setup
 

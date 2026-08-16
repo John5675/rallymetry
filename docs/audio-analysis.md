@@ -75,6 +75,7 @@ All settings use the `PICKLEBALL_VISION_` prefix:
 | `AUDIO_ANALYSIS_FRAME_DURATION_MS` | `32` | Signal-feature window duration |
 | `AUDIO_ANALYSIS_HOP_DURATION_MS` | `10` | Feature-window step |
 | `AUDIO_VIDEO_OFFSET_MS` | `0` | Correction applied on the canonical timeline |
+| `FUSION_TOLERANCE_MS` | `90` | Shared maximum A/V evidence-matching distance for downstream fusion |
 
 Channels are always retained in feature output. `combined` affects candidate
 selection only; it does not downmix the stored WAV or discard channel observations.

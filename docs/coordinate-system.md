@@ -95,6 +95,13 @@ Valid examples include annotated court landmarks, a player's estimated shoe/cour
 contact, and a confirmed ball bounce location. An airborne player extremity,
 paddle, or ball does not lie on that plane.
 
+For automatic bounce detection, “confirmed” means that visual trajectory reversal,
+local shape, continuity, and projected-court image inclusion meet the explicit
+plane-contact threshold. Audio support cannot satisfy this gate. Only then may the
+candidate image point be mapped to `courtPosition`; otherwise that field remains
+null. This coordinate is an estimated contact location, not a 3D reconstruction or
+line call.
+
 Never project an airborne ball through the homography as a court position. Future
 3D ball reconstruction must use a camera model and sufficient temporal or
 multi-view constraints, and must advertise its uncertainty separately.

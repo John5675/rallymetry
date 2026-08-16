@@ -128,6 +128,7 @@ def _configuration_payload(
     return {
         **settings.as_dict(),
         "audioVideoOffsetMs": timeline.audio_video_offset_ms,
+        "fusionToleranceMs": timeline.fusion_tolerance_ms,
     }
 
 

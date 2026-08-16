@@ -307,10 +307,13 @@ class MediaTimeline:
     """Map relative video/audio timestamps onto source-media presentation time."""
 
     audio_video_offset_ms: float = 0.0
+    fusion_tolerance_ms: float = 90.0
 
     def __post_init__(self) -> None:
         if not math.isfinite(self.audio_video_offset_ms):
             raise ValueError("audio_video_offset_ms must be finite")
+        if not math.isfinite(self.fusion_tolerance_ms) or self.fusion_tolerance_ms <= 0:
+            raise ValueError("fusion_tolerance_ms must be finite and positive")
 
     def video_timestamp_to_media_time(
         self,

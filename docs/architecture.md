@@ -256,6 +256,15 @@ it never mutates `ball_tracks.json`, `tracks.json`, or `audio-events.json`. Huma
 annotations are a post-inference evaluation input only, with sparse reviewed time
 kept distinct from reviewed-negative complete-video coverage.
 
+Multimodal bounce detection is a separate derived-event layer over the immutable
+ball trajectory. It generates candidates only from visual reversal, motion, shape,
+and continuity evidence. Optional rally intervals and generic audio transients are
+confidence support; neither can create a candidate. Audio fusion remaps raw analysis
+timestamps with explicit A/V offset and tolerance provenance. Court homography is
+applied to a candidate ball point only after visual plane-contact plausibility and
+projected-court image inclusion. Outputs retain low-confidence candidates and never
+infer true 3D position or line calls.
+
 The local annotation-review interface is an adapter over fixed split records,
 human annotation JSON, source images, and optional raw detector suggestions. It binds
 only to loopback and introduces no product backend. Suggestions stay in their raw

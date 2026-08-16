@@ -4,6 +4,7 @@ from typing import cast
 
 import pytest
 
+from pickleball_vision.bounce_detection_workflow import BounceDetectionArtifacts
 from pickleball_vision.calibration import CalibrationCorrespondence
 from pickleball_vision.cli import EXIT_OK, EXIT_USAGE_ERROR, main
 from pickleball_vision.config import (
@@ -29,6 +30,7 @@ def _clear_settings(monkeypatch: pytest.MonkeyPatch) -> None:
         "LOG_FORMAT",
         "OUTPUT_DIR",
         "AUDIO_VIDEO_OFFSET_MS",
+        "FUSION_TOLERANCE_MS",
         "AUDIO_ANALYSIS_SAMPLE_RATE_HZ",
         "AUDIO_ANALYSIS_ONSET_SENSITIVITY",
         "AUDIO_ANALYSIS_MINIMUM_EVENT_SEPARATION_MS",
@@ -110,6 +112,20 @@ def _clear_settings(monkeypatch: pytest.MonkeyPatch) -> None:
         "RALLY_EVALUATION_MINIMUM_IOU",
         "RALLY_EVALUATION_BOUNDARY_TOLERANCE_SECONDS",
         "RALLY_SPARSE_EVALUATION_MARGIN_SECONDS",
+        "BOUNCE_TRAJECTORY_WINDOW_SECONDS",
+        "BOUNCE_MINIMUM_OBSERVATIONS_EACH_SIDE",
+        "BOUNCE_MINIMUM_VERTICAL_SPEED_DIAGONALS_PER_SECOND",
+        "BOUNCE_MINIMUM_VERTICAL_REVERSAL_DIAGONALS_PER_SECOND",
+        "BOUNCE_MINIMUM_SHAPE_PROMINENCE_DIAGONAL_FRACTION",
+        "BOUNCE_MINIMUM_CONTINUITY_FRACTION",
+        "BOUNCE_MINIMUM_VISUAL_CANDIDATE_CONFIDENCE",
+        "BOUNCE_ACCEPTED_CONFIDENCE",
+        "BOUNCE_PLANE_PROJECTION_MINIMUM_VISUAL_CONFIDENCE",
+        "BOUNCE_MINIMUM_BETWEEN_SECONDS",
+        "BOUNCE_AUDIO_CONFIDENCE_WEIGHT",
+        "BOUNCE_RALLY_SEQUENCE_CONFIDENCE_BOOST",
+        "BOUNCE_EVALUATION_TOLERANCE_MS",
+        "BOUNCE_SPARSE_EVALUATION_MARGIN_SECONDS",
     ):
         monkeypatch.delenv(f"{ENV_PREFIX}{suffix}", raising=False)
 
@@ -849,3 +865,72 @@ def test_segment_rallies_command_routes_structured_inputs(
     assert received["annotations_complete"] is True
     assert received["evaluation_partition"] == "test"
     assert log_record["event"] == "rallies_segmented"
+
+
+def test_detect_bounces_command_routes_visual_and_optional_multimodal_inputs(
+    synthetic_video: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _clear_settings(monkeypatch)
+    monkeypatch.setenv("PICKLEBALL_VISION_AUDIO_VIDEO_OFFSET_MS", "45")
+    ball_tracks = tmp_path / "ball_tracks.json"
+    calibration = tmp_path / "calibration.json"
+    rallies = tmp_path / "rallies.json"
+    audio_events = tmp_path / "audio-events.json"
+    annotations = tmp_path / "annotations.json"
+    output_dir = tmp_path / "bounces"
+    received: dict[str, object] = {}
+
+    def fake_detect_bounces(video_path: Path, **kwargs: object) -> BounceDetectionArtifacts:
+        received["video_path"] = video_path
+        received.update(kwargs)
+        return BounceDetectionArtifacts(
+            bounces_path=output_dir / "bounces.json",
+            debug_video_path=output_dir / "bounce-debug.mp4",
+            evaluation_path=output_dir / "bounce-evaluation.json",
+            visual_candidate_count=12,
+            accepted_bounce_count=8,
+            fused_candidate_count=5,
+        )
+
+    monkeypatch.setattr("pickleball_vision.cli.detect_bounces_in_video", fake_detect_bounces)
+    exit_code = main(
+        [
+            "detect-bounces",
+            str(synthetic_video),
+            "--ball-tracks",
+            str(ball_tracks),
+            "--calibration",
+            str(calibration),
+            "--rallies",
+            str(rallies),
+            "--audio-events",
+            str(audio_events),
+            "--annotations",
+            str(annotations),
+            "--annotations-complete",
+            "--evaluation-partition",
+            "test",
+            "--output-dir",
+            str(output_dir),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+    log_record = json.loads(captured.err)
+    assert exit_code == EXIT_OK
+    assert report["acceptedBounceCount"] == 8
+    assert received["video_path"] == synthetic_video
+    assert received["ball_tracks_path"] == ball_tracks
+    assert received["calibration_path"] == calibration
+    assert received["rallies_path"] == rallies
+    assert received["audio_events_path"] == audio_events
+    assert received["annotations_path"] == annotations
+    assert received["annotations_complete"] is True
+    assert received["evaluation_partition"] == "test"
+    timeline = cast(MediaTimeline, received["timeline"])
+    assert timeline.audio_video_offset_ms == 45.0
+    assert log_record["event"] == "bounces_detected"

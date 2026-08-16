@@ -6,6 +6,7 @@ from pickleball_vision.config import (
     AudioAnalysisChannelMode,
     AudioAnalysisSettings,
     BallTrackingSettings,
+    BounceDetectionSettings,
     Environment,
     LogFormat,
     MediaSettings,
@@ -34,6 +35,7 @@ def test_settings_have_safe_development_defaults() -> None:
     assert settings.player_analysis == PlayerAnalysisSettings()
     assert settings.ball_tracking == BallTrackingSettings()
     assert settings.rally_segmentation == RallySegmentationSettings()
+    assert settings.bounce_detection == BounceDetectionSettings()
 
 
 def test_settings_load_prefixed_environment_values() -> None:
@@ -44,6 +46,7 @@ def test_settings_load_prefixed_environment_values() -> None:
             "PICKLEBALL_VISION_LOG_FORMAT": "console",
             "PICKLEBALL_VISION_OUTPUT_DIR": "~/pickleball-output",
             "PICKLEBALL_VISION_AUDIO_VIDEO_OFFSET_MS": "-35.5",
+            "PICKLEBALL_VISION_FUSION_TOLERANCE_MS": "75",
             "PICKLEBALL_VISION_AUDIO_ANALYSIS_SAMPLE_RATE_HZ": "24000",
             "PICKLEBALL_VISION_AUDIO_ANALYSIS_ONSET_SENSITIVITY": "5.5",
             "PICKLEBALL_VISION_AUDIO_ANALYSIS_MINIMUM_EVENT_SEPARATION_MS": "120",
@@ -79,6 +82,8 @@ def test_settings_load_prefixed_environment_values() -> None:
             "PICKLEBALL_VISION_RALLY_DEAD_BALL_HANDOFF_WINDOW_SECONDS": "2.8",
             "PICKLEBALL_VISION_RALLY_DEAD_BALL_HANDOFF_MINIMUM_QUALITY_MARGIN": "0.08",
             "PICKLEBALL_VISION_RALLY_EVALUATION_MINIMUM_IOU": "0.4",
+            "PICKLEBALL_VISION_BOUNCE_AUDIO_CONFIDENCE_WEIGHT": "0.25",
+            "PICKLEBALL_VISION_BOUNCE_EVALUATION_TOLERANCE_MS": "100",
         }
     )
 
@@ -86,7 +91,10 @@ def test_settings_load_prefixed_environment_values() -> None:
     assert settings.log_level == "WARNING"
     assert settings.log_format is LogFormat.CONSOLE
     assert settings.output_dir == Path("~/pickleball-output").expanduser()
-    assert settings.media == MediaSettings(audio_video_offset_ms=-35.5)
+    assert settings.media == MediaSettings(
+        audio_video_offset_ms=-35.5,
+        fusion_tolerance_ms=75.0,
+    )
     assert settings.audio_analysis == AudioAnalysisSettings(
         analysis_sample_rate_hz=24000,
         onset_sensitivity=5.5,
@@ -135,6 +143,10 @@ def test_settings_load_prefixed_environment_values() -> None:
         dead_ball_handoff_window_seconds=2.8,
         dead_ball_handoff_minimum_quality_margin=0.08,
         evaluation_minimum_iou=0.4,
+    )
+    assert settings.bounce_detection == BounceDetectionSettings(
+        audio_confidence_weight=0.25,
+        evaluation_tolerance_ms=100.0,
     )
 
 
@@ -235,6 +247,18 @@ def test_settings_load_prefixed_environment_values() -> None:
         (
             {"PICKLEBALL_VISION_RALLY_DEAD_BALL_HANDOFF_MINIMUM_QUALITY_MARGIN": "1.1"},
             "PICKLEBALL_VISION_RALLY_DEAD_BALL_HANDOFF_MINIMUM_QUALITY_MARGIN",
+        ),
+        (
+            {"PICKLEBALL_VISION_BOUNCE_AUDIO_CONFIDENCE_WEIGHT": "1.1"},
+            "PICKLEBALL_VISION_BOUNCE_AUDIO_CONFIDENCE_WEIGHT",
+        ),
+        (
+            {"PICKLEBALL_VISION_BOUNCE_MINIMUM_OBSERVATIONS_EACH_SIDE": "1"},
+            "PICKLEBALL_VISION_BOUNCE_MINIMUM_OBSERVATIONS_EACH_SIDE",
+        ),
+        (
+            {"PICKLEBALL_VISION_FUSION_TOLERANCE_MS": "0"},
+            "PICKLEBALL_VISION_FUSION_TOLERANCE_MS",
         ),
         (
             {

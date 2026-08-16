@@ -8,7 +8,8 @@ training, raw spatial ball inference, fixed-split evaluation, and conservative
 image-space ball trajectory reconstruction are also implemented. Synchronized raw
 audio features, generic transient candidates, versioned human multimodal event
 ground truth, and structured automatic rally segmentation are implemented. Automatic
-bounce, paddle-contact, hitter, and shot inference remain contracts only.
+visual-first multimodal bounce detection is also implemented. Paddle-contact,
+hitter, and shot inference remain contracts only.
 
 ## Intended flow
 
@@ -27,7 +28,8 @@ source media metadata (video + optional audio)
       -> generic audio transient candidates
       + human multimodal event ground truth
       -> automatic rally intervals
-      -> multimodal bounce/contact/hitter/shot events
+      -> visual-first bounce candidates + optional audio confidence support
+      -> multimodal contact/hitter/shot events
       -> structured match data
       -> analytics
 ```
@@ -75,9 +77,11 @@ mediaTime = (audioStartTime or 0)
 ```
 
 `audioVideoOffsetMs` defaults to zero and is a configured correction for downstream
-fusion; stream start times remain separately visible evidence. A positive offset
-makes an audio observation later on the canonical timeline. Every future fusion
-stage must also use an explicit timing tolerance and provide a vision-only fallback.
+fusion; `fusionToleranceMs` defaults to 90 milliseconds and is the shared maximum
+matching distance for downstream A/V evidence. Stream start times remain separately
+visible evidence. A positive offset makes an audio observation later on the
+canonical timeline. Every fusion stage must preserve its effective tolerance and
+provide a vision-only fallback.
 
 Audio extraction decodes the selected source stream into PCM WAV, preserves source
 sample rate and channels by default, and never rewrites the source recording.
@@ -149,6 +153,30 @@ missed, and false rallies, plus start/end timing error. The implementation never
 tunes thresholds automatically and records whether a run is development,
 validation, or test. Exact fields, settings, and commands are documented in
 `rally-segmentation.md`.
+
+## Multimodal bounce-detection contract
+
+Bounce detection consumes the immutable, frame-complete ball trajectory and manual
+calibration. Image-space direction reversal, vertical motion, local shape, and
+same-segment continuity are required to create a visual candidate. Optional rally
+intervals provide confidence-only sequence context and cannot create a candidate.
+
+Generic audio transients are remapped from analysis time using the source stream
+starts, the configured `audioVideoOffsetMs`, and an explicit `fusionToleranceMs`.
+Audio can increase confidence only on an existing visual candidate; one-to-one
+matching retains the raw transient ID and never assigns it an independent bounce
+meaning. Vision-only operation remains fully supported.
+
+Known court geometry may be projected into the image during visual assessment. A
+ball image point is transformed into court coordinates only after the candidate has
+already met the visual plane-contact threshold and lies inside the projected court
+polygon. Null court positions remain null. The stage never projects an airborne
+ball, infers true 3D position, or performs a line call.
+
+Human `BOUNCE` events are isolated to post-inference evaluation. Visual-only and
+fused evaluation threshold the same visual candidates and report precision, recall,
+F1, and timing error. Exact commands, fields, thresholds, and sparse-review rules
+are defined in `bounce-detection.md`.
 
 ## Court calibration contract
 

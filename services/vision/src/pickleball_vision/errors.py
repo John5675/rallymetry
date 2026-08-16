@@ -34,6 +34,7 @@ class ErrorCode(StrEnum):
     BALL_MODEL = "ball_model_error"
     BALL_TRACKING_INPUT = "ball_tracking_input_error"
     BALL_TRAINING = "ball_training_error"
+    BOUNCE_DETECTION_INPUT = "bounce_detection_input_error"
     OUTPUT_WRITE = "output_write_error"
     PLAYER_ASSIGNMENT_IO = "player_assignment_io_error"
     PLAYER_ISOLATION_CANCELLED = "player_isolation_cancelled"
@@ -445,5 +446,16 @@ class RallySegmentationInputError(PickleballVisionError):
         super().__init__(
             f"Invalid rally-segmentation input: {reason}",
             code=ErrorCode.RALLY_SEGMENTATION_INPUT,
+            details={"reason": reason},
+        )
+
+
+class BounceDetectionInputError(PickleballVisionError):
+    """Raised when bounce-detection artifacts are incompatible or malformed."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Invalid bounce-detection input: {reason}",
+            code=ErrorCode.BOUNCE_DETECTION_INPUT,
             details={"reason": reason},
         )

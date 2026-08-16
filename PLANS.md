@@ -424,7 +424,7 @@ Exit criteria:
 - No automatic rally segmentation, bounce/contact detection, hitter inference,
   shot inference, match analytics, or product application behavior is implemented.
 
-## 13. Automatic rally segmentation — current
+## 13. Automatic rally segmentation — complete
 
 Derive inspectable rally intervals from structured ball-trajectory activity,
 sustained motion, bounded trajectory gaps, serve-like motion onsets, time between
@@ -466,9 +466,46 @@ Exit criteria:
 - No automatic bounce detection, paddle-contact detection, hitter inference, or
   shot reconstruction/classification is implemented.
 
+## 14. Multimodal bounce detection — current
+
+Derive inspectable bounce candidates primarily from visual ball-trajectory evidence,
+then optionally fuse synchronized generic audio transients as confidence support.
+Audio never creates a candidate and court homography is applied only after visual
+evidence supports plausible contact with the court plane.
+
+Exit criteria:
+
+- `pickleball-vision detect-bounces <video> --ball-tracks <json> --calibration
+  <json> --output-dir <dir>` validates source provenance and consumes immutable
+  trajectory/calibration artifacts.
+- Candidate generation requires an image-space vertical reversal, sufficient
+  before/after motion, local trajectory shape, and same-segment continuity. Optional
+  rally intervals can support confidence but cannot create a bounce.
+- Optional generic audio transients use the configurable `audioVideoOffsetMs` and
+  `fusionToleranceMs`, can increase confidence only on an existing visual
+  candidate, and retain the matched raw audio event ID.
+- Every candidate retains frame/time, source image position, visual/audio/fused
+  confidence, evidence mode, acceptance states, and separately inspectable signals.
+- Court coordinates are emitted only after visual plane-contact plausibility and
+  projected-court image inclusion. No airborne projection, true 3D inference, or
+  line calling is performed.
+- Audio-free input succeeds through the same visual path. Neighboring-court sounds
+  remain an explicit limitation.
+- Human `BOUNCE` annotations are loaded only after inference. Evaluation reports
+  one-to-one precision, recall, F1, and timing error for visual-only and
+  visual-plus-audio thresholds over the same visual candidate set.
+- `bounces.json`, `bounce-debug.mp4`, and `bounce-evaluation.json` are generated
+  atomically without modifying source media or input artifacts.
+- Synthetic tests cover visual reversals, projection gating, audio-only prohibition,
+  A/V offset/tolerance, no-audio fallback, comparative evaluation, serialization,
+  provenance, CLI routing, and debug rendering.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- No paddle-contact detection, hitter identification, shot reconstruction,
+  classification, line calling, or analytics is implemented.
+
 ## Future milestones — not current
 
-14. Multimodal bounce detection
 15. Multimodal paddle-contact detection
 16. Hitter identification
 17. Shot reconstruction and classification

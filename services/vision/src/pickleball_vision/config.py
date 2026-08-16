@@ -44,6 +44,7 @@ class MediaSettings:
     """Canonical media-timeline settings shared by future A/V fusion stages."""
 
     audio_video_offset_ms: float = 0.0
+    fusion_tolerance_ms: float = 90.0
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> MediaSettings:
@@ -51,15 +52,26 @@ class MediaSettings:
 
         source = os.environ if environ is None else environ
         offset_ms = _float_setting(source, "AUDIO_VIDEO_OFFSET_MS", cls().audio_video_offset_ms)
+        tolerance_ms = _float_setting(
+            source,
+            "FUSION_TOLERANCE_MS",
+            cls().fusion_tolerance_ms,
+        )
         if not math.isfinite(offset_ms):
             setting = f"{ENV_PREFIX}AUDIO_VIDEO_OFFSET_MS"
             raise ConfigurationError(f"{setting} must be finite", setting=setting)
-        return cls(audio_video_offset_ms=offset_ms)
+        if not math.isfinite(tolerance_ms) or tolerance_ms <= 0:
+            setting = f"{ENV_PREFIX}FUSION_TOLERANCE_MS"
+            raise ConfigurationError(f"{setting} must be finite and positive", setting=setting)
+        return cls(audio_video_offset_ms=offset_ms, fusion_tolerance_ms=tolerance_ms)
 
     def as_dict(self) -> dict[str, object]:
         """Return non-secret timing configuration for provenance."""
 
-        return {"audioVideoOffsetMs": self.audio_video_offset_ms}
+        return {
+            "audioVideoOffsetMs": self.audio_video_offset_ms,
+            "fusionToleranceMs": self.fusion_tolerance_ms,
+        }
 
 
 @dataclass(frozen=True, slots=True)
@@ -1076,6 +1088,168 @@ class RallySegmentationSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class BounceDetectionSettings:
+    """Validated visual-first bounce-candidate and optional fusion thresholds."""
+
+    trajectory_window_seconds: float = 0.20
+    minimum_observations_each_side: int = 2
+    minimum_vertical_speed_diagonals_per_second: float = 0.018
+    minimum_vertical_reversal_diagonals_per_second: float = 0.040
+    minimum_shape_prominence_diagonal_fraction: float = 0.0015
+    minimum_continuity_fraction: float = 0.65
+    minimum_visual_candidate_confidence: float = 0.35
+    accepted_confidence: float = 0.80
+    plane_projection_minimum_visual_confidence: float = 0.55
+    minimum_between_bounces_seconds: float = 0.18
+    audio_confidence_weight: float = 0.20
+    rally_sequence_confidence_boost: float = 0.05
+    evaluation_tolerance_ms: float = 120.0
+    sparse_evaluation_margin_seconds: float = 0.30
+
+    @classmethod
+    def from_env(
+        cls,
+        environ: Mapping[str, str] | None = None,
+    ) -> BounceDetectionSettings:
+        """Load bounce thresholds from prefixed environment variables."""
+
+        source = os.environ if environ is None else environ
+        defaults = cls()
+        float_suffixes = {
+            "trajectory_window_seconds": "BOUNCE_TRAJECTORY_WINDOW_SECONDS",
+            "minimum_vertical_speed_diagonals_per_second": (
+                "BOUNCE_MINIMUM_VERTICAL_SPEED_DIAGONALS_PER_SECOND"
+            ),
+            "minimum_vertical_reversal_diagonals_per_second": (
+                "BOUNCE_MINIMUM_VERTICAL_REVERSAL_DIAGONALS_PER_SECOND"
+            ),
+            "minimum_shape_prominence_diagonal_fraction": (
+                "BOUNCE_MINIMUM_SHAPE_PROMINENCE_DIAGONAL_FRACTION"
+            ),
+            "minimum_continuity_fraction": "BOUNCE_MINIMUM_CONTINUITY_FRACTION",
+            "minimum_visual_candidate_confidence": ("BOUNCE_MINIMUM_VISUAL_CANDIDATE_CONFIDENCE"),
+            "accepted_confidence": "BOUNCE_ACCEPTED_CONFIDENCE",
+            "plane_projection_minimum_visual_confidence": (
+                "BOUNCE_PLANE_PROJECTION_MINIMUM_VISUAL_CONFIDENCE"
+            ),
+            "minimum_between_bounces_seconds": "BOUNCE_MINIMUM_BETWEEN_SECONDS",
+            "audio_confidence_weight": "BOUNCE_AUDIO_CONFIDENCE_WEIGHT",
+            "rally_sequence_confidence_boost": "BOUNCE_RALLY_SEQUENCE_CONFIDENCE_BOOST",
+            "evaluation_tolerance_ms": "BOUNCE_EVALUATION_TOLERANCE_MS",
+            "sparse_evaluation_margin_seconds": "BOUNCE_SPARSE_EVALUATION_MARGIN_SECONDS",
+        }
+        values: dict[str, float | int] = {
+            name: _float_setting(source, suffix, getattr(defaults, name))
+            for name, suffix in float_suffixes.items()
+        }
+        observation_suffix = "BOUNCE_MINIMUM_OBSERVATIONS_EACH_SIDE"
+        observations = _int_setting(
+            source,
+            observation_suffix,
+            defaults.minimum_observations_each_side,
+        )
+        if observations < 2:
+            setting = f"{ENV_PREFIX}{observation_suffix}"
+            raise ConfigurationError(f"{setting} must be at least 2", setting=setting)
+        values["minimum_observations_each_side"] = observations
+        fraction_fields = (
+            "minimum_shape_prominence_diagonal_fraction",
+            "minimum_continuity_fraction",
+            "minimum_visual_candidate_confidence",
+            "accepted_confidence",
+            "plane_projection_minimum_visual_confidence",
+            "audio_confidence_weight",
+            "rally_sequence_confidence_boost",
+        )
+        for name in fraction_fields:
+            value = float(values[name])
+            if not 0 <= value <= 1:
+                setting = f"{ENV_PREFIX}{float_suffixes[name]}"
+                raise ConfigurationError(
+                    f"{setting} must be between 0 and 1 inclusive",
+                    setting=setting,
+                )
+        for name, suffix in float_suffixes.items():
+            if name in fraction_fields:
+                continue
+            value = float(values[name])
+            if not math.isfinite(value) or value <= 0:
+                setting = f"{ENV_PREFIX}{suffix}"
+                raise ConfigurationError(f"{setting} must be finite and positive", setting=setting)
+        if values["accepted_confidence"] < values["minimum_visual_candidate_confidence"]:
+            setting = f"{ENV_PREFIX}BOUNCE_ACCEPTED_CONFIDENCE"
+            raise ConfigurationError(
+                f"{setting} must be at least "
+                f"{ENV_PREFIX}BOUNCE_MINIMUM_VISUAL_CANDIDATE_CONFIDENCE",
+                setting=setting,
+            )
+        if (
+            values["plane_projection_minimum_visual_confidence"]
+            < values["minimum_visual_candidate_confidence"]
+        ):
+            setting = f"{ENV_PREFIX}BOUNCE_PLANE_PROJECTION_MINIMUM_VISUAL_CONFIDENCE"
+            raise ConfigurationError(
+                f"{setting} must be at least "
+                f"{ENV_PREFIX}BOUNCE_MINIMUM_VISUAL_CANDIDATE_CONFIDENCE",
+                setting=setting,
+            )
+        return cls(
+            trajectory_window_seconds=float(values["trajectory_window_seconds"]),
+            minimum_observations_each_side=int(values["minimum_observations_each_side"]),
+            minimum_vertical_speed_diagonals_per_second=float(
+                values["minimum_vertical_speed_diagonals_per_second"]
+            ),
+            minimum_vertical_reversal_diagonals_per_second=float(
+                values["minimum_vertical_reversal_diagonals_per_second"]
+            ),
+            minimum_shape_prominence_diagonal_fraction=float(
+                values["minimum_shape_prominence_diagonal_fraction"]
+            ),
+            minimum_continuity_fraction=float(values["minimum_continuity_fraction"]),
+            minimum_visual_candidate_confidence=float(
+                values["minimum_visual_candidate_confidence"]
+            ),
+            accepted_confidence=float(values["accepted_confidence"]),
+            plane_projection_minimum_visual_confidence=float(
+                values["plane_projection_minimum_visual_confidence"]
+            ),
+            minimum_between_bounces_seconds=float(values["minimum_between_bounces_seconds"]),
+            audio_confidence_weight=float(values["audio_confidence_weight"]),
+            rally_sequence_confidence_boost=float(values["rally_sequence_confidence_boost"]),
+            evaluation_tolerance_ms=float(values["evaluation_tolerance_ms"]),
+            sparse_evaluation_margin_seconds=float(values["sparse_evaluation_margin_seconds"]),
+        )
+
+    def as_dict(self) -> dict[str, object]:
+        """Return complete, non-secret visual and fusion configuration."""
+
+        return {
+            "trajectoryWindowSeconds": self.trajectory_window_seconds,
+            "minimumObservationsEachSide": self.minimum_observations_each_side,
+            "minimumVerticalSpeedDiagonalsPerSecond": (
+                self.minimum_vertical_speed_diagonals_per_second
+            ),
+            "minimumVerticalReversalDiagonalsPerSecond": (
+                self.minimum_vertical_reversal_diagonals_per_second
+            ),
+            "minimumShapeProminenceDiagonalFraction": (
+                self.minimum_shape_prominence_diagonal_fraction
+            ),
+            "minimumContinuityFraction": self.minimum_continuity_fraction,
+            "minimumVisualCandidateConfidence": self.minimum_visual_candidate_confidence,
+            "acceptedConfidence": self.accepted_confidence,
+            "planeProjectionMinimumVisualConfidence": (
+                self.plane_projection_minimum_visual_confidence
+            ),
+            "minimumBetweenBouncesSeconds": self.minimum_between_bounces_seconds,
+            "audioConfidenceWeight": self.audio_confidence_weight,
+            "rallySequenceConfidenceBoost": self.rally_sequence_confidence_boost,
+            "evaluationToleranceMs": self.evaluation_tolerance_ms,
+            "sparseEvaluationMarginSeconds": self.sparse_evaluation_margin_seconds,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class Settings:
     """Validated settings loaded once at an executable boundary."""
 
@@ -1091,6 +1265,7 @@ class Settings:
     player_analysis: PlayerAnalysisSettings = field(default_factory=PlayerAnalysisSettings)
     ball_tracking: BallTrackingSettings = field(default_factory=BallTrackingSettings)
     rally_segmentation: RallySegmentationSettings = field(default_factory=RallySegmentationSettings)
+    bounce_detection: BounceDetectionSettings = field(default_factory=BounceDetectionSettings)
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> Settings:
@@ -1143,6 +1318,7 @@ class Settings:
             player_analysis=PlayerAnalysisSettings.from_env(source),
             ball_tracking=BallTrackingSettings.from_env(source),
             rally_segmentation=RallySegmentationSettings.from_env(source),
+            bounce_detection=BounceDetectionSettings.from_env(source),
         )
 
     def public_values(self) -> dict[str, object]:
@@ -1161,4 +1337,5 @@ class Settings:
             "player_analysis": self.player_analysis.as_dict(),
             "ball_tracking": self.ball_tracking.as_dict(),
             "rally_segmentation": self.rally_segmentation.as_dict(),
+            "bounce_detection": self.bounce_detection.as_dict(),
         }
