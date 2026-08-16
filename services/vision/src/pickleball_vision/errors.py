@@ -25,6 +25,7 @@ class ErrorCode(StrEnum):
     MEDIA_INSPECTION = "media_inspection_error"
     AUDIO_STREAM_NOT_FOUND = "audio_stream_not_found"
     AUDIO_EXTRACTION = "audio_extraction_error"
+    AUDIO_ANALYSIS = "audio_analysis_error"
     AUDIO_CONVERSION_INVALID = "audio_conversion_invalid"
     BALL_EVALUATION = "ball_evaluation_error"
     BALL_INFERENCE = "ball_inference_error"
@@ -130,6 +131,17 @@ class AudioExtractionError(PickleballVisionError):
             f"Unable to extract audio to {path}: {reason}",
             code=ErrorCode.AUDIO_EXTRACTION,
             details={"path": path, "reason": reason},
+        )
+
+
+class AudioAnalysisError(PickleballVisionError):
+    """Raised when synchronized audio cannot be analyzed or persisted safely."""
+
+    def __init__(self, reason: str, *, operation: str) -> None:
+        super().__init__(
+            f"Audio analysis failed during {operation}: {reason}",
+            code=ErrorCode.AUDIO_ANALYSIS,
+            details={"operation": operation, "reason": reason},
         )
 
 

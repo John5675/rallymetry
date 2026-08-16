@@ -3,6 +3,8 @@ from pathlib import Path
 import pytest
 
 from pickleball_vision.config import (
+    AudioAnalysisChannelMode,
+    AudioAnalysisSettings,
     BallTrackingSettings,
     Environment,
     LogFormat,
@@ -24,6 +26,7 @@ def test_settings_have_safe_development_defaults() -> None:
     assert settings.log_format is LogFormat.JSON
     assert settings.output_dir == Path("output")
     assert settings.media == MediaSettings()
+    assert settings.audio_analysis == AudioAnalysisSettings()
     assert settings.person_detection == PersonDetectionSettings()
     assert settings.player_isolation == PlayerIsolationSettings()
     assert settings.player_tracking == PlayerTrackingSettings()
@@ -39,6 +42,12 @@ def test_settings_load_prefixed_environment_values() -> None:
             "PICKLEBALL_VISION_LOG_FORMAT": "console",
             "PICKLEBALL_VISION_OUTPUT_DIR": "~/pickleball-output",
             "PICKLEBALL_VISION_AUDIO_VIDEO_OFFSET_MS": "-35.5",
+            "PICKLEBALL_VISION_AUDIO_ANALYSIS_SAMPLE_RATE_HZ": "24000",
+            "PICKLEBALL_VISION_AUDIO_ANALYSIS_ONSET_SENSITIVITY": "5.5",
+            "PICKLEBALL_VISION_AUDIO_ANALYSIS_MINIMUM_EVENT_SEPARATION_MS": "120",
+            "PICKLEBALL_VISION_AUDIO_ANALYSIS_CHANNEL_MODE": "per_channel",
+            "PICKLEBALL_VISION_AUDIO_ANALYSIS_FRAME_DURATION_MS": "40",
+            "PICKLEBALL_VISION_AUDIO_ANALYSIS_HOP_DURATION_MS": "12.5",
             "PICKLEBALL_VISION_PERSON_MODEL": "custom-person.pt",
             "PICKLEBALL_VISION_PERSON_DEVICE": "CPU",
             "PICKLEBALL_VISION_PERSON_MIN_CONFIDENCE": "0.15",
@@ -71,6 +80,14 @@ def test_settings_load_prefixed_environment_values() -> None:
     assert settings.log_format is LogFormat.CONSOLE
     assert settings.output_dir == Path("~/pickleball-output").expanduser()
     assert settings.media == MediaSettings(audio_video_offset_ms=-35.5)
+    assert settings.audio_analysis == AudioAnalysisSettings(
+        analysis_sample_rate_hz=24000,
+        onset_sensitivity=5.5,
+        minimum_event_separation_ms=120.0,
+        channel_mode=AudioAnalysisChannelMode.PER_CHANNEL,
+        frame_duration_ms=40.0,
+        hop_duration_ms=12.5,
+    )
     assert settings.person_detection == PersonDetectionSettings(
         model="custom-person.pt",
         device="cpu",
@@ -117,6 +134,25 @@ def test_settings_load_prefixed_environment_values() -> None:
         (
             {"PICKLEBALL_VISION_AUDIO_VIDEO_OFFSET_MS": "nan"},
             "PICKLEBALL_VISION_AUDIO_VIDEO_OFFSET_MS",
+        ),
+        (
+            {"PICKLEBALL_VISION_AUDIO_ANALYSIS_SAMPLE_RATE_HZ": "4000"},
+            "PICKLEBALL_VISION_AUDIO_ANALYSIS_SAMPLE_RATE_HZ",
+        ),
+        (
+            {"PICKLEBALL_VISION_AUDIO_ANALYSIS_ONSET_SENSITIVITY": "nan"},
+            "PICKLEBALL_VISION_AUDIO_ANALYSIS_ONSET_SENSITIVITY",
+        ),
+        (
+            {"PICKLEBALL_VISION_AUDIO_ANALYSIS_CHANNEL_MODE": "stereo"},
+            "PICKLEBALL_VISION_AUDIO_ANALYSIS_CHANNEL_MODE",
+        ),
+        (
+            {
+                "PICKLEBALL_VISION_AUDIO_ANALYSIS_FRAME_DURATION_MS": "10",
+                "PICKLEBALL_VISION_AUDIO_ANALYSIS_HOP_DURATION_MS": "20",
+            },
+            "PICKLEBALL_VISION_AUDIO_ANALYSIS_HOP_DURATION_MS",
         ),
         ({"PICKLEBALL_VISION_PERSON_MODEL": "  "}, "PICKLEBALL_VISION_PERSON_MODEL"),
         ({"PICKLEBALL_VISION_PERSON_DEVICE": "tpu"}, "PICKLEBALL_VISION_PERSON_DEVICE"),

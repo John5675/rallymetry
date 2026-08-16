@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import cast
 
 from pickleball_vision import __version__
+from pickleball_vision.audio_analysis_workflow import analyze_audio_in_video
 from pickleball_vision.ball_config import load_ball_experiment_configuration
 from pickleball_vision.ball_dataset import create_ball_annotation_template
 from pickleball_vision.ball_detection_workflow import detect_balls_in_video
@@ -112,6 +113,18 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         choices=(1, 2),
         help="optional explicit mono/stereo conversion (source channels are preserved by default)",
+    )
+
+    analyze_audio_parser = subparsers.add_parser(
+        "analyze-audio",
+        help="extract synchronized raw audio features and generic transient candidates",
+    )
+    analyze_audio_parser.add_argument("video", type=Path, help="path to a local video file")
+    analyze_audio_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=True,
+        help="directory for audio JSON, waveform, and transient timeline artifacts",
     )
 
     sample_parser = subparsers.add_parser(
@@ -581,6 +594,26 @@ def _run_extract_audio(
     return EXIT_OK
 
 
+def _run_analyze_audio(
+    video_path: Path,
+    *,
+    output_dir: Path,
+    settings: Settings,
+) -> int:
+    artifacts = analyze_audio_in_video(
+        video_path,
+        output_dir=output_dir,
+        settings=settings.audio_analysis,
+        timeline=_media_timeline(settings),
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "audio_analyzed",
+        extra={"context": artifacts.as_dict()},
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
 def _run_sample_frames(video_path: Path, *, count: int, output_dir: Path) -> int:
     artifacts = sample_frames(video_path, count=count, output_dir=output_dir)
     resolved_video = video_path.expanduser().resolve()
@@ -1031,6 +1064,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 output_path=cast(Path, args.output),
                 sample_rate_hz=cast(int | None, args.sample_rate),
                 channels=cast(int | None, args.channels),
+                settings=settings,
+            )
+        if args.command == "analyze-audio":
+            return _run_analyze_audio(
+                cast(Path, args.video),
+                output_dir=cast(Path, args.output_dir),
                 settings=settings,
             )
         if args.command == "sample-frames":

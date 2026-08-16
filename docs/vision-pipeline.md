@@ -5,8 +5,9 @@ when its matching milestone is current. Audio-aware media ingestion, manual cour
 calibration, broad person detection, primary-player isolation, and persistent
 logical-player tracking are implemented. Ball dataset extraction, custom detector
 training, raw spatial ball inference, fixed-split evaluation, and conservative
-image-space ball trajectory reconstruction are also implemented. Audio observations
-and all semantic event stages remain contracts only.
+image-space ball trajectory reconstruction are also implemented. Synchronized raw
+audio features and generic transient candidates are implemented; all semantic event
+stages remain contracts only.
 
 ## Intended flow
 
@@ -21,7 +22,8 @@ source media metadata (video + optional audio)
       -> primary-player isolation
       -> persistent player tracks
       -> observed/interpolated ball track segments
-      -> optional raw audio observations
+      -> optional raw audio feature observations
+      -> generic audio transient candidates
       -> rally and multimodal bounce/contact/hitter/shot events
       -> structured match data
       -> analytics
@@ -82,6 +84,25 @@ conversion flags, backend provenance, and the sample-to-source-time mapping. Raw
 audio timestamp discontinuities are normalized in the WAV with inserted/dropped
 samples and that operation is recorded. Raw audio and later raw audio observations
 are evidence, not bounce/contact events.
+
+## Audio observation contract
+
+Audio analysis consumes the synchronized PCM representation and emits two distinct
+layers. Raw feature observations describe overlapping signal windows with sample and
+media timestamps, peak amplitude, RMS energy, spectral-flux onset strength, compact
+frequency evidence, and per-channel values. Generic `TRANSIENT` candidates reference
+supporting observations and retain confidence, channel triggers, and threshold
+provenance.
+
+Candidates have no paddle/bounce classification and no primary-match association.
+Neighboring-court sounds, speech, wind, footsteps, and environmental noise remain
+possible explanations. Later fusion may adjust confidence only when compatible
+visual evidence exists and must never let audio override contradictory video.
+
+When audio is absent, audio analysis emits explicit unavailable JSON/visual artifacts
+and no observations. This is a successful vision-only state, not a pipeline failure.
+Exact fields, configuration, timing, and manual review are documented in
+`audio-analysis.md`.
 
 ## Court calibration contract
 

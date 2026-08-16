@@ -28,8 +28,8 @@ end-to-end result:
 3. **Annotation datasets** retain source hashes, frame/time provenance, human label
    groups, object annotations, and leakage-safe split units independently of model
    output.
-4. **Observations** record model detections as produced, including confidence and
-   provenance.
+4. **Observations** record model detections and raw audio signal features as
+   produced, including confidence and provenance.
 5. **Tracks** associate observations over time without rewriting their evidence.
 6. **Events** infer pickleball meaning such as bounces or contacts, with confidence
    and links to supporting observations.
@@ -40,6 +40,13 @@ end-to-end result:
 Raw detections and derived events must remain separate even if a future optimized
 implementation computes them in one process. Persistent identifiers belong to the
 tracking layer, not to individual detections.
+
+Audio analysis is a parallel observation path. It retains synchronized PCM and
+channel-aware signal windows separately from derived generic transient candidates.
+Those candidates are still non-semantic evidence: they do not assert a paddle
+contact, bounce, rally, or primary-court source. Audio-free inputs create an explicit
+unavailable result so every downstream audio consumer can select a vision-only
+fallback.
 
 The person detector is accessed through a model-independent protocol. Its
 Ultralytics implementation owns model loading and tensor translation; pipeline

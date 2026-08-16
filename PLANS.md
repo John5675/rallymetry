@@ -297,7 +297,7 @@ Exit criteria:
 - No ball trajectory reconstruction, audio-event extraction, or semantic event
   inference is implemented.
 
-## 9. Ball trajectory reconstruction — current
+## 9. Ball trajectory reconstruction — complete
 
 Associate immutable frame-local ball candidates into conservative, inspectable
 primary-match image-space trajectories. Prefer explicit unknown periods over weak
@@ -329,9 +329,40 @@ Exit criteria:
 - No audio-event extraction, bounce/contact inference, rally inference, or later
   semantic event behavior is implemented.
 
+## 10. Audio event extraction — current
+
+Decode optional synchronized audio into an explicit analysis representation, derive
+time-localized channel-aware signal features, and identify generic transient
+candidates as supporting evidence. Preserve the canonical media timeline and never
+classify a transient as a paddle contact, bounce, or primary-match event.
+
+Exit criteria:
+
+- `pickleball-vision analyze-audio <video> --output-dir <dir>` uses the reusable
+  media boundary and writes `audio-events.json`, `audio-summary.json`,
+  `waveform.png`, and `audio-events.png` without modifying the source recording.
+- Analysis sample rate, onset sensitivity, minimum event separation, combined or
+  per-channel mode, and configured A/V offset are externalized and retained in run
+  provenance; any sample-rate/channel conversion is explicit.
+- Raw time-localized feature windows retain RMS energy, peak amplitude, spectral
+  flux/onset strength, frequency summaries, channel information, timestamps, and
+  duration separately from generic `TRANSIENT` candidates.
+- Every candidate retains its source-media timestamp, duration, confidence, signal
+  evidence, channel data, and `source=AUDIO`; no `PADDLE` or `BOUNCE` semantic label
+  is produced.
+- Candidate timestamps map through the canonical audio sample-to-media-time model,
+  including stream start time and configured `audioVideoOffsetMs`.
+- Audio-free media exits successfully with `audioAnalysisAvailable=false`, creates
+  inspectable empty JSON/visual artifacts, and does not make any other stage fail.
+- Synthetic tests cover known impulses, quiet intervals, clustered impulses,
+  background noise, stereo-channel differences, event separation, timestamps,
+  non-zero A/V offsets, and no-audio behavior.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- No contact, bounce, rally, hitter, shot, or multimodal domain event is inferred.
+
 ## Future milestones — not current
 
-10. Audio event extraction
 11. Manual event annotation
 12. Rally segmentation
 13. Multimodal bounce detection

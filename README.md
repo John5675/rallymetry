@@ -5,7 +5,7 @@ doubles pickleball matches into inspectable, structured match data. The long-ter
 goal includes court and player tracking, ball trajectories, rally and shot events,
 match analytics, and AI-assisted coaching.
 
-The current milestone is **Ball trajectory reconstruction**. The local
+The current milestone is **Audio event extraction**. The local
 CLI can inspect video plus optional synchronized audio, extract lossless analysis
 audio, calibrate the court, detect people broadly, derive court-aware candidates,
 manually assign the four logical match roles, and track those identities separately
@@ -16,8 +16,9 @@ leakage-safe dataset splits. It now supports versioned single-class ball trainin
 high-resolution/ROI/tiled raw inference, fixed-split evaluation, and strategy
 comparison, plus a resumable local interface for human correction of training
 annotations. It now reconstructs a conservative primary-match image-space ball path
-with explicit observed, interpolated, and unknown states. Pickleball event inference
-remains unimplemented.
+with explicit observed, interpolated, and unknown states. Synchronized audio can now
+be converted into inspectable raw signal features and generic transient candidates.
+Paddle-contact, bounce, and other pickleball event inference remains unimplemented.
 
 ## Repository map
 
@@ -62,6 +63,8 @@ Inspect and extract from a local video:
 uv run pickleball-vision inspect /absolute/path/to/match.mp4
 uv run pickleball-vision extract-audio /absolute/path/to/match.mp4 \
   --output ../../output/match-audio.wav
+uv run pickleball-vision analyze-audio /absolute/path/to/match.mp4 \
+  --output-dir ../../output/audio-analysis
 uv run pickleball-vision extract-frame /absolute/path/to/match.mp4 \
   --timestamp 30.5 \
   --output ../../output/frame-at-30.5s.jpg
@@ -136,6 +139,12 @@ uv run pickleball-vision doctor
 Set `PICKLEBALL_VISION_AUDIO_VIDEO_OFFSET_MS` to a finite positive or negative
 correction when measured evidence shows a source A/V offset; its default is zero.
 See [the media timeline contract](docs/media-timeline.md).
+
+Audio analysis preserves channels in a synchronized PCM representation, stores raw
+window features separately from generic `TRANSIENT` candidates, and creates waveform
+and event-timeline review images. A transient is never classified as a paddle contact
+or bounce at this stage, and no-audio videos exit successfully with an explicit
+vision-only fallback. See [the audio-analysis guide](docs/audio-analysis.md).
 
 Person inference is configured with `PERSON_MODEL`, `PERSON_DEVICE`,
 `PERSON_MIN_CONFIDENCE`, `PERSON_IMAGE_SIZE`, `PERSON_IOU_THRESHOLD`, and

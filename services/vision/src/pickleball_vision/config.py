@@ -32,6 +32,13 @@ class LogFormat(StrEnum):
     CONSOLE = "console"
 
 
+class AudioAnalysisChannelMode(StrEnum):
+    """How onset evidence is combined while retaining every source channel."""
+
+    COMBINED = "combined"
+    PER_CHANNEL = "per_channel"
+
+
 @dataclass(frozen=True, slots=True)
 class MediaSettings:
     """Canonical media-timeline settings shared by future A/V fusion stages."""
@@ -53,6 +60,119 @@ class MediaSettings:
         """Return non-secret timing configuration for provenance."""
 
         return {"audioVideoOffsetMs": self.audio_video_offset_ms}
+
+
+@dataclass(frozen=True, slots=True)
+class AudioAnalysisSettings:
+    """Validated signal-window and generic transient-detection settings."""
+
+    analysis_sample_rate_hz: int = 16000
+    onset_sensitivity: float = 4.0
+    minimum_event_separation_ms: float = 80.0
+    channel_mode: AudioAnalysisChannelMode = AudioAnalysisChannelMode.COMBINED
+    frame_duration_ms: float = 32.0
+    hop_duration_ms: float = 10.0
+
+    @classmethod
+    def from_env(
+        cls,
+        environ: Mapping[str, str] | None = None,
+    ) -> AudioAnalysisSettings:
+        """Load audio analysis configuration from prefixed environment variables."""
+
+        source = os.environ if environ is None else environ
+        defaults = cls()
+        sample_rate_hz = _int_setting(
+            source,
+            "AUDIO_ANALYSIS_SAMPLE_RATE_HZ",
+            defaults.analysis_sample_rate_hz,
+        )
+        sensitivity = _float_setting(
+            source,
+            "AUDIO_ANALYSIS_ONSET_SENSITIVITY",
+            defaults.onset_sensitivity,
+        )
+        separation_ms = _float_setting(
+            source,
+            "AUDIO_ANALYSIS_MINIMUM_EVENT_SEPARATION_MS",
+            defaults.minimum_event_separation_ms,
+        )
+        frame_duration_ms = _float_setting(
+            source,
+            "AUDIO_ANALYSIS_FRAME_DURATION_MS",
+            defaults.frame_duration_ms,
+        )
+        hop_duration_ms = _float_setting(
+            source,
+            "AUDIO_ANALYSIS_HOP_DURATION_MS",
+            defaults.hop_duration_ms,
+        )
+        channel_mode_raw = source.get(
+            f"{ENV_PREFIX}AUDIO_ANALYSIS_CHANNEL_MODE",
+            defaults.channel_mode.value,
+        )
+        try:
+            channel_mode = AudioAnalysisChannelMode(channel_mode_raw.strip().lower())
+        except ValueError as error:
+            setting = f"{ENV_PREFIX}AUDIO_ANALYSIS_CHANNEL_MODE"
+            raise ConfigurationError(
+                f"{setting} must be combined or per_channel",
+                setting=setting,
+            ) from error
+        validations = (
+            (
+                sample_rate_hz >= 8000,
+                "AUDIO_ANALYSIS_SAMPLE_RATE_HZ",
+                "must be at least 8000",
+            ),
+            (
+                sensitivity > 0 and math.isfinite(sensitivity),
+                "AUDIO_ANALYSIS_ONSET_SENSITIVITY",
+                "must be finite and positive",
+            ),
+            (
+                separation_ms > 0 and math.isfinite(separation_ms),
+                "AUDIO_ANALYSIS_MINIMUM_EVENT_SEPARATION_MS",
+                "must be finite and positive",
+            ),
+            (
+                frame_duration_ms > 0 and math.isfinite(frame_duration_ms),
+                "AUDIO_ANALYSIS_FRAME_DURATION_MS",
+                "must be finite and positive",
+            ),
+            (
+                hop_duration_ms > 0 and math.isfinite(hop_duration_ms),
+                "AUDIO_ANALYSIS_HOP_DURATION_MS",
+                "must be finite and positive",
+            ),
+            (
+                hop_duration_ms <= frame_duration_ms,
+                "AUDIO_ANALYSIS_HOP_DURATION_MS",
+                "must not exceed AUDIO_ANALYSIS_FRAME_DURATION_MS",
+            ),
+        )
+        for valid, suffix, reason in validations:
+            if not valid:
+                setting = f"{ENV_PREFIX}{suffix}"
+                raise ConfigurationError(f"{setting} {reason}", setting=setting)
+        return cls(
+            analysis_sample_rate_hz=sample_rate_hz,
+            onset_sensitivity=sensitivity,
+            minimum_event_separation_ms=separation_ms,
+            channel_mode=channel_mode,
+            frame_duration_ms=frame_duration_ms,
+            hop_duration_ms=hop_duration_ms,
+        )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "analysisSampleRateHz": self.analysis_sample_rate_hz,
+            "onsetSensitivity": self.onset_sensitivity,
+            "minimumEventSeparationMs": self.minimum_event_separation_ms,
+            "channelMode": self.channel_mode.value,
+            "frameDurationMs": self.frame_duration_ms,
+            "hopDurationMs": self.hop_duration_ms,
+        }
 
 
 def _float_setting(source: Mapping[str, str], suffix: str, default: float) -> float:
@@ -798,6 +918,7 @@ class Settings:
     log_format: LogFormat = LogFormat.JSON
     output_dir: Path = Path("output")
     media: MediaSettings = field(default_factory=MediaSettings)
+    audio_analysis: AudioAnalysisSettings = field(default_factory=AudioAnalysisSettings)
     person_detection: PersonDetectionSettings = field(default_factory=PersonDetectionSettings)
     player_isolation: PlayerIsolationSettings = field(default_factory=PlayerIsolationSettings)
     player_tracking: PlayerTrackingSettings = field(default_factory=PlayerTrackingSettings)
@@ -848,6 +969,7 @@ class Settings:
             log_format=log_format,
             output_dir=Path(output_dir_raw).expanduser(),
             media=MediaSettings.from_env(source),
+            audio_analysis=AudioAnalysisSettings.from_env(source),
             person_detection=PersonDetectionSettings.from_env(source),
             player_isolation=PlayerIsolationSettings.from_env(source),
             player_tracking=PlayerTrackingSettings.from_env(source),
@@ -864,6 +986,7 @@ class Settings:
             "log_format": self.log_format.value,
             "output_dir": str(self.output_dir),
             "media": self.media.as_dict(),
+            "audio_analysis": self.audio_analysis.as_dict(),
             "person_detection": self.person_detection.as_dict(),
             "player_isolation": self.player_isolation.as_dict(),
             "player_tracking": self.player_tracking.as_dict(),

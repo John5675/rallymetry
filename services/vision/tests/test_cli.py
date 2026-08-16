@@ -26,6 +26,12 @@ def _clear_settings(monkeypatch: pytest.MonkeyPatch) -> None:
         "LOG_FORMAT",
         "OUTPUT_DIR",
         "AUDIO_VIDEO_OFFSET_MS",
+        "AUDIO_ANALYSIS_SAMPLE_RATE_HZ",
+        "AUDIO_ANALYSIS_ONSET_SENSITIVITY",
+        "AUDIO_ANALYSIS_MINIMUM_EVENT_SEPARATION_MS",
+        "AUDIO_ANALYSIS_CHANNEL_MODE",
+        "AUDIO_ANALYSIS_FRAME_DURATION_MS",
+        "AUDIO_ANALYSIS_HOP_DURATION_MS",
         "PERSON_MODEL",
         "PERSON_DEVICE",
         "PERSON_MIN_CONFIDENCE",
@@ -654,3 +660,34 @@ def test_dataset_commands_extract_and_split_without_model_inference(
     assert split_report["frame_count"] == 3
     assert split_report["unit_count"] == 1
     assert split_report["split_counts"] == {"test": 0, "train": 3, "validation": 0}
+
+
+def test_analyze_audio_command_gracefully_reports_video_without_audio(
+    synthetic_video: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _clear_settings(monkeypatch)
+    output_dir = tmp_path / "audio-analysis"
+
+    exit_code = main(
+        [
+            "analyze-audio",
+            str(synthetic_video),
+            "--output-dir",
+            str(output_dir),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+    log_record = json.loads(captured.err)
+    assert exit_code == EXIT_OK
+    assert report["audioAnalysisAvailable"] is False
+    assert report["analysisAudioPath"] is None
+    assert Path(report["eventsPath"]).is_file()
+    assert Path(report["summaryPath"]).is_file()
+    assert Path(report["waveformPath"]).is_file()
+    assert Path(report["eventsImagePath"]).is_file()
+    assert log_record["event"] == "audio_analyzed"

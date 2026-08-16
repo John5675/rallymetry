@@ -4,8 +4,9 @@
 
 The local pipeline accepts a source recording with video and optional synchronized
 audio. Computer-vision stages continue to work when audio is absent. The media
-layer exposes stream facts and lossless analysis audio; it does not detect audio
-events or infer pickleball semantics.
+layer exposes stream facts and lossless analysis audio. The audio-analysis stage may
+derive raw signal observations and generic transients, but it does not infer
+pickleball semantics.
 
 FFmpeg implementation details are isolated behind the vision service's media
 backend. PyAV supplies FFmpeg stream probing, while the project-managed FFmpeg
@@ -68,3 +69,8 @@ timestamps and bytes are not changed.
 Audio is supporting evidence only. A transient may raise or lower confidence in a
 visually plausible bounce or paddle contact, but cannot create the event by itself,
 override contradictory video, or be assumed to originate on the primary court.
+
+Milestone 10 audio observations use the same formula without a second timing model.
+Each feature window retains its analysis-relative time, while each transient uses its
+peak sample to calculate canonical `mediaTimestampSeconds`. See
+`audio-analysis.md` for fields and manual synchronization review.
