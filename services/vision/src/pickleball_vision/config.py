@@ -1250,6 +1250,172 @@ class BounceDetectionSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class ContactDetectionSettings:
+    """Validated visual-first paddle-contact and optional fusion thresholds."""
+
+    trajectory_window_seconds: float = 0.16
+    minimum_observations_each_side: int = 2
+    minimum_velocity_change_diagonals_per_second: float = 0.060
+    minimum_direction_change_degrees: float = 22.0
+    minimum_speed_change_ratio: float = 1.35
+    minimum_continuity_fraction: float = 0.65
+    maximum_player_proximity_diagonal_fraction: float = 0.12
+    minimum_visual_candidate_confidence: float = 0.40
+    accepted_confidence: float = 0.78
+    minimum_between_contacts_seconds: float = 0.12
+    bounce_exclusion_window_seconds: float = 0.08
+    maximum_previous_bounce_gap_seconds: float = 3.0
+    audio_confidence_weight: float = 0.20
+    rally_sequence_confidence_boost: float = 0.04
+    previous_bounce_confidence_boost: float = 0.03
+    evaluation_tolerance_ms: float = 100.0
+    sparse_evaluation_margin_seconds: float = 0.30
+
+    @classmethod
+    def from_env(
+        cls,
+        environ: Mapping[str, str] | None = None,
+    ) -> ContactDetectionSettings:
+        """Load contact thresholds from prefixed environment variables."""
+
+        source = os.environ if environ is None else environ
+        defaults = cls()
+        float_suffixes = {
+            "trajectory_window_seconds": "CONTACT_TRAJECTORY_WINDOW_SECONDS",
+            "minimum_velocity_change_diagonals_per_second": (
+                "CONTACT_MINIMUM_VELOCITY_CHANGE_DIAGONALS_PER_SECOND"
+            ),
+            "minimum_direction_change_degrees": ("CONTACT_MINIMUM_DIRECTION_CHANGE_DEGREES"),
+            "minimum_speed_change_ratio": "CONTACT_MINIMUM_SPEED_CHANGE_RATIO",
+            "minimum_continuity_fraction": "CONTACT_MINIMUM_CONTINUITY_FRACTION",
+            "maximum_player_proximity_diagonal_fraction": (
+                "CONTACT_MAXIMUM_PLAYER_PROXIMITY_DIAGONAL_FRACTION"
+            ),
+            "minimum_visual_candidate_confidence": ("CONTACT_MINIMUM_VISUAL_CANDIDATE_CONFIDENCE"),
+            "accepted_confidence": "CONTACT_ACCEPTED_CONFIDENCE",
+            "minimum_between_contacts_seconds": "CONTACT_MINIMUM_BETWEEN_SECONDS",
+            "bounce_exclusion_window_seconds": "CONTACT_BOUNCE_EXCLUSION_WINDOW_SECONDS",
+            "maximum_previous_bounce_gap_seconds": ("CONTACT_MAXIMUM_PREVIOUS_BOUNCE_GAP_SECONDS"),
+            "audio_confidence_weight": "CONTACT_AUDIO_CONFIDENCE_WEIGHT",
+            "rally_sequence_confidence_boost": "CONTACT_RALLY_SEQUENCE_CONFIDENCE_BOOST",
+            "previous_bounce_confidence_boost": ("CONTACT_PREVIOUS_BOUNCE_CONFIDENCE_BOOST"),
+            "evaluation_tolerance_ms": "CONTACT_EVALUATION_TOLERANCE_MS",
+            "sparse_evaluation_margin_seconds": ("CONTACT_SPARSE_EVALUATION_MARGIN_SECONDS"),
+        }
+        values: dict[str, float | int] = {
+            name: _float_setting(source, suffix, getattr(defaults, name))
+            for name, suffix in float_suffixes.items()
+        }
+        observation_suffix = "CONTACT_MINIMUM_OBSERVATIONS_EACH_SIDE"
+        observations = _int_setting(
+            source,
+            observation_suffix,
+            defaults.minimum_observations_each_side,
+        )
+        if observations < 2:
+            setting = f"{ENV_PREFIX}{observation_suffix}"
+            raise ConfigurationError(f"{setting} must be at least 2", setting=setting)
+        values["minimum_observations_each_side"] = observations
+        fraction_fields = (
+            "minimum_continuity_fraction",
+            "maximum_player_proximity_diagonal_fraction",
+            "minimum_visual_candidate_confidence",
+            "accepted_confidence",
+            "audio_confidence_weight",
+            "rally_sequence_confidence_boost",
+            "previous_bounce_confidence_boost",
+        )
+        for name in fraction_fields:
+            value = float(values[name])
+            if not 0 <= value <= 1:
+                setting = f"{ENV_PREFIX}{float_suffixes[name]}"
+                raise ConfigurationError(
+                    f"{setting} must be between 0 and 1 inclusive",
+                    setting=setting,
+                )
+        for name, suffix in float_suffixes.items():
+            if name in fraction_fields:
+                continue
+            value = float(values[name])
+            if not math.isfinite(value) or value <= 0:
+                setting = f"{ENV_PREFIX}{suffix}"
+                raise ConfigurationError(
+                    f"{setting} must be finite and positive",
+                    setting=setting,
+                )
+        if values["maximum_player_proximity_diagonal_fraction"] == 0:
+            setting = f"{ENV_PREFIX}CONTACT_MAXIMUM_PLAYER_PROXIMITY_DIAGONAL_FRACTION"
+            raise ConfigurationError(f"{setting} must be greater than zero", setting=setting)
+        if values["minimum_direction_change_degrees"] > 180:
+            setting = f"{ENV_PREFIX}CONTACT_MINIMUM_DIRECTION_CHANGE_DEGREES"
+            raise ConfigurationError(f"{setting} must not exceed 180", setting=setting)
+        if values["minimum_speed_change_ratio"] <= 1:
+            setting = f"{ENV_PREFIX}CONTACT_MINIMUM_SPEED_CHANGE_RATIO"
+            raise ConfigurationError(f"{setting} must be greater than 1", setting=setting)
+        if values["accepted_confidence"] < values["minimum_visual_candidate_confidence"]:
+            setting = f"{ENV_PREFIX}CONTACT_ACCEPTED_CONFIDENCE"
+            raise ConfigurationError(
+                f"{setting} must be at least "
+                f"{ENV_PREFIX}CONTACT_MINIMUM_VISUAL_CANDIDATE_CONFIDENCE",
+                setting=setting,
+            )
+        return cls(
+            trajectory_window_seconds=float(values["trajectory_window_seconds"]),
+            minimum_observations_each_side=int(values["minimum_observations_each_side"]),
+            minimum_velocity_change_diagonals_per_second=float(
+                values["minimum_velocity_change_diagonals_per_second"]
+            ),
+            minimum_direction_change_degrees=float(values["minimum_direction_change_degrees"]),
+            minimum_speed_change_ratio=float(values["minimum_speed_change_ratio"]),
+            minimum_continuity_fraction=float(values["minimum_continuity_fraction"]),
+            maximum_player_proximity_diagonal_fraction=float(
+                values["maximum_player_proximity_diagonal_fraction"]
+            ),
+            minimum_visual_candidate_confidence=float(
+                values["minimum_visual_candidate_confidence"]
+            ),
+            accepted_confidence=float(values["accepted_confidence"]),
+            minimum_between_contacts_seconds=float(values["minimum_between_contacts_seconds"]),
+            bounce_exclusion_window_seconds=float(values["bounce_exclusion_window_seconds"]),
+            maximum_previous_bounce_gap_seconds=float(
+                values["maximum_previous_bounce_gap_seconds"]
+            ),
+            audio_confidence_weight=float(values["audio_confidence_weight"]),
+            rally_sequence_confidence_boost=float(values["rally_sequence_confidence_boost"]),
+            previous_bounce_confidence_boost=float(values["previous_bounce_confidence_boost"]),
+            evaluation_tolerance_ms=float(values["evaluation_tolerance_ms"]),
+            sparse_evaluation_margin_seconds=float(values["sparse_evaluation_margin_seconds"]),
+        )
+
+    def as_dict(self) -> dict[str, object]:
+        """Return complete, non-secret visual and fusion configuration."""
+
+        return {
+            "trajectoryWindowSeconds": self.trajectory_window_seconds,
+            "minimumObservationsEachSide": self.minimum_observations_each_side,
+            "minimumVelocityChangeDiagonalsPerSecond": (
+                self.minimum_velocity_change_diagonals_per_second
+            ),
+            "minimumDirectionChangeDegrees": self.minimum_direction_change_degrees,
+            "minimumSpeedChangeRatio": self.minimum_speed_change_ratio,
+            "minimumContinuityFraction": self.minimum_continuity_fraction,
+            "maximumPlayerProximityDiagonalFraction": (
+                self.maximum_player_proximity_diagonal_fraction
+            ),
+            "minimumVisualCandidateConfidence": self.minimum_visual_candidate_confidence,
+            "acceptedConfidence": self.accepted_confidence,
+            "minimumBetweenContactsSeconds": self.minimum_between_contacts_seconds,
+            "bounceExclusionWindowSeconds": self.bounce_exclusion_window_seconds,
+            "maximumPreviousBounceGapSeconds": self.maximum_previous_bounce_gap_seconds,
+            "audioConfidenceWeight": self.audio_confidence_weight,
+            "rallySequenceConfidenceBoost": self.rally_sequence_confidence_boost,
+            "previousBounceConfidenceBoost": self.previous_bounce_confidence_boost,
+            "evaluationToleranceMs": self.evaluation_tolerance_ms,
+            "sparseEvaluationMarginSeconds": self.sparse_evaluation_margin_seconds,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class Settings:
     """Validated settings loaded once at an executable boundary."""
 
@@ -1266,6 +1432,7 @@ class Settings:
     ball_tracking: BallTrackingSettings = field(default_factory=BallTrackingSettings)
     rally_segmentation: RallySegmentationSettings = field(default_factory=RallySegmentationSettings)
     bounce_detection: BounceDetectionSettings = field(default_factory=BounceDetectionSettings)
+    contact_detection: ContactDetectionSettings = field(default_factory=ContactDetectionSettings)
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> Settings:
@@ -1319,6 +1486,7 @@ class Settings:
             ball_tracking=BallTrackingSettings.from_env(source),
             rally_segmentation=RallySegmentationSettings.from_env(source),
             bounce_detection=BounceDetectionSettings.from_env(source),
+            contact_detection=ContactDetectionSettings.from_env(source),
         )
 
     def public_values(self) -> dict[str, object]:
@@ -1338,4 +1506,5 @@ class Settings:
             "ball_tracking": self.ball_tracking.as_dict(),
             "rally_segmentation": self.rally_segmentation.as_dict(),
             "bounce_detection": self.bounce_detection.as_dict(),
+            "contact_detection": self.contact_detection.as_dict(),
         }

@@ -5,7 +5,7 @@ doubles pickleball matches into inspectable, structured match data. The long-ter
 goal includes court and player tracking, ball trajectories, rally and shot events,
 match analytics, and AI-assisted coaching.
 
-The current milestone is **Multimodal bounce detection**. Milestones 0–13 are
+The current milestone is **Multimodal paddle-contact detection**. Milestones 0–14 are
 complete. The local
 CLI can inspect video plus optional synchronized audio, extract lossless analysis
 audio, calibrate the court, detect people broadly, derive court-aware candidates,
@@ -26,8 +26,10 @@ serve-like onsets, adjacent-burst dead-ball handoff rejection, and optional
 player/audio confidence support, then evaluates
 against human rally boundaries. Visual-first bounce candidates now combine local
 trajectory reversal, continuity, and optional synchronized audio support while
-gating court projection behind plane-contact plausibility. Automatic paddle-contact
-inference remains unimplemented.
+gating court projection behind plane-contact plausibility. Visual-first paddle-
+contact candidates now combine trajectory velocity/direction discontinuity,
+logical-player proximity, rally/event-state context, and optional synchronized
+audio support without assigning a hitter.
 
 ## Repository map
 
@@ -132,6 +134,14 @@ uv run pickleball-vision detect-bounces /absolute/path/to/match.mp4 \
   --audio-events ../../output/audio-analysis/audio-events.json \
   --annotations ../../output/match-annotations.json \
   --output-dir ../../output/bounce-detection
+uv run pickleball-vision detect-contacts /absolute/path/to/match.mp4 \
+  --ball-tracks ../../output/ball-tracking/ball_tracks.json \
+  --player-tracks ../../output/player-tracking/tracks.json \
+  --rallies ../../output/rally-segmentation/rallies.json \
+  --bounces ../../output/bounce-detection/bounces.json \
+  --audio-events ../../output/audio-analysis/audio-events.json \
+  --annotations ../../output/match-annotations.json \
+  --output-dir ../../output/contact-detection
 ```
 
 Command results are emitted as JSON on standard output. Diagnostic structured
@@ -243,6 +253,13 @@ creates no candidate. Court coordinates remain null unless the visual candidate 
 plausibly on the plane and inside the projected court image; no 3D position or line
 call is inferred. Evaluation compares visual-only and fused thresholds over the
 same candidate set. See [the bounce detection guide](docs/bounce-detection.md).
+
+Multimodal paddle-contact detection requires a visual trajectory velocity/direction
+discontinuity before player, rally, bounce-state, or audio context can affect
+confidence. Candidate-player rankings retain logical roles and proximity evidence
+but never assign a hitter. Audio alone creates no contact. Evaluation compares
+visual-only and fused thresholds over the same candidate set. See
+[the paddle-contact detection guide](docs/contact-detection.md).
 
 ## Verify the setup
 

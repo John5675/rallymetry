@@ -7,6 +7,7 @@ from pickleball_vision.config import (
     AudioAnalysisSettings,
     BallTrackingSettings,
     BounceDetectionSettings,
+    ContactDetectionSettings,
     Environment,
     LogFormat,
     MediaSettings,
@@ -36,6 +37,7 @@ def test_settings_have_safe_development_defaults() -> None:
     assert settings.ball_tracking == BallTrackingSettings()
     assert settings.rally_segmentation == RallySegmentationSettings()
     assert settings.bounce_detection == BounceDetectionSettings()
+    assert settings.contact_detection == ContactDetectionSettings()
 
 
 def test_settings_load_prefixed_environment_values() -> None:
@@ -84,6 +86,8 @@ def test_settings_load_prefixed_environment_values() -> None:
             "PICKLEBALL_VISION_RALLY_EVALUATION_MINIMUM_IOU": "0.4",
             "PICKLEBALL_VISION_BOUNCE_AUDIO_CONFIDENCE_WEIGHT": "0.25",
             "PICKLEBALL_VISION_BOUNCE_EVALUATION_TOLERANCE_MS": "100",
+            "PICKLEBALL_VISION_CONTACT_ACCEPTED_CONFIDENCE": "0.82",
+            "PICKLEBALL_VISION_CONTACT_AUDIO_CONFIDENCE_WEIGHT": "0.3",
         }
     )
 
@@ -147,6 +151,10 @@ def test_settings_load_prefixed_environment_values() -> None:
     assert settings.bounce_detection == BounceDetectionSettings(
         audio_confidence_weight=0.25,
         evaluation_tolerance_ms=100.0,
+    )
+    assert settings.contact_detection == ContactDetectionSettings(
+        accepted_confidence=0.82,
+        audio_confidence_weight=0.3,
     )
 
 
@@ -255,6 +263,14 @@ def test_settings_load_prefixed_environment_values() -> None:
         (
             {"PICKLEBALL_VISION_BOUNCE_MINIMUM_OBSERVATIONS_EACH_SIDE": "1"},
             "PICKLEBALL_VISION_BOUNCE_MINIMUM_OBSERVATIONS_EACH_SIDE",
+        ),
+        (
+            {"PICKLEBALL_VISION_CONTACT_AUDIO_CONFIDENCE_WEIGHT": "1.1"},
+            "PICKLEBALL_VISION_CONTACT_AUDIO_CONFIDENCE_WEIGHT",
+        ),
+        (
+            {"PICKLEBALL_VISION_CONTACT_MINIMUM_OBSERVATIONS_EACH_SIDE": "1"},
+            "PICKLEBALL_VISION_CONTACT_MINIMUM_OBSERVATIONS_EACH_SIDE",
         ),
         (
             {"PICKLEBALL_VISION_FUSION_TOLERANCE_MS": "0"},

@@ -25,6 +25,7 @@ from pickleball_vision.ball_training import train_ball_detector
 from pickleball_vision.bounce_detection_workflow import detect_bounces_in_video
 from pickleball_vision.calibration_workflow import calibrate_video
 from pickleball_vision.config import Settings
+from pickleball_vision.contact_detection_workflow import detect_contacts_in_video
 from pickleball_vision.dataset import (
     DatasetLabelGroup,
     DatasetSplit,
@@ -628,6 +629,64 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         required=True,
         help="directory for bounces.json, bounce-debug.mp4, and bounce-evaluation.json",
+    )
+    detect_contacts_parser = subparsers.add_parser(
+        "detect-contacts",
+        help="detect visual-first paddle contacts with optional synchronized audio support",
+    )
+    detect_contacts_parser.add_argument(
+        "video",
+        type=Path,
+        help="source video represented by the input artifacts",
+    )
+    detect_contacts_parser.add_argument(
+        "--ball-tracks",
+        type=Path,
+        required=True,
+        help="frame-complete ball_tracks.json from track-ball",
+    )
+    detect_contacts_parser.add_argument(
+        "--player-tracks",
+        type=Path,
+        required=True,
+        help="source-compatible logical tracks.json used to rank candidate players",
+    )
+    detect_contacts_parser.add_argument(
+        "--rallies",
+        type=Path,
+        help="optional source-compatible rallies.json for confidence support only",
+    )
+    detect_contacts_parser.add_argument(
+        "--bounces",
+        type=Path,
+        help="optional bounces.json for event-state support and coincident-bounce exclusion",
+    )
+    detect_contacts_parser.add_argument(
+        "--audio-events",
+        type=Path,
+        help="optional audio-events.json; transients cannot create contact candidates",
+    )
+    detect_contacts_parser.add_argument(
+        "--annotations",
+        type=Path,
+        help="optional human annotations used only for post-inference evaluation",
+    )
+    detect_contacts_parser.add_argument(
+        "--annotations-complete",
+        action="store_true",
+        help="treat all unannotated source time as reviewed negative evaluation coverage",
+    )
+    detect_contacts_parser.add_argument(
+        "--evaluation-partition",
+        choices=("development", "validation", "test"),
+        default="validation",
+        help="provenance label only; the command never tunes thresholds automatically",
+    )
+    detect_contacts_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=True,
+        help="directory for contacts.json, contact-debug.mp4, and contact-evaluation.json",
     )
     return parser
 
@@ -1262,6 +1321,42 @@ def _run_detect_bounces(
     return EXIT_OK
 
 
+def _run_detect_contacts(
+    video_path: Path,
+    *,
+    ball_tracks_path: Path,
+    player_tracks_path: Path,
+    rallies_path: Path | None,
+    bounces_path: Path | None,
+    audio_events_path: Path | None,
+    annotations_path: Path | None,
+    annotations_complete: bool,
+    evaluation_partition: str,
+    output_dir: Path,
+    settings: Settings,
+) -> int:
+    artifacts = detect_contacts_in_video(
+        video_path,
+        ball_tracks_path=ball_tracks_path,
+        player_tracks_path=player_tracks_path,
+        rallies_path=rallies_path,
+        bounces_path=bounces_path,
+        audio_events_path=audio_events_path,
+        annotations_path=annotations_path,
+        annotations_complete=annotations_complete,
+        evaluation_partition=evaluation_partition,
+        output_dir=output_dir,
+        settings=settings.contact_detection,
+        timeline=_media_timeline(settings),
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "contacts_detected",
+        extra={"context": artifacts.as_dict()},
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command and translate failures into stable process exit codes."""
 
@@ -1464,6 +1559,20 @@ def main(argv: Sequence[str] | None = None) -> int:
                 ball_tracks_path=cast(Path, args.ball_tracks),
                 calibration_path=cast(Path, args.calibration),
                 rallies_path=cast(Path | None, args.rallies),
+                audio_events_path=cast(Path | None, args.audio_events),
+                annotations_path=cast(Path | None, args.annotations),
+                annotations_complete=cast(bool, args.annotations_complete),
+                evaluation_partition=cast(str, args.evaluation_partition),
+                output_dir=cast(Path, args.output_dir),
+                settings=settings,
+            )
+        if args.command == "detect-contacts":
+            return _run_detect_contacts(
+                cast(Path, args.video),
+                ball_tracks_path=cast(Path, args.ball_tracks),
+                player_tracks_path=cast(Path, args.player_tracks),
+                rallies_path=cast(Path | None, args.rallies),
+                bounces_path=cast(Path | None, args.bounces),
                 audio_events_path=cast(Path | None, args.audio_events),
                 annotations_path=cast(Path | None, args.annotations),
                 annotations_complete=cast(bool, args.annotations_complete),

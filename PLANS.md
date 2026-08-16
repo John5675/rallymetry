@@ -466,7 +466,7 @@ Exit criteria:
 - No automatic bounce detection, paddle-contact detection, hitter inference, or
   shot reconstruction/classification is implemented.
 
-## 14. Multimodal bounce detection — current
+## 14. Multimodal bounce detection — complete
 
 Derive inspectable bounce candidates primarily from visual ball-trajectory evidence,
 then optionally fuse synchronized generic audio transients as confidence support.
@@ -504,9 +504,49 @@ Exit criteria:
 - No paddle-contact detection, hitter identification, shot reconstruction,
   classification, line calling, or analytics is implemented.
 
+## 15. Multimodal paddle-contact detection — current
+
+Derive inspectable paddle-contact candidates from visual ball-trajectory
+discontinuities and source-compatible logical-player tracks, then optionally fuse
+synchronized generic audio transients as confidence support. Audio never creates a
+candidate, and candidate-player proximity remains evidence rather than hitter
+assignment.
+
+Exit criteria:
+
+- `pickleball-vision detect-contacts <video> --ball-tracks <json> --player-tracks
+  <json> --output-dir <dir>` validates source provenance and consumes immutable
+  trajectory/player artifacts.
+- Candidate generation requires sufficient trajectory evidence before and after an
+  abrupt velocity or direction discontinuity. Optional court-side, rally-sequence,
+  previous-event-state, and player-proximity signals remain separately inspectable.
+- Candidate players are ranked visual proximity/context observations. The stage
+  does not select or assign a hitter.
+- Optional generic audio transients use the configured `audioVideoOffsetMs` and
+  `fusionToleranceMs`, can increase confidence only on an existing visual
+  candidate, and retain the matched raw audio event ID.
+- Every candidate retains frame/time, source image position, candidate players,
+  visual/audio/fused confidence, evidence mode, acceptance states, and separately
+  inspectable supporting signals.
+- Audio-free input succeeds through the same visual path. Neighboring-court sounds
+  and people remain explicit limitations.
+- Human `SERVE_CONTACT` and `PADDLE_CONTACT` annotations are loaded only after
+  inference. Evaluation reports one-to-one precision, recall, F1, and timing error
+  for visual-only and visual-plus-audio thresholds over the same visual candidate
+  set.
+- `contacts.json`, `contact-debug.mp4`, and `contact-evaluation.json` are generated
+  atomically without modifying source media or input artifacts.
+- Synthetic tests cover velocity/direction discontinuity, trajectory continuity,
+  player proximity/ranking without hitter assignment, court-side/rally/event-state
+  context, audio-only prohibition, A/V offset/tolerance, no-audio fallback,
+  comparative evaluation, provenance, CLI routing, and debug rendering.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- No hitter identification, shot reconstruction/classification, line calling, or
+  analytics is implemented.
+
 ## Future milestones — not current
 
-15. Multimodal paddle-contact detection
 16. Hitter identification
 17. Shot reconstruction and classification
 18. Match analytics

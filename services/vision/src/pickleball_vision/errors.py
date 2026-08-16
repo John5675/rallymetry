@@ -35,6 +35,7 @@ class ErrorCode(StrEnum):
     BALL_TRACKING_INPUT = "ball_tracking_input_error"
     BALL_TRAINING = "ball_training_error"
     BOUNCE_DETECTION_INPUT = "bounce_detection_input_error"
+    CONTACT_DETECTION_INPUT = "contact_detection_input_error"
     OUTPUT_WRITE = "output_write_error"
     PLAYER_ASSIGNMENT_IO = "player_assignment_io_error"
     PLAYER_ISOLATION_CANCELLED = "player_isolation_cancelled"
@@ -457,5 +458,16 @@ class BounceDetectionInputError(PickleballVisionError):
         super().__init__(
             f"Invalid bounce-detection input: {reason}",
             code=ErrorCode.BOUNCE_DETECTION_INPUT,
+            details={"reason": reason},
+        )
+
+
+class ContactDetectionInputError(PickleballVisionError):
+    """Raised when contact-detection artifacts are incompatible or malformed."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Invalid paddle-contact detection input: {reason}",
+            code=ErrorCode.CONTACT_DETECTION_INPUT,
             details={"reason": reason},
         )

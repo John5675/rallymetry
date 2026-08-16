@@ -265,6 +265,15 @@ applied to a candidate ball point only after visual plane-contact plausibility a
 projected-court image inclusion. Outputs retain low-confidence candidates and never
 infer true 3D position or line calls.
 
+Multimodal paddle-contact detection is the next separate event layer. It requires
+visual ball-trajectory velocity/direction discontinuity before logical-player,
+rally, bounce-state, or audio context can affect confidence. Logical-player boxes
+support proximity ranking while bottom-center ground points remain the only physical
+court-position estimate. Candidate-player rankings are not hitter assignments;
+`assignedHitter` remains null. Generic audio cannot create a contact, and airborne
+ball points are never projected through court homography. Human contact annotations
+are isolated to post-inference temporal evaluation.
+
 The local annotation-review interface is an adapter over fixed split records,
 human annotation JSON, source images, and optional raw detector suggestions. It binds
 only to loopback and introduces no product backend. Suggestions stay in their raw

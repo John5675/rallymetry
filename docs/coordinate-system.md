@@ -106,6 +106,12 @@ Never project an airborne ball through the homography as a court position. Futur
 3D ball reconstruction must use a camera model and sufficient temporal or
 multi-view constraints, and must advertise its uncertainty separately.
 
+Paddle-contact detection retains the ball only in source-image pixels. Player
+proximity may use distance to a linked person bounding-box extent, but the box center
+does not become a physical position. The player's physical court estimate remains
+the bottom-center ground point. An airborne contact candidate is not assigned a
+court side or location through homography.
+
 ## Time coordinates
 
 Keep an integer zero-based decoded `frame_index` and an explicit `timestamp_s` when

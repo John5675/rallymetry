@@ -8,8 +8,8 @@ training, raw spatial ball inference, fixed-split evaluation, and conservative
 image-space ball trajectory reconstruction are also implemented. Synchronized raw
 audio features, generic transient candidates, versioned human multimodal event
 ground truth, and structured automatic rally segmentation are implemented. Automatic
-visual-first multimodal bounce detection is also implemented. Paddle-contact,
-hitter, and shot inference remain contracts only.
+visual-first multimodal bounce detection and paddle-contact detection are also
+implemented. Hitter and shot inference remain contracts only.
 
 ## Intended flow
 
@@ -29,7 +29,8 @@ source media metadata (video + optional audio)
       + human multimodal event ground truth
       -> automatic rally intervals
       -> visual-first bounce candidates + optional audio confidence support
-      -> multimodal contact/hitter/shot events
+      -> visual-first paddle-contact candidates + optional audio confidence support
+      -> hitter/shot events
       -> structured match data
       -> analytics
 ```
@@ -177,6 +178,26 @@ Human `BOUNCE` events are isolated to post-inference evaluation. Visual-only and
 fused evaluation threshold the same visual candidates and report precision, recall,
 F1, and timing error. Exact commands, fields, thresholds, and sparse-review rules
 are defined in `bounce-detection.md`.
+
+## Multimodal paddle-contact detection contract
+
+Paddle-contact detection consumes the immutable, frame-complete ball trajectory and
+source-compatible logical-player tracks. Abrupt image-space velocity change,
+direction or speed discontinuity, and same-segment before/after continuity are
+required to create a visual candidate. Player proximity uses distance to the linked
+person box while the separately retained physical player position remains the
+bottom-center ground-contact estimate.
+
+Optional rally intervals and accepted bounce state provide confidence or exclusion
+context but cannot create a contact. Optional generic audio transients are remapped
+with the configured A/V offset and tolerance and can increase confidence only on an
+existing visual candidate. Audio-free operation remains fully supported.
+
+Candidate-player rankings retain all available logical roles, tracking uncertainty,
+court-side context, and proximity evidence. They do not assign a hitter. The stage
+does not project an airborne ball through homography or infer a true 3D position.
+Human `SERVE_CONTACT` and `PADDLE_CONTACT` events remain post-inference evaluation
+inputs. Exact commands and thresholds are defined in `contact-detection.md`.
 
 ## Court calibration contract
 

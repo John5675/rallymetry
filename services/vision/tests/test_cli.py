@@ -13,6 +13,7 @@ from pickleball_vision.config import (
     PlayerAnalysisSettings,
     PlayerIsolationSettings,
 )
+from pickleball_vision.contact_detection_workflow import ContactDetectionArtifacts
 from pickleball_vision.court import CourtDimensions, ImagePoint, court_landmarks
 from pickleball_vision.match_annotation import MatchAnnotationArtifacts
 from pickleball_vision.media import MediaTimeline
@@ -934,3 +935,76 @@ def test_detect_bounces_command_routes_visual_and_optional_multimodal_inputs(
     timeline = cast(MediaTimeline, received["timeline"])
     assert timeline.audio_video_offset_ms == 45.0
     assert log_record["event"] == "bounces_detected"
+
+
+def test_detect_contacts_command_routes_visual_and_optional_multimodal_inputs(
+    synthetic_video: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _clear_settings(monkeypatch)
+    monkeypatch.setenv("PICKLEBALL_VISION_AUDIO_VIDEO_OFFSET_MS", "35")
+    ball_tracks = tmp_path / "ball_tracks.json"
+    player_tracks = tmp_path / "tracks.json"
+    rallies = tmp_path / "rallies.json"
+    bounces = tmp_path / "bounces.json"
+    audio_events = tmp_path / "audio-events.json"
+    annotations = tmp_path / "annotations.json"
+    output_dir = tmp_path / "contacts"
+    received: dict[str, object] = {}
+
+    def fake_detect_contacts(video_path: Path, **kwargs: object) -> ContactDetectionArtifacts:
+        received["video_path"] = video_path
+        received.update(kwargs)
+        return ContactDetectionArtifacts(
+            contacts_path=output_dir / "contacts.json",
+            debug_video_path=output_dir / "contact-debug.mp4",
+            evaluation_path=output_dir / "contact-evaluation.json",
+            visual_candidate_count=14,
+            accepted_contact_count=9,
+            fused_candidate_count=6,
+        )
+
+    monkeypatch.setattr("pickleball_vision.cli.detect_contacts_in_video", fake_detect_contacts)
+    exit_code = main(
+        [
+            "detect-contacts",
+            str(synthetic_video),
+            "--ball-tracks",
+            str(ball_tracks),
+            "--player-tracks",
+            str(player_tracks),
+            "--rallies",
+            str(rallies),
+            "--bounces",
+            str(bounces),
+            "--audio-events",
+            str(audio_events),
+            "--annotations",
+            str(annotations),
+            "--annotations-complete",
+            "--evaluation-partition",
+            "test",
+            "--output-dir",
+            str(output_dir),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+    log_record = json.loads(captured.err)
+    assert exit_code == EXIT_OK
+    assert report["acceptedContactCount"] == 9
+    assert received["video_path"] == synthetic_video
+    assert received["ball_tracks_path"] == ball_tracks
+    assert received["player_tracks_path"] == player_tracks
+    assert received["rallies_path"] == rallies
+    assert received["bounces_path"] == bounces
+    assert received["audio_events_path"] == audio_events
+    assert received["annotations_path"] == annotations
+    assert received["annotations_complete"] is True
+    assert received["evaluation_partition"] == "test"
+    timeline = cast(MediaTimeline, received["timeline"])
+    assert timeline.audio_video_offset_ms == 35.0
+    assert log_record["event"] == "contacts_detected"
