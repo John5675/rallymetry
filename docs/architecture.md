@@ -4,8 +4,41 @@
 
 Pickleball Vision will turn recorded doubles-match video into evidence-backed,
 structured match data. The first product boundary is a local, inspectable pipeline.
-Backend services, asynchronous orchestration, and a web dashboard are deliberately
-deferred until the vision pipeline is useful and measurable.
+That pipeline remains the analysis source of truth and must continue to work locally
+without hosted services when possible. The remaining application architecture is
+now fixed, although its product services are deferred to their roadmap milestones.
+
+## Locked application stack
+
+```text
+React + Vite + TypeScript (browser; eventually deployed to Vercel)
+        |
+        | HTTPS application requests
+        v
+FastAPI product API
+        |
+        +-- official PyMongo Async API --> MongoDB Atlas
+        |                                  structured records + small job queue
+        |
+        +-- hosted artifact adapter ----> Vercel Blob
+
+Separate Python analysis worker
+        |
+        +-- claims/updates jobs --------> MongoDB Atlas
+        +-- reads/writes binaries ------> Vercel Blob
+        +-- invokes --------------------> existing CV + audio pipeline
+```
+
+The frontend is React with Vite and TypeScript, not Next.js. The product API is
+FastAPI, not Spring Boot. Hosted structured data uses MongoDB Atlas through the
+official PyMongo Async API, not PostgreSQL or Motor. Hosted videos and generated
+binary or large frame-level artifacts use Vercel Blob.
+
+FastAPI request handling is a control-plane boundary. It may validate requests,
+read or update compact structured records, issue safe artifact operations, and
+enqueue analysis work. It must not run the heavy CV/audio pipeline inside an HTTP
+request. Heavy analysis also must not run in Vercel Functions. A separately deployed
+Python worker owns long-running pipeline execution.
 
 ## Monorepo boundaries
 
@@ -16,6 +49,100 @@ deferred until the vision pipeline is useful and measurable.
 | `docs` | Stable contracts, definitions, labeling policy | Generated run artifacts |
 | `sample-data` | Local, uncommitted test media | Private URLs or committed video |
 | `output` | Local, generated results | Source-of-truth code or labels |
+
+Planned application areas are documented now but must not be created before their
+milestones become current:
+
+| Planned area | Responsibility | Must not own |
+| --- | --- | --- |
+| React/Vite web application | Browser presentation and later human workflows | Hosted credentials, CV execution, domain truth |
+| FastAPI product API | HTTP contracts, validation, compact records, artifact coordination, job submission/status | Heavy analysis inside requests |
+| Python analysis worker | Claim jobs, stage media, invoke existing pipeline, persist results | Browser presentation or synchronous request handling |
+| Hosted persistence adapters | PyMongo Async and Vercel Blob integration behind project interfaces | CV/audio domain algorithms |
+
+Exact directories and deployment configuration belong to the corresponding product
+milestones. Milestone 11 introduces no application scaffolding.
+
+## Runtime responsibilities
+
+### Browser application
+
+The browser eventually presents match status, structured results, review media, and
+human corrections. It calls FastAPI through documented HTTP contracts. It never
+receives MongoDB credentials or Vercel Blob credentials. If a future direct upload
+flow is needed, FastAPI may issue a short-lived, narrowly scoped operation; permanent
+service credentials remain server-side.
+
+User authentication is intentionally deferred until a dedicated web-access
+milestone. Earlier local or hosted prototypes must not create an accidental auth
+system. The design should remain proportionate to approximately six users.
+
+### FastAPI product API
+
+FastAPI is the product control plane. Its responsibilities are bounded request
+validation, structured application reads/writes, hosted-artifact coordination, job
+creation, and job-status reporting. Request completion cannot depend on finishing a
+video analysis. The API returns a durable job identifier and exposes status/results
+after the worker processes that job.
+
+### Analysis worker
+
+The analysis worker is a separate Python process and deployment unit. It retrieves
+source media through an adapter, runs the existing CV/audio pipeline, uploads large
+generated artifacts through an adapter, and writes compact status and result records.
+It preserves the pipeline's raw-observation/derived-event boundaries and never turns
+an infrastructure job state into match evidence.
+
+The worker may call stable Python interfaces or the preserved CLI boundary. Hosted
+concerns must not be spread through detector, calibration, tracking, audio, or
+analytics modules.
+
+### MongoDB Atlas
+
+MongoDB Atlas stores hosted structured application data such as match metadata,
+artifact manifests, compact summaries, job records, job leases, and references to
+structured analysis outputs. Python application code uses the official PyMongo Async
+API. Motor is not part of the architecture.
+
+For the expected small scale, MongoDB may also implement the initial job queue using
+atomic claims, explicit states, attempt metadata, and expiring worker leases. Redis
+and Celery are intentionally absent unless measured throughput, latency, or delivery
+requirements later demonstrate that MongoDB is insufficient.
+
+Large source videos, annotated videos, extracted audio, model weights, datasets, and
+large frame-level CV/audio artifacts do not belong directly in MongoDB documents.
+MongoDB stores their metadata, provenance, status, and blob references.
+
+### Vercel Blob
+
+Vercel Blob stores hosted source video and binary/generated artifacts, including
+review media, visualizations, and large structured artifacts when appropriate. Only
+FastAPI and the analysis worker access Blob through project-owned interfaces and
+adapters. Storage provider details and credentials cannot become CV/audio domain
+dependencies or browser configuration.
+
+### Local pipeline
+
+The existing `pickleball-vision` CLI and local filesystem artifacts remain supported.
+Local ingestion, calibration, detection, tracking, audio analysis, and future local
+pipeline stages should continue working without MongoDB Atlas, Vercel Blob, or an
+internet connection when their model assets are already present. Hosted execution
+adapts this pipeline; it does not replace or fork it.
+
+## Data placement
+
+| Data | System of record |
+| --- | --- |
+| Local source media and generated artifacts | Local filesystem, as today |
+| Hosted source videos and large generated artifacts | Vercel Blob |
+| Match metadata, job state, compact summaries, artifact manifests | MongoDB Atlas |
+| Raw and derived pipeline contracts | Existing versioned artifact schemas, stored locally or by blob reference |
+| Secrets | Server/worker environment or deployment secret store; never browser data |
+
+MongoDB documents should reference immutable or versioned artifact identities and
+retain provenance. Moving an artifact from the local filesystem to hosted blob
+storage must not collapse raw observations into events or make presentation records
+the analytical source of truth.
 
 ## Data layers
 
@@ -120,6 +247,12 @@ Configuration is loaded there, structured logging is initialized there, and type
 application errors are translated to stable exit codes there. Library imports must
 not configure global logging or perform I/O.
 
+During hosted milestones, FastAPI accepts short control-plane requests and the
+separate worker performs long-running analysis. MongoDB job state connects those
+processes without importing API or storage concerns into the vision domain. The
+React/Vite application consumes API contracts only; it never calls the worker or
+database directly.
+
 Each future pipeline stage should have declared inputs, outputs, schema versions,
 configuration, and provenance. Intermediate artifacts should be serializable so a
 developer can inspect a failed stage without rerunning every preceding stage.
@@ -132,9 +265,13 @@ analytics may consume structured match data. Reverse dependencies are forbidden.
 UI- or API-specific representations must adapt domain records instead of becoming
 the domain model.
 
-## Deferred architecture
+## Deployment boundary
 
-Spring Boot, Next.js, queues, remote object storage, and hosted inference are not
-Foundation concerns. Their boundaries will be designed during Backend
-productization, Async processing, and Web dashboard milestones after local pipeline
-contracts are supported by evidence.
+The React/Vite frontend will eventually deploy to Vercel. FastAPI and the Python
+analysis worker require independent Python-capable runtime boundaries; heavy analysis
+cannot execute in Vercel Functions or in the API request process. Their exact hosting
+provider is intentionally deferred.
+
+MongoDB Atlas and Vercel Blob are hosted adapters, not prerequisites for local use.
+No application service, database integration, worker, web application, deployment,
+or authentication feature is implemented during architecture lock-in.

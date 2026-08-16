@@ -5,7 +5,7 @@ doubles pickleball matches into inspectable, structured match data. The long-ter
 goal includes court and player tracking, ball trajectories, rally and shot events,
 match analytics, and AI-assisted coaching.
 
-The current milestone is **Audio event extraction**. The local
+The current milestone is **Architecture lock-in**. Milestones 0–10 are complete. The local
 CLI can inspect video plus optional synchronized audio, extract lossless analysis
 audio, calibrate the court, detect people broadly, derive court-aware candidates,
 manually assign the four logical match roles, and track those identities separately
@@ -31,8 +31,12 @@ Paddle-contact, bounce, and other pickleball event inference remains unimplement
 - `PLANS.md`: ordered milestones and the single current milestone
 - `AGENTS.md`: durable rules for humans and coding agents
 
-Spring Boot and Next.js are intentionally absent. Product services will be added
-only after the local computer-vision pipeline is proven.
+The locked product stack is a React/Vite/TypeScript frontend, a FastAPI product API,
+MongoDB Atlas for hosted structured data and the initial small-scale job queue,
+Vercel Blob for hosted media/artifacts, and a separate Python analysis worker that
+invokes the existing pipeline. Heavy analysis will not run in Vercel Functions or
+inside FastAPI HTTP requests. These product components remain unimplemented until
+their milestones become current; see [the architecture contract](docs/architecture.md).
 
 ## Prerequisites
 

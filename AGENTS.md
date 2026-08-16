@@ -49,6 +49,26 @@ and the relevant design document before changing code.
 - Record any resampling/channel conversion performed for analysis.
 - Event fusion must support a configurable A/V timing offset and tolerance.
 - All audio-dependent downstream stages must support a vision-only fallback.
+- Do not introduce Spring Boot.
+- Do not introduce PostgreSQL.
+- Do not introduce Next.js.
+- Use FastAPI for the product API.
+- Use MongoDB Atlas for hosted structured data.
+- Use the official PyMongo Async API rather than Motor.
+- Use Vercel Blob for hosted binary and generated artifacts.
+- Do not store large videos or frame-level CV artifacts directly in MongoDB.
+- Keep heavy analysis outside the API process and outside HTTP request handling.
+- Use a separate Python analysis worker for heavy CV and audio processing.
+- MongoDB may act as the small-scale job queue.
+- Do not add Redis or Celery unless demonstrated requirements justify them.
+- Preserve the existing CLI and local pipeline.
+- The local pipeline must continue working without MongoDB, Vercel, or internet
+  connectivity when possible.
+- Keep hosted integrations behind interfaces and adapters rather than embedding
+  them throughout CV or audio code.
+- Never expose MongoDB credentials or Vercel Blob credentials to the browser.
+- Do not require user authentication until the dedicated web-access milestone.
+- Prefer the simplest solution suitable for approximately six users.
 - Videos, private YouTube URLs, secrets, large datasets, and trained model weights
   must not be committed.
 - Add or update tests for behavior-changing work.

@@ -329,7 +329,7 @@ Exit criteria:
 - No audio-event extraction, bounce/contact inference, rally inference, or later
   semantic event behavior is implemented.
 
-## 10. Audio event extraction — current
+## 10. Audio event extraction — complete
 
 Decode optional synchronized audio into an explicit analysis representation, derive
 time-localized channel-aware signal features, and identify generic transient
@@ -361,21 +361,53 @@ Exit criteria:
   pass.
 - No contact, bounce, rally, hitter, shot, or multimodal domain event is inferred.
 
+## 11. Architecture lock-in — current
+
+Lock the remaining product architecture to a React/Vite/TypeScript frontend,
+FastAPI product API, MongoDB Atlas structured store and small-scale job queue,
+Vercel Blob binary-artifact store, and a separate Python analysis worker that
+invokes the existing CV/audio pipeline. Preserve the local CLI and implement no
+product feature in this milestone.
+
+Exit criteria:
+
+- `AGENTS.md` records the finalized stack, service separation, offline-local
+  compatibility, hosted-adapter, credential, authentication-deferment, and
+  six-user simplicity rules as durable repository constraints.
+- Architecture documentation defines browser, API, persistence, blob storage,
+  worker, and existing-pipeline responsibilities and their allowed dependency
+  directions.
+- Heavy analysis is explicitly prohibited inside FastAPI HTTP request handling and
+  Vercel Functions; a separate Python worker owns long-running CV/audio execution.
+- MongoDB Atlas stores hosted structured records and may provide the initial
+  small-scale job queue through the official PyMongo Async API. Large videos and
+  frame-level CV artifacts remain outside MongoDB.
+- Vercel Blob stores hosted source binaries and generated artifacts through
+  server-side adapters; MongoDB and Blob credentials are never browser-visible.
+- The roadmap names Milestones 12–26 in their finalized order and contains no
+  planned Spring Boot, PostgreSQL, Next.js, or default Redis/Celery architecture.
+- No FastAPI service, database integration, worker, frontend, deployment, auth, or
+  other product feature is implemented.
+- All existing tests, Ruff checks, Ruff formatting, static type checks, and the CLI
+  health check pass without requiring MongoDB, Vercel, or internet connectivity.
+
 ## Future milestones — not current
 
-11. Manual event annotation
-12. Rally segmentation
-13. Multimodal bounce detection
-14. Multimodal contact detection
-15. Hitter identification
-16. Shot reconstruction/classification
-17. Analytics
-18. Backend
-19. Async processing
-20. Web dashboard
-21. Human corrections
-22. AI coach
-23. Final audit
+12. Multimodal ground-truth annotation
+13. Rally segmentation
+14. Multimodal bounce detection
+15. Multimodal paddle-contact detection
+16. Hitter identification
+17. Shot reconstruction and classification
+18. Match analytics
+19. MongoDB + Vercel Blob persistence
+20. FastAPI application API
+21. Background analysis worker + MongoDB job queue
+22. React/Vite match dashboard
+23. Vercel deployment + hosted media
+24. Human correction workflow
+25. AI coaching
+26. Final architecture / quality audit
 
 Moving a milestone to current should add measurable entry and exit criteria while
 preserving completed milestone history. Do not bundle later milestones into the
