@@ -13,6 +13,7 @@ from pickleball_vision.config import (
     PlayerAnalysisSettings,
     PlayerIsolationSettings,
     PlayerTrackingSettings,
+    RallySegmentationSettings,
     Settings,
 )
 from pickleball_vision.errors import ConfigurationError, ErrorCode
@@ -32,6 +33,7 @@ def test_settings_have_safe_development_defaults() -> None:
     assert settings.player_tracking == PlayerTrackingSettings()
     assert settings.player_analysis == PlayerAnalysisSettings()
     assert settings.ball_tracking == BallTrackingSettings()
+    assert settings.rally_segmentation == RallySegmentationSettings()
 
 
 def test_settings_load_prefixed_environment_values() -> None:
@@ -72,6 +74,11 @@ def test_settings_load_prefixed_environment_values() -> None:
             "PICKLEBALL_VISION_BALL_TRACKING_MAX_INTERPOLATION_GAP_SECONDS": "0.05",
             "PICKLEBALL_VISION_BALL_TRACKING_MINIMUM_SEGMENT_OBSERVATIONS": "3",
             "PICKLEBALL_VISION_BALL_TRACKING_SMOOTHING_WINDOW_FRAMES": "7",
+            "PICKLEBALL_VISION_RALLY_END_QUIET_SECONDS": "1.2",
+            "PICKLEBALL_VISION_RALLY_RESTART_QUIET_SECONDS": "0.6",
+            "PICKLEBALL_VISION_RALLY_DEAD_BALL_HANDOFF_WINDOW_SECONDS": "2.8",
+            "PICKLEBALL_VISION_RALLY_DEAD_BALL_HANDOFF_MINIMUM_QUALITY_MARGIN": "0.08",
+            "PICKLEBALL_VISION_RALLY_EVALUATION_MINIMUM_IOU": "0.4",
         }
     )
 
@@ -121,6 +128,13 @@ def test_settings_load_prefixed_environment_values() -> None:
         max_interpolation_gap_seconds=0.05,
         minimum_segment_observations=3,
         smoothing_window_frames=7,
+    )
+    assert settings.rally_segmentation == RallySegmentationSettings(
+        end_quiet_seconds=1.2,
+        restart_quiet_seconds=0.6,
+        dead_ball_handoff_window_seconds=2.8,
+        dead_ball_handoff_minimum_quality_margin=0.08,
+        evaluation_minimum_iou=0.4,
     )
 
 
@@ -213,6 +227,21 @@ def test_settings_load_prefixed_environment_values() -> None:
         (
             {"PICKLEBALL_VISION_BALL_TRACKING_SMOOTHING_WINDOW_FRAMES": "4"},
             "PICKLEBALL_VISION_BALL_TRACKING_SMOOTHING_WINDOW_FRAMES",
+        ),
+        (
+            {"PICKLEBALL_VISION_RALLY_EVALUATION_MINIMUM_IOU": "1.1"},
+            "PICKLEBALL_VISION_RALLY_EVALUATION_MINIMUM_IOU",
+        ),
+        (
+            {"PICKLEBALL_VISION_RALLY_DEAD_BALL_HANDOFF_MINIMUM_QUALITY_MARGIN": "1.1"},
+            "PICKLEBALL_VISION_RALLY_DEAD_BALL_HANDOFF_MINIMUM_QUALITY_MARGIN",
+        ),
+        (
+            {
+                "PICKLEBALL_VISION_RALLY_END_QUIET_SECONDS": "0.5",
+                "PICKLEBALL_VISION_RALLY_RESTART_QUIET_SECONDS": "0.6",
+            },
+            "PICKLEBALL_VISION_RALLY_RESTART_QUIET_SECONDS",
         ),
     ],
 )

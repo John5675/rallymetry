@@ -361,7 +361,7 @@ Exit criteria:
   pass.
 - No contact, bounce, rally, hitter, shot, or multimodal domain event is inferred.
 
-## 11. Architecture lock-in — current
+## 11. Architecture lock-in — complete
 
 Lock the remaining product architecture to a React/Vite/TypeScript frontend,
 FastAPI product API, MongoDB Atlas structured store and small-scale job queue,
@@ -391,10 +391,83 @@ Exit criteria:
 - All existing tests, Ruff checks, Ruff formatting, static type checks, and the CLI
   health check pass without requiring MongoDB, Vercel, or internet connectivity.
 
+## 12. Multimodal ground-truth annotation — complete
+
+Create a local, resumable human-annotation workflow for synchronized match-video
+ground truth before automatic rally, bounce, contact, hitter, or shot inference.
+Store explicit human events independently of model output and make optional raw
+audio context visible without turning transients into semantic events.
+
+Exit criteria:
+
+- `pickleball-vision annotate-match <video> --output <json>` opens a loopback-only
+  local annotation interface with native media playback, pause, frame stepping,
+  seeking, event creation, event editing/deletion, and useful keyboard shortcuts.
+- A versioned annotation schema retains source video/media metadata and, for each
+  event, a stable ID, event type, frame, canonical media timestamp, optional player,
+  team, shot type, court position, audio label, notes, and annotation confidence.
+- Supported event types are `RALLY_START`, `RALLY_END`, `SERVE_CONTACT`,
+  `PADDLE_CONTACT`, `BOUNCE`, `RALLY_WINNER`, and `SHOT_TYPE`.
+- Optional audio labels are `PRIMARY_EVENT_AUDIBLE`,
+  `PRIMARY_EVENT_NOT_AUDIBLE`, `OTHER_COURT_TRANSIENT`, and `AMBIGUOUS_AUDIO`;
+  normal annotation does not require an audio label.
+- Reopening an existing compatible annotation file resumes work without changing
+  source media. Every edit is validated and saved atomically.
+- When synchronized audio-analysis artifacts are available, the interface may show
+  waveform and generic transient context aligned to the canonical media timeline;
+  video without audio remains fully supported.
+- Tests cover schema creation, serialization, reload/resume, add/edit/delete,
+  validation, source provenance, frame/timestamp conversion, optional metadata,
+  and audio-free/audio-context behavior using synthetic media.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- No automatic rally segmentation, bounce/contact detection, hitter inference,
+  shot inference, match analytics, or product application behavior is implemented.
+
+## 13. Automatic rally segmentation — current
+
+Derive inspectable rally intervals from structured ball-trajectory activity,
+sustained motion, bounded trajectory gaps, serve-like motion onsets, time between
+activity bursts, and optional compatible player-reset evidence. Generic audio
+transients may support confidence but can never create a rally boundary.
+Materially weaker activity bursts immediately adjacent to stronger rally evidence
+are retained as uncertain dead-ball-handoff candidates and excluded from predicted
+rallies without assigning a semantic event label.
+
+Exit criteria:
+
+- `pickleball-vision segment-rallies <video> --ball-tracks <json> --output-dir
+  <dir>` validates source provenance and consumes the frame-complete ball trajectory
+  without mutating it.
+- Ball activity, motion continuity, long gaps, serve-like sequences, activity-burst
+  spacing, and optional source-compatible player-reset behavior remain separately
+  inspectable supporting signals rather than an end-to-end classifier.
+- Adjacent-burst arbitration reduces dead-ball return/handoff false rallies while
+  retaining the rejected interval, quality score, comparison margin, and original
+  evidence in `rallies.json`.
+- Audio remains optional, records confidence-only support, and cannot start or end a
+  rally by itself. Vision-only segmentation remains fully supported.
+- Every predicted rally retains a stable ID, zero-based start/end frames,
+  video-relative timestamps, heuristic confidence, complete configuration, input
+  provenance, and supporting signals.
+- Human annotations are loaded only after inference. Evaluation uses one-to-one
+  interval matching and reports precision, recall, matched/missed/false rallies,
+  and start/end timing error without tuning thresholds automatically.
+- Sparse reviewed annotations do not turn unreviewed video time into negative ground
+  truth. Complete-video evaluation must be explicitly requested.
+- `rallies.json`, `rally-debug.mp4`, and `rally-evaluation.json` are generated, and
+  the debug overlay distinguishes predictions from optional human rally intervals.
+- Synthetic tests cover activity bursts, short and long gaps, serve-like onsets,
+  dead-ball handoff rejection, optional player/audio support, the audio-only
+  prohibition, serialization,
+  provenance validation, sparse/full evaluation, and debug rendering.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- No automatic bounce detection, paddle-contact detection, hitter inference, or
+  shot reconstruction/classification is implemented.
+
 ## Future milestones — not current
 
-12. Multimodal ground-truth annotation
-13. Rally segmentation
 14. Multimodal bounce detection
 15. Multimodal paddle-contact detection
 16. Hitter identification

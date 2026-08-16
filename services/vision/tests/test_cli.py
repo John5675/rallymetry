@@ -13,10 +13,13 @@ from pickleball_vision.config import (
     PlayerIsolationSettings,
 )
 from pickleball_vision.court import CourtDimensions, ImagePoint, court_landmarks
+from pickleball_vision.match_annotation import MatchAnnotationArtifacts
+from pickleball_vision.media import MediaTimeline
 from pickleball_vision.person_detection_pipeline import PersonDetectionArtifacts
 from pickleball_vision.player_analysis_workflow import PlayerAnalysisArtifacts
 from pickleball_vision.player_isolation import LOGICAL_PLAYER_ROLES
 from pickleball_vision.player_isolation_workflow import PlayerIsolationArtifacts
+from pickleball_vision.rally_segmentation_workflow import RallySegmentationArtifacts
 
 
 def _clear_settings(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -81,6 +84,32 @@ def _clear_settings(monkeypatch: pytest.MonkeyPatch) -> None:
         "BALL_TRACKING_SMOOTHING_WINDOW_FRAMES",
         "BALL_TRACKING_MAXIMUM_SMOOTHING_ADJUSTMENT_DIAGONAL_FRACTION",
         "BALL_TRACKING_DEBUG_TRAIL_SECONDS",
+        "RALLY_MINIMUM_MOTION_SPEED_DIAGONALS_PER_SECOND",
+        "RALLY_MOTION_LINK_GAP_SECONDS",
+        "RALLY_MOTION_SUPPORT_WINDOW_SECONDS",
+        "RALLY_MINIMUM_MOTION_SUPPORT_FRACTION",
+        "RALLY_SERVE_MINIMUM_SPEED_DIAGONALS_PER_SECOND",
+        "RALLY_SERVE_SPEED_SURGE_RATIO",
+        "RALLY_SERVE_BASELINE_WINDOW_SECONDS",
+        "RALLY_SERVE_CONFIRMATION_SECONDS",
+        "RALLY_SERVE_MINIMUM_DISPLACEMENT_DIAGONAL_FRACTION",
+        "RALLY_SERVE_MINIMUM_MOTION_FRACTION",
+        "RALLY_MINIMUM_DURATION_SECONDS",
+        "RALLY_MAXIMUM_DURATION_SECONDS",
+        "RALLY_END_QUIET_SECONDS",
+        "RALLY_END_TAIL_GRACE_SECONDS",
+        "RALLY_MINIMUM_BETWEEN_SECONDS",
+        "RALLY_RESTART_QUIET_SECONDS",
+        "RALLY_RESTART_MINIMUM_ELAPSED_SECONDS",
+        "RALLY_DEAD_BALL_HANDOFF_WINDOW_SECONDS",
+        "RALLY_DEAD_BALL_HANDOFF_MINIMUM_QUALITY_MARGIN",
+        "RALLY_DEAD_BALL_HANDOFF_FULL_DURATION_SECONDS",
+        "RALLY_PLAYER_RESET_WINDOW_SECONDS",
+        "RALLY_PLAYER_RESET_MAXIMUM_SPEED_MPS",
+        "RALLY_AUDIO_SUPPORT_TOLERANCE_SECONDS",
+        "RALLY_EVALUATION_MINIMUM_IOU",
+        "RALLY_EVALUATION_BOUNDARY_TOLERANCE_SECONDS",
+        "RALLY_SPARSE_EVALUATION_MARGIN_SECONDS",
     ):
         monkeypatch.delenv(f"{ENV_PREFIX}{suffix}", raising=False)
 
@@ -691,3 +720,132 @@ def test_analyze_audio_command_gracefully_reports_video_without_audio(
     assert Path(report["waveformPath"]).is_file()
     assert Path(report["eventsImagePath"]).is_file()
     assert log_record["event"] == "audio_analyzed"
+
+
+def test_annotate_match_command_routes_optional_audio_context(
+    synthetic_video: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _clear_settings(monkeypatch)
+    monkeypatch.setenv("PICKLEBALL_VISION_AUDIO_VIDEO_OFFSET_MS", "30")
+    output_path = tmp_path / "annotations.json"
+    audio_events_path = tmp_path / "audio-events.json"
+    received: dict[str, object] = {}
+
+    def fake_serve_match_annotation(
+        video_path: Path,
+        **kwargs: object,
+    ) -> MatchAnnotationArtifacts:
+        received["video_path"] = video_path
+        received.update(kwargs)
+        return MatchAnnotationArtifacts(
+            url="http://127.0.0.1:54321/",
+            annotations_path=output_path,
+            event_count=7,
+            audio_context_available=True,
+        )
+
+    monkeypatch.setattr(
+        "pickleball_vision.cli.serve_match_annotation",
+        fake_serve_match_annotation,
+    )
+
+    exit_code = main(
+        [
+            "annotate-match",
+            str(synthetic_video),
+            "--output",
+            str(output_path),
+            "--audio-events",
+            str(audio_events_path),
+            "--port",
+            "0",
+            "--no-open",
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+    log_record = json.loads(captured.err)
+    assert exit_code == EXIT_OK
+    assert report["eventCount"] == 7
+    assert report["audioContextAvailable"] is True
+    assert received["video_path"] == synthetic_video
+    assert received["output_path"] == output_path
+    assert received["audio_events_path"] == audio_events_path
+    assert received["port"] == 0
+    assert received["open_browser"] is False
+    timeline = cast(MediaTimeline, received["timeline"])
+    assert timeline.audio_video_offset_ms == 30.0
+    assert log_record["event"] == "match_annotation_stopped"
+
+
+def test_segment_rallies_command_routes_structured_inputs(
+    synthetic_video: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _clear_settings(monkeypatch)
+    ball_tracks = tmp_path / "ball_tracks.json"
+    player_tracks = tmp_path / "tracks.json"
+    audio_events = tmp_path / "audio-events.json"
+    annotations = tmp_path / "annotations.json"
+    output_dir = tmp_path / "rallies"
+    received: dict[str, object] = {}
+
+    def fake_segment_rallies(video_path: Path, **kwargs: object) -> RallySegmentationArtifacts:
+        received["video_path"] = video_path
+        received.update(kwargs)
+        return RallySegmentationArtifacts(
+            rallies_path=output_dir / "rallies.json",
+            debug_video_path=output_dir / "rally-debug.mp4",
+            evaluation_path=output_dir / "rally-evaluation.json",
+            rally_count=8,
+            matched_rally_count=4,
+            missed_rally_count=1,
+            false_rally_count=2,
+            rejected_adjacent_burst_count=3,
+        )
+
+    monkeypatch.setattr(
+        "pickleball_vision.cli.segment_rallies_in_video",
+        fake_segment_rallies,
+    )
+    exit_code = main(
+        [
+            "segment-rallies",
+            str(synthetic_video),
+            "--ball-tracks",
+            str(ball_tracks),
+            "--player-tracks",
+            str(player_tracks),
+            "--audio-events",
+            str(audio_events),
+            "--annotations",
+            str(annotations),
+            "--annotations-complete",
+            "--evaluation-partition",
+            "test",
+            "--output-dir",
+            str(output_dir),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+    log_record = json.loads(captured.err)
+    assert exit_code == EXIT_OK
+    assert report["rallyCount"] == 8
+    assert report["matchedRallyCount"] == 4
+    assert report["rejectedAdjacentBurstCount"] == 3
+    assert received["video_path"] == synthetic_video
+    assert received["ball_tracks_path"] == ball_tracks
+    assert received["player_tracks_path"] == player_tracks
+    assert received["audio_events_path"] == audio_events
+    assert received["annotations_path"] == annotations
+    assert received["annotations_complete"] is True
+    assert received["evaluation_partition"] == "test"
+    assert log_record["event"] == "rallies_segmented"

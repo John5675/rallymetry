@@ -1,9 +1,10 @@
 # Annotation Guide
 
 This is the durable labeling policy for dataset and evaluation milestones. Ball
-dataset extraction, leakage-safe splitting, detector training, and local
-human-review tooling are implemented. Model suggestions are never ground truth
-until a human explicitly accepts them and marks the frame reviewed.
+dataset extraction, leakage-safe splitting, detector training, local detector-data
+review, and multimodal match-event annotation are implemented. Model suggestions
+are never ground truth until a human explicitly accepts them and marks the frame
+reviewed.
 
 ## General rules
 
@@ -110,10 +111,30 @@ truth.
 
 ## Events
 
-Rally boundaries, bounces, paddle contacts, hitters, and shot classes are distinct
-labels. Each event includes a frame interval when exact timing is ambiguous, a
-confidence, and links to evidence. “Unknown hitter” and “unknown shot class” are
-valid; guessing is not.
+The match ground-truth schema supports `RALLY_START`, `RALLY_END`,
+`SERVE_CONTACT`, `PADDLE_CONTACT`, `BOUNCE`, `RALLY_WINNER`, and `SHOT_TYPE` as
+distinct human labels. Each event retains an exact frame, derived video and
+canonical media timestamps, stable ID, and optional player, team, shot type,
+court-plane position, notes, and annotation confidence. Unknown or omitted player,
+winner, location, and shot class are valid; guessing is not.
+
+Optional audio labels are `PRIMARY_EVENT_AUDIBLE`,
+`PRIMARY_EVENT_NOT_AUDIBLE`, `OTHER_COURT_TRANSIENT`, and `AMBIGUOUS_AUDIO`.
+They describe human review context for an existing event. A raw transient marker
+is not a bounce or contact, must not create an event automatically, and may belong
+to a neighboring court. Normal match annotation never requires audio.
+
+The local editor saves after every validated edit, resumes compatible files, and
+does not alter source media or audio-analysis artifacts. Exact event semantics,
+schema, controls, and the recommended review procedure are documented in
+[the multimodal match annotation guide](match-annotation.md).
+
+Automatic rally evaluation pairs human `RALLY_START`/`RALLY_END` events only after
+inference. A selected 5–10-rally annotation file is sparse evaluation coverage, not
+proof that the rest of the video contains no rallies. Treat unreviewed time as
+excluded. Mark complete-video coverage explicitly only after a human has reviewed
+the entire recording for missing rally boundaries. Thresholds may be developed on a
+development partition but must remain frozen for held-out validation/test clips.
 
 ## Quality control
 

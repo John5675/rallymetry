@@ -6,8 +6,9 @@ calibration, broad person detection, primary-player isolation, and persistent
 logical-player tracking are implemented. Ball dataset extraction, custom detector
 training, raw spatial ball inference, fixed-split evaluation, and conservative
 image-space ball trajectory reconstruction are also implemented. Synchronized raw
-audio features and generic transient candidates are implemented; all semantic event
-stages remain contracts only.
+audio features, generic transient candidates, versioned human multimodal event
+ground truth, and structured automatic rally segmentation are implemented. Automatic
+bounce, paddle-contact, hitter, and shot inference remain contracts only.
 
 ## Intended flow
 
@@ -24,7 +25,9 @@ source media metadata (video + optional audio)
       -> observed/interpolated ball track segments
       -> optional raw audio feature observations
       -> generic audio transient candidates
-      -> rally and multimodal bounce/contact/hitter/shot events
+      + human multimodal event ground truth
+      -> automatic rally intervals
+      -> multimodal bounce/contact/hitter/shot events
       -> structured match data
       -> analytics
 ```
@@ -103,6 +106,49 @@ When audio is absent, audio analysis emits explicit unavailable JSON/visual arti
 and no observations. This is a successful vision-only state, not a pipeline failure.
 Exact fields, configuration, timing, and manual review are documented in
 `audio-analysis.md`.
+
+## Multimodal ground-truth contract
+
+The local match editor creates a separate, versioned human annotation artifact. It
+supports explicit rally boundaries, serve and paddle contacts, bounces, rally
+winners, and shot-type labels with exact frame/time provenance and optional
+metadata. It never mutates source video, raw audio features, transient candidates,
+detector outputs, or trajectories.
+
+Optional Prompt 10 waveform and generic transient artifacts are display-only
+context. They are kept separate from match events and are never promoted into
+semantic annotations. Optional human audio labels describe evidence around a
+visually reviewed event; audio remains unnecessary for ordinary annotation. The
+schema, semantics, controls, and audit workflow are defined in
+`match-annotation.md`.
+
+## Automatic rally-segmentation contract
+
+Rally segmentation consumes the immutable, frame-complete primary-match ball
+trajectory. It derives image-space motion in normalized source-frame units and
+combines sustained activity, bounded gaps, long quiet periods, serve-like motion
+onsets, and time between bursts. A configurable adjacent-burst arbitration step
+retains but rejects materially weaker intervals close to stronger rally evidence,
+which reduces dead-ball return and handoff false positives. Optional
+source-compatible logical-player tracks
+provide reset-like low-motion confidence evidence. Incompatible player artifacts
+are rejected rather than silently sampled or rescaled.
+
+Optional generic audio transients may increase confidence near an already visual
+boundary. Audio never proposes a start or end, and the same inference behavior is
+available when audio is absent. A serve-like sequence is an onset heuristic, not a
+serve-contact event. The stage produces no bounce, contact, hitter, or shot record.
+Likewise, an adjacent rejected interval is only a possible dead-ball handoff; no
+semantic event is asserted.
+
+Human `RALLY_START`/`RALLY_END` annotations are loaded only after inference for
+one-to-one interval evaluation. Sparse annotation coverage excludes unreviewed time
+instead of treating it as negative; complete-video negative coverage requires an
+explicit command flag. Evaluation reports interval precision/recall, matched,
+missed, and false rallies, plus start/end timing error. The implementation never
+tunes thresholds automatically and records whether a run is development,
+validation, or test. Exact fields, settings, and commands are documented in
+`rally-segmentation.md`.
 
 ## Court calibration contract
 

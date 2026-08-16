@@ -37,6 +37,7 @@ from pickleball_vision.dataset_workflow import (
 )
 from pickleball_vision.errors import ErrorCode, PickleballVisionError
 from pickleball_vision.logging import configure_logging
+from pickleball_vision.match_annotation_ui import serve_match_annotation
 from pickleball_vision.media import (
     AudioExtractionOptions,
     MediaTimeline,
@@ -47,6 +48,7 @@ from pickleball_vision.person_detection_pipeline import detect_people_in_video
 from pickleball_vision.player_analysis_workflow import analyze_players_in_video
 from pickleball_vision.player_isolation_workflow import isolate_primary_players
 from pickleball_vision.player_tracking_workflow import track_players_in_video
+from pickleball_vision.rally_segmentation_workflow import segment_rallies_in_video
 from pickleball_vision.video import extract_frame, sample_frames
 
 EXIT_OK = 0
@@ -125,6 +127,34 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         required=True,
         help="directory for audio JSON, waveform, and transient timeline artifacts",
+    )
+
+    annotate_match_parser = subparsers.add_parser(
+        "annotate-match",
+        help="launch a resumable local editor for multimodal human ground truth",
+    )
+    annotate_match_parser.add_argument("video", type=Path, help="path to a local video file")
+    annotate_match_parser.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+        help="versioned annotation JSON to create or reopen",
+    )
+    annotate_match_parser.add_argument(
+        "--audio-events",
+        type=Path,
+        help="optional Prompt 10 audio-events.json for waveform/transient context",
+    )
+    annotate_match_parser.add_argument(
+        "--port",
+        type=int,
+        default=8766,
+        help="loopback annotation server port; use 0 to select an available port",
+    )
+    annotate_match_parser.add_argument(
+        "--no-open",
+        action="store_true",
+        help="do not open the default browser automatically",
     )
 
     sample_parser = subparsers.add_parser(
@@ -497,6 +527,54 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="directory for ball_tracks.json, ball-debug.mp4, and tracking summary",
     )
+
+    segment_rallies_parser = subparsers.add_parser(
+        "segment-rallies",
+        help="infer rally intervals from structured trajectory and optional supporting signals",
+    )
+    segment_rallies_parser.add_argument(
+        "video",
+        type=Path,
+        help="source video represented by the input artifacts",
+    )
+    segment_rallies_parser.add_argument(
+        "--ball-tracks",
+        type=Path,
+        required=True,
+        help="frame-complete ball_tracks.json from track-ball",
+    )
+    segment_rallies_parser.add_argument(
+        "--player-tracks",
+        type=Path,
+        help="optional source-compatible tracks.json for player-reset confidence support",
+    )
+    segment_rallies_parser.add_argument(
+        "--audio-events",
+        type=Path,
+        help="optional audio-events.json; transients support confidence but not boundaries",
+    )
+    segment_rallies_parser.add_argument(
+        "--annotations",
+        type=Path,
+        help="optional human match annotations used only for post-inference evaluation",
+    )
+    segment_rallies_parser.add_argument(
+        "--annotations-complete",
+        action="store_true",
+        help="treat all unannotated source time as reviewed negative evaluation coverage",
+    )
+    segment_rallies_parser.add_argument(
+        "--evaluation-partition",
+        choices=("development", "validation", "test"),
+        default="validation",
+        help="provenance label only; the command never tunes thresholds automatically",
+    )
+    segment_rallies_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=True,
+        help="directory for rallies.json, rally-debug.mp4, and rally-evaluation.json",
+    )
     return parser
 
 
@@ -608,6 +686,32 @@ def _run_analyze_audio(
     )
     logging.getLogger("pickleball_vision.cli").info(
         "audio_analyzed",
+        extra={"context": artifacts.as_dict()},
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
+def _run_annotate_match(
+    video_path: Path,
+    *,
+    output_path: Path,
+    audio_events_path: Path | None,
+    port: int,
+    open_browser: bool,
+    settings: Settings,
+) -> int:
+    artifacts = serve_match_annotation(
+        video_path,
+        output_path=output_path,
+        timeline=_media_timeline(settings),
+        audio_events_path=audio_events_path,
+        port=port,
+        open_browser=open_browser,
+        on_started=lambda url: print(f"Match annotation interface: {url}", file=sys.stderr),
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "match_annotation_stopped",
         extra={"context": artifacts.as_dict()},
     )
     _print_json(artifacts.as_dict())
@@ -1036,6 +1140,37 @@ def _run_track_ball(
     return EXIT_OK
 
 
+def _run_segment_rallies(
+    video_path: Path,
+    *,
+    ball_tracks_path: Path,
+    player_tracks_path: Path | None,
+    audio_events_path: Path | None,
+    annotations_path: Path | None,
+    annotations_complete: bool,
+    evaluation_partition: str,
+    output_dir: Path,
+    settings: Settings,
+) -> int:
+    artifacts = segment_rallies_in_video(
+        video_path,
+        ball_tracks_path=ball_tracks_path,
+        player_tracks_path=player_tracks_path,
+        audio_events_path=audio_events_path,
+        annotations_path=annotations_path,
+        annotations_complete=annotations_complete,
+        evaluation_partition=evaluation_partition,
+        output_dir=output_dir,
+        settings=settings.rally_segmentation,
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "rallies_segmented",
+        extra={"context": artifacts.as_dict()},
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command and translate failures into stable process exit codes."""
 
@@ -1070,6 +1205,15 @@ def main(argv: Sequence[str] | None = None) -> int:
             return _run_analyze_audio(
                 cast(Path, args.video),
                 output_dir=cast(Path, args.output_dir),
+                settings=settings,
+            )
+        if args.command == "annotate-match":
+            return _run_annotate_match(
+                cast(Path, args.video),
+                output_path=cast(Path, args.output),
+                audio_events_path=cast(Path | None, args.audio_events),
+                port=cast(int, args.port),
+                open_browser=not cast(bool, args.no_open),
                 settings=settings,
             )
         if args.command == "sample-frames":
@@ -1208,6 +1352,18 @@ def main(argv: Sequence[str] | None = None) -> int:
                 cast(Path, args.video),
                 detections_path=cast(Path, args.detections),
                 calibration_path=cast(Path, args.calibration),
+                output_dir=cast(Path, args.output_dir),
+                settings=settings,
+            )
+        if args.command == "segment-rallies":
+            return _run_segment_rallies(
+                cast(Path, args.video),
+                ball_tracks_path=cast(Path, args.ball_tracks),
+                player_tracks_path=cast(Path | None, args.player_tracks),
+                audio_events_path=cast(Path | None, args.audio_events),
+                annotations_path=cast(Path | None, args.annotations),
+                annotations_complete=cast(bool, args.annotations_complete),
+                evaluation_partition=cast(str, args.evaluation_partition),
                 output_dir=cast(Path, args.output_dir),
                 settings=settings,
             )

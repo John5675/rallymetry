@@ -129,6 +129,17 @@ pipeline stages should continue working without MongoDB Atlas, Vercel Blob, or a
 internet connection when their model assets are already present. Hosted execution
 adapts this pipeline; it does not replace or fork it.
 
+The Milestone 12 annotation editor is also a local-pipeline tool. Its loopback-only
+HTTP server and native browser media controls are a maintainable local UI adapter,
+not the FastAPI product API or React dashboard. It writes versioned human ground
+truth directly to the local artifact boundary and introduces no hosted dependency.
+
+Milestone 13 rally segmentation is another local derived-event stage. It consumes
+versioned trajectory and optional compatible player/audio evidence, writes rally
+intervals separately from every raw input, and loads human annotations only after
+inference for evaluation. It does not depend on the future API, worker, database, or
+blob adapters.
+
 ## Data placement
 
 | Data | System of record |
@@ -232,6 +243,18 @@ unknown. `ball_tracks.json` references selected and rejected detector IDs, retai
 observed points separately from interpolation and smoothing, and contains no semantic
 pickleball events. Calibration projects only known court geometry into the image for
 relevance; airborne ball points never pass through court homography.
+
+Automatic rally segmentation is a derived event layer over the structured ball
+timeline. It uses explicit ball activity, sustained image-space motion, bounded and
+long gaps, serve-like motion onsets, burst spacing, and optional source-compatible
+player reset evidence. Generic audio transients are optional confidence support and
+cannot create a boundary. Adjacent bursts are compared using explicit motion,
+coverage, persistence, and duration evidence so a weaker possible dead-ball handoff
+can be excluded without being semantically classified or discarded.
+`rallies.json` retains accepted and rejected candidates, supporting signals, and provenance;
+it never mutates `ball_tracks.json`, `tracks.json`, or `audio-events.json`. Human
+annotations are a post-inference evaluation input only, with sparse reviewed time
+kept distinct from reviewed-negative complete-video coverage.
 
 The local annotation-review interface is an adapter over fixed split records,
 human annotation JSON, source images, and optional raw detector suggestions. It binds

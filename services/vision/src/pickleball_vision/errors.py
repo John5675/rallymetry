@@ -23,6 +23,8 @@ class ErrorCode(StrEnum):
     INVALID_FRAME_INDEX = "invalid_frame_index"
     INVALID_TIMESTAMP = "invalid_timestamp"
     MEDIA_INSPECTION = "media_inspection_error"
+    MATCH_ANNOTATION_INPUT = "match_annotation_input_error"
+    MATCH_ANNOTATION_IO = "match_annotation_io_error"
     AUDIO_STREAM_NOT_FOUND = "audio_stream_not_found"
     AUDIO_EXTRACTION = "audio_extraction_error"
     AUDIO_ANALYSIS = "audio_analysis_error"
@@ -38,6 +40,7 @@ class ErrorCode(StrEnum):
     PLAYER_ISOLATION_INPUT = "player_isolation_input_error"
     PLAYER_ANALYSIS_INPUT = "player_analysis_input_error"
     PLAYER_TRACKING_INPUT = "player_tracking_input_error"
+    RALLY_SEGMENTATION_INPUT = "rally_segmentation_input_error"
     VIDEO_NOT_FOUND = "video_not_found"
     VIDEO_UNREADABLE = "video_unreadable"
 
@@ -97,6 +100,28 @@ class MediaInspectionError(PickleballVisionError):
         super().__init__(
             f"Unable to inspect media streams in {path}: {reason}",
             code=ErrorCode.MEDIA_INSPECTION,
+            details={"path": path, "reason": reason},
+        )
+
+
+class MatchAnnotationInputError(PickleballVisionError):
+    """Raised when match ground-truth annotation data is invalid."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Invalid match annotation: {reason}",
+            code=ErrorCode.MATCH_ANNOTATION_INPUT,
+            details={"reason": reason},
+        )
+
+
+class MatchAnnotationIoError(PickleballVisionError):
+    """Raised when match ground-truth annotation data cannot be persisted."""
+
+    def __init__(self, path: str, *, reason: str) -> None:
+        super().__init__(
+            f"Unable to access match annotation {path}: {reason}",
+            code=ErrorCode.MATCH_ANNOTATION_IO,
             details={"path": path, "reason": reason},
         )
 
@@ -409,5 +434,16 @@ class PlayerAnalysisInputError(PickleballVisionError):
         super().__init__(
             f"Invalid player-position analysis input: {reason}",
             code=ErrorCode.PLAYER_ANALYSIS_INPUT,
+            details={"reason": reason},
+        )
+
+
+class RallySegmentationInputError(PickleballVisionError):
+    """Raised when rally segmentation artifacts are incompatible or malformed."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Invalid rally-segmentation input: {reason}",
+            code=ErrorCode.RALLY_SEGMENTATION_INPUT,
             details={"reason": reason},
         )

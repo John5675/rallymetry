@@ -910,6 +910,172 @@ class BallTrackingSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class RallySegmentationSettings:
+    """Validated thresholds for inspectable, signal-based rally segmentation."""
+
+    minimum_motion_speed_diagonals_per_second: float = 0.10
+    motion_link_gap_seconds: float = 0.20
+    motion_support_window_seconds: float = 0.30
+    minimum_motion_support_fraction: float = 0.25
+    serve_minimum_speed_diagonals_per_second: float = 0.18
+    serve_speed_surge_ratio: float = 1.60
+    serve_baseline_window_seconds: float = 0.40
+    serve_confirmation_seconds: float = 1.20
+    serve_minimum_displacement_diagonal_fraction: float = 0.06
+    serve_minimum_motion_fraction: float = 0.20
+    minimum_rally_duration_seconds: float = 0.75
+    maximum_rally_duration_seconds: float = 45.0
+    end_quiet_seconds: float = 0.90
+    end_tail_grace_seconds: float = 0.25
+    minimum_between_rallies_seconds: float = 1.0
+    restart_quiet_seconds: float = 0.50
+    restart_minimum_elapsed_seconds: float = 2.50
+    dead_ball_handoff_window_seconds: float = 2.25
+    dead_ball_handoff_minimum_quality_margin: float = 0.05
+    dead_ball_handoff_full_duration_seconds: float = 4.0
+    player_reset_window_seconds: float = 1.0
+    player_reset_maximum_speed_mps: float = 1.25
+    audio_support_tolerance_seconds: float = 0.12
+    evaluation_minimum_iou: float = 0.25
+    evaluation_boundary_tolerance_seconds: float = 1.50
+    sparse_evaluation_margin_seconds: float = 2.0
+
+    @classmethod
+    def from_env(
+        cls,
+        environ: Mapping[str, str] | None = None,
+    ) -> RallySegmentationSettings:
+        """Load rally thresholds from prefixed environment variables."""
+
+        source = os.environ if environ is None else environ
+        defaults = cls()
+        suffixes = {
+            "minimum_motion_speed_diagonals_per_second": (
+                "RALLY_MINIMUM_MOTION_SPEED_DIAGONALS_PER_SECOND"
+            ),
+            "motion_link_gap_seconds": "RALLY_MOTION_LINK_GAP_SECONDS",
+            "motion_support_window_seconds": "RALLY_MOTION_SUPPORT_WINDOW_SECONDS",
+            "minimum_motion_support_fraction": "RALLY_MINIMUM_MOTION_SUPPORT_FRACTION",
+            "serve_minimum_speed_diagonals_per_second": (
+                "RALLY_SERVE_MINIMUM_SPEED_DIAGONALS_PER_SECOND"
+            ),
+            "serve_speed_surge_ratio": "RALLY_SERVE_SPEED_SURGE_RATIO",
+            "serve_baseline_window_seconds": "RALLY_SERVE_BASELINE_WINDOW_SECONDS",
+            "serve_confirmation_seconds": "RALLY_SERVE_CONFIRMATION_SECONDS",
+            "serve_minimum_displacement_diagonal_fraction": (
+                "RALLY_SERVE_MINIMUM_DISPLACEMENT_DIAGONAL_FRACTION"
+            ),
+            "serve_minimum_motion_fraction": "RALLY_SERVE_MINIMUM_MOTION_FRACTION",
+            "minimum_rally_duration_seconds": "RALLY_MINIMUM_DURATION_SECONDS",
+            "maximum_rally_duration_seconds": "RALLY_MAXIMUM_DURATION_SECONDS",
+            "end_quiet_seconds": "RALLY_END_QUIET_SECONDS",
+            "end_tail_grace_seconds": "RALLY_END_TAIL_GRACE_SECONDS",
+            "minimum_between_rallies_seconds": "RALLY_MINIMUM_BETWEEN_SECONDS",
+            "restart_quiet_seconds": "RALLY_RESTART_QUIET_SECONDS",
+            "restart_minimum_elapsed_seconds": "RALLY_RESTART_MINIMUM_ELAPSED_SECONDS",
+            "dead_ball_handoff_window_seconds": "RALLY_DEAD_BALL_HANDOFF_WINDOW_SECONDS",
+            "dead_ball_handoff_minimum_quality_margin": (
+                "RALLY_DEAD_BALL_HANDOFF_MINIMUM_QUALITY_MARGIN"
+            ),
+            "dead_ball_handoff_full_duration_seconds": (
+                "RALLY_DEAD_BALL_HANDOFF_FULL_DURATION_SECONDS"
+            ),
+            "player_reset_window_seconds": "RALLY_PLAYER_RESET_WINDOW_SECONDS",
+            "player_reset_maximum_speed_mps": "RALLY_PLAYER_RESET_MAXIMUM_SPEED_MPS",
+            "audio_support_tolerance_seconds": "RALLY_AUDIO_SUPPORT_TOLERANCE_SECONDS",
+            "evaluation_minimum_iou": "RALLY_EVALUATION_MINIMUM_IOU",
+            "evaluation_boundary_tolerance_seconds": (
+                "RALLY_EVALUATION_BOUNDARY_TOLERANCE_SECONDS"
+            ),
+            "sparse_evaluation_margin_seconds": "RALLY_SPARSE_EVALUATION_MARGIN_SECONDS",
+        }
+        values = {
+            field_name: _float_setting(source, suffix, getattr(defaults, field_name))
+            for field_name, suffix in suffixes.items()
+        }
+        fraction_fields = (
+            "minimum_motion_support_fraction",
+            "serve_minimum_displacement_diagonal_fraction",
+            "serve_minimum_motion_fraction",
+            "dead_ball_handoff_minimum_quality_margin",
+            "evaluation_minimum_iou",
+        )
+        for field_name in fraction_fields:
+            value = values[field_name]
+            if not 0 <= value <= 1:
+                setting = f"{ENV_PREFIX}{suffixes[field_name]}"
+                raise ConfigurationError(
+                    f"{setting} must be between 0 and 1 inclusive",
+                    setting=setting,
+                )
+        for field_name, value in values.items():
+            if field_name in fraction_fields:
+                continue
+            if not math.isfinite(value) or value <= 0:
+                setting = f"{ENV_PREFIX}{suffixes[field_name]}"
+                raise ConfigurationError(f"{setting} must be finite and positive", setting=setting)
+        if values["maximum_rally_duration_seconds"] <= values["minimum_rally_duration_seconds"]:
+            setting = f"{ENV_PREFIX}RALLY_MAXIMUM_DURATION_SECONDS"
+            raise ConfigurationError(
+                f"{setting} must exceed {ENV_PREFIX}RALLY_MINIMUM_DURATION_SECONDS",
+                setting=setting,
+            )
+        if values["restart_quiet_seconds"] >= values["end_quiet_seconds"]:
+            setting = f"{ENV_PREFIX}RALLY_RESTART_QUIET_SECONDS"
+            raise ConfigurationError(
+                f"{setting} must be less than {ENV_PREFIX}RALLY_END_QUIET_SECONDS",
+                setting=setting,
+            )
+        return cls(**values)
+
+    def as_dict(self) -> dict[str, object]:
+        """Return the complete non-secret segmentation configuration."""
+
+        return {
+            "minimum_motion_speed_diagonals_per_second": (
+                self.minimum_motion_speed_diagonals_per_second
+            ),
+            "motion_link_gap_seconds": self.motion_link_gap_seconds,
+            "motion_support_window_seconds": self.motion_support_window_seconds,
+            "minimum_motion_support_fraction": self.minimum_motion_support_fraction,
+            "serve_like_sequence": {
+                "minimum_speed_diagonals_per_second": (
+                    self.serve_minimum_speed_diagonals_per_second
+                ),
+                "speed_surge_ratio": self.serve_speed_surge_ratio,
+                "baseline_window_seconds": self.serve_baseline_window_seconds,
+                "confirmation_seconds": self.serve_confirmation_seconds,
+                "minimum_displacement_diagonal_fraction": (
+                    self.serve_minimum_displacement_diagonal_fraction
+                ),
+                "minimum_motion_fraction": self.serve_minimum_motion_fraction,
+            },
+            "minimum_rally_duration_seconds": self.minimum_rally_duration_seconds,
+            "maximum_rally_duration_seconds": self.maximum_rally_duration_seconds,
+            "end_quiet_seconds": self.end_quiet_seconds,
+            "end_tail_grace_seconds": self.end_tail_grace_seconds,
+            "minimum_between_rallies_seconds": self.minimum_between_rallies_seconds,
+            "restart_quiet_seconds": self.restart_quiet_seconds,
+            "restart_minimum_elapsed_seconds": self.restart_minimum_elapsed_seconds,
+            "dead_ball_handoff_filter": {
+                "adjacent_burst_window_seconds": self.dead_ball_handoff_window_seconds,
+                "minimum_quality_margin": self.dead_ball_handoff_minimum_quality_margin,
+                "full_duration_seconds": self.dead_ball_handoff_full_duration_seconds,
+                "semantic_classification": False,
+            },
+            "player_reset_window_seconds": self.player_reset_window_seconds,
+            "player_reset_maximum_speed_mps": self.player_reset_maximum_speed_mps,
+            "audio_support_tolerance_seconds": self.audio_support_tolerance_seconds,
+            "evaluation": {
+                "minimum_interval_iou": self.evaluation_minimum_iou,
+                "boundary_tolerance_seconds": self.evaluation_boundary_tolerance_seconds,
+                "sparse_annotation_margin_seconds": self.sparse_evaluation_margin_seconds,
+                "automatic_threshold_tuning": False,
+            },
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class Settings:
     """Validated settings loaded once at an executable boundary."""
 
@@ -924,6 +1090,7 @@ class Settings:
     player_tracking: PlayerTrackingSettings = field(default_factory=PlayerTrackingSettings)
     player_analysis: PlayerAnalysisSettings = field(default_factory=PlayerAnalysisSettings)
     ball_tracking: BallTrackingSettings = field(default_factory=BallTrackingSettings)
+    rally_segmentation: RallySegmentationSettings = field(default_factory=RallySegmentationSettings)
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> Settings:
@@ -975,6 +1142,7 @@ class Settings:
             player_tracking=PlayerTrackingSettings.from_env(source),
             player_analysis=PlayerAnalysisSettings.from_env(source),
             ball_tracking=BallTrackingSettings.from_env(source),
+            rally_segmentation=RallySegmentationSettings.from_env(source),
         )
 
     def public_values(self) -> dict[str, object]:
@@ -992,4 +1160,5 @@ class Settings:
             "player_tracking": self.player_tracking.as_dict(),
             "player_analysis": self.player_analysis.as_dict(),
             "ball_tracking": self.ball_tracking.as_dict(),
+            "rally_segmentation": self.rally_segmentation.as_dict(),
         }

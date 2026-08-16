@@ -5,7 +5,8 @@ doubles pickleball matches into inspectable, structured match data. The long-ter
 goal includes court and player tracking, ball trajectories, rally and shot events,
 match analytics, and AI-assisted coaching.
 
-The current milestone is **Architecture lock-in**. Milestones 0–10 are complete. The local
+The current milestone is **Automatic rally segmentation**. Milestones 0–12 are
+complete. The local
 CLI can inspect video plus optional synchronized audio, extract lossless analysis
 audio, calibrate the court, detect people broadly, derive court-aware candidates,
 manually assign the four logical match roles, and track those identities separately
@@ -18,7 +19,13 @@ comparison, plus a resumable local interface for human correction of training
 annotations. It now reconstructs a conservative primary-match image-space ball path
 with explicit observed, interpolated, and unknown states. Synchronized audio can now
 be converted into inspectable raw signal features and generic transient candidates.
-Paddle-contact, bounce, and other pickleball event inference remains unimplemented.
+It also provides a resumable local editor for explicit human rally, contact, bounce,
+winner, shot-type, and optional audio-context annotations. Structured automatic
+rally segmentation now combines primary-ball activity, sustained motion, gaps,
+serve-like onsets, adjacent-burst dead-ball handoff rejection, and optional
+player/audio confidence support, then evaluates
+against human rally boundaries. Automatic paddle-contact and bounce inference
+remain unimplemented.
 
 ## Repository map
 
@@ -69,6 +76,9 @@ uv run pickleball-vision extract-audio /absolute/path/to/match.mp4 \
   --output ../../output/match-audio.wav
 uv run pickleball-vision analyze-audio /absolute/path/to/match.mp4 \
   --output-dir ../../output/audio-analysis
+uv run pickleball-vision annotate-match /absolute/path/to/match.mp4 \
+  --output ../../output/match-annotations.json \
+  --audio-events ../../output/audio-analysis/audio-events.json
 uv run pickleball-vision extract-frame /absolute/path/to/match.mp4 \
   --timestamp 30.5 \
   --output ../../output/frame-at-30.5s.jpg
@@ -108,6 +118,11 @@ uv run pickleball-vision track-ball /absolute/path/to/match.mp4 \
   --detections ../../output/ball-detection/match/detections.json \
   --calibration ../../output/calibration/calibration.json \
   --output-dir ../../output/ball-tracking
+uv run pickleball-vision segment-rallies /absolute/path/to/match.mp4 \
+  --ball-tracks ../../output/ball-tracking/ball_tracks.json \
+  --audio-events ../../output/audio-analysis/audio-events.json \
+  --annotations ../../output/match-annotations.json \
+  --output-dir ../../output/rally-segmentation
 ```
 
 Command results are emitted as JSON on standard output. Diagnostic structured
@@ -149,6 +164,11 @@ window features separately from generic `TRANSIENT` candidates, and creates wave
 and event-timeline review images. A transient is never classified as a paddle contact
 or bounce at this stage, and no-audio videos exit successfully with an explicit
 vision-only fallback. See [the audio-analysis guide](docs/audio-analysis.md).
+
+Multimodal match ground truth is created in a loopback-only browser editor. It
+supports native playback, exact frame stepping, seeking, add/edit/delete, atomic
+resume, and optional waveform/transient context without treating audio as a
+semantic event. See [the match annotation guide](docs/match-annotation.md).
 
 Person inference is configured with `PERSON_MODEL`, `PERSON_DEVICE`,
 `PERSON_MIN_CONFIDENCE`, `PERSON_IMAGE_SIZE`, `PERSON_IOU_THRESHOLD`, and
@@ -198,6 +218,15 @@ primary-court image envelope. It retains raw observations separately from bounde
 smoothing, marks only short internal gaps as interpolated, and leaves longer gaps
 unknown. Airborne ball points are never projected through court homography. See
 [the ball trajectory guide](docs/ball-tracking.md).
+
+Automatic rally segmentation consumes the structured trajectory and uses explicit
+motion, gap, serve-like onset, and activity-burst signals. Compatible player tracks
+and generic audio transients may support confidence but cannot create a boundary.
+Materially weaker bursts immediately adjacent to stronger rally evidence are
+retained as inspectable rejected candidates instead of being reported as rallies.
+Human annotations are isolated to post-inference evaluation, and sparse annotation
+files do not make unreviewed video time negative. See
+[the rally segmentation guide](docs/rally-segmentation.md).
 
 ## Verify the setup
 
