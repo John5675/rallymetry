@@ -225,7 +225,7 @@ Exit criteria:
 - Release 0.1 stops at player position analytics. No ball tracking, audio-event
   analysis, rally inference, or product-service behavior is implemented.
 
-## 7. Ball dataset tooling — current
+## 7. Ball dataset tooling — complete
 
 Create inspectable, model-free tooling for extracting ball-annotation frames and
 clips from local source videos, preserving source/frame provenance, organizing
@@ -256,9 +256,49 @@ Exit criteria:
 - No ball detector training, inference, trajectory reconstruction, or pickleball
   event inference is implemented.
 
+## 8. Ball detector — current
+
+Train and evaluate a custom single-class `pickleball` detector from human-reviewed,
+versioned datasets. Preserve raw frame-local observations and compare spatial
+inference strategies suitable for tiny near- and far-side balls without introducing
+temporal tracking.
+
+Exit criteria:
+
+- A versioned external JSON configuration fixes dataset/model versions, training
+  parameters, random seed, validation/test assignments, and named inference
+  strategies.
+- Training refuses unreviewed or ambiguous ground truth, materializes a reproducible
+  single-class dataset, isolates Ultralytics-specific behavior behind an adapter,
+  and writes experiment metadata, hashes, model provenance, and metrics beside each
+  run.
+- Video inference supports configurable high-resolution full-frame, calibrated
+  primary-court ROI, tiled, and court-ROI tiled strategies while retaining original
+  source-pixel coordinates and all per-crop proposals.
+- Court calibration may define an image crop only; airborne detections are never
+  projected through court homography.
+- Raw detections retain frame number, timestamp, confidence, model/weights version,
+  spatial strategy, and proposal provenance; no track, interpolation, bounce,
+  contact, or other event is inferred.
+- Fixed validation/test evaluation persists precision, recall, false positives,
+  false positives per evaluated minute, positive-frame detection coverage, and
+  human-annotated near/far recall and coverage.
+- Strategy comparison evaluates identical model weights and identical fixed frame
+  record IDs, then writes individual metrics plus a machine-readable comparison.
+- A loopback-only manual review interface overlays raw model suggestions without
+  promoting them automatically, supports drawing/removing boxes plus per-ball
+  near/far, scope, visibility, and confidence labels, and atomically persists
+  resumable reviewed positives, reviewed negatives, and drafts.
+- Synthetic tests cover configuration, annotation validation, dataset preparation,
+  model adaptation, crop/tile coordinate restoration, cross-tile deduplication,
+  evaluation metrics, experiment persistence, and video raw-detection artifacts.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- No ball trajectory reconstruction, audio-event extraction, or semantic event
+  inference is implemented.
+
 ## Future milestones — not current
 
-8. Ball detector
 9. Ball trajectory reconstruction
 10. Audio event extraction
 11. Manual event annotation

@@ -3,15 +3,18 @@
 This document describes stable stage boundaries. A stage may be introduced only
 when its matching milestone is current. Audio-aware media ingestion, manual court
 calibration, broad person detection, primary-player isolation, and persistent
-logical-player tracking are implemented. Ball dataset extraction and split tooling
-are also implemented as an offline annotation branch; ball inference and all later
-event stages remain contracts only.
+logical-player tracking are implemented. Ball dataset extraction, custom detector
+training, raw spatial ball inference, and fixed-split evaluation are also implemented;
+ball trajectories and all later event stages remain contracts only.
 
 ## Intended flow
 
 ```text
 source media metadata (video + optional audio)
-  +-> ball annotation frame/clip datasets (offline branch; no inference)
+  +-> ball annotation frame/clip datasets
+      -> fixed split + reviewed boxes
+      -> custom ball training/evaluation
+      -> raw frame-local ball observations
   +-> court calibration
       -> person and ball observations
       -> primary-player isolation
@@ -132,7 +135,39 @@ ball is still a positive pickleball observation with separate scope metadata.
 
 Split assignment operates on whole source videos, named clips, or rally/group IDs.
 It writes references only and never independently randomizes neighboring frames.
-This stage contains no detector, model weights, predictions, trajectories, or events.
+This dataset stage contains no detector, model weights, predictions, trajectories, or
+events.
+
+## Ball detector contract
+
+The custom detector has exactly one class, `pickleball`. Training consumes fixed
+train/validation/test record IDs and explicit human-reviewed annotation records. An
+unreviewed frame is never a negative, ambiguous objects are excluded from detector
+ground truth, and dataset/model versions plus source/configuration hashes are retained
+with every experiment and metric artifact.
+
+Ultralytics-specific loading, training, and result translation remain behind project
+adapters. Configured high-resolution inference is independent of person-detector
+resolution. Supported spatial modes are full frame, padded primary-court image ROI,
+overlapping full-frame tiles, and overlapping court-ROI tiles. Crop-local predictions
+are translated back to original source pixels; all proposals are retained before
+cross-crop NMS.
+
+Court homography is used only in reverse to project canonical court corners for an
+image crop. It is never applied to an airborne ball position. Raw ball detections
+retain model/weights identity, configuration, confidence, frame/time, source-pixel
+box, crop provenance, and explicit absence of tracking/interpolation/events.
+
+Evaluation performs one-to-one IoU matching on an immutable validation or test
+partition and persists precision, recall, false positives, false positives per union
+clip minute, positive-frame detection coverage, and near/far recall/coverage based on
+human side labels. Strategy comparison verifies identical ordered frame record IDs.
+
+Manual detector-data review uses the fixed split as its queue. The local loopback UI
+may display raw detections as suggestions, but it never mutates that raw artifact or
+automatically copies a suggestion into ground truth. Human-reviewed positive and
+negative frames, draft annotations, per-ball context, and review progress are saved
+atomically in the annotation boundary. No temporal ball path or event is inferred.
 
 ## Primary-player isolation contract
 

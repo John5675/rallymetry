@@ -78,6 +78,26 @@ content hashes plus frame/time provenance in `dataset-manifest.json`. Split mani
 reference those immutable records without copying or moving images. `positive`,
 `negative`, and `unlabeled` are human curation states, never detector predictions.
 
+The custom pickleball detector consumes a fixed split manifest plus a separate,
+fully human-reviewed annotation manifest. Training materialization, Ultralytics
+training, and model inference are separate boundaries. Each experiment snapshots
+dataset/model versions, content hashes, configuration, code/runtime provenance,
+weights hashes, and metrics. Model weights and generated datasets remain local.
+
+Spatial inference may run a high-resolution full frame, a calibrated image-space
+court crop, overlapping tiles, or tiled court crop. The model adapter sees only one
+image or crop at a time; orchestration restores boxes to source pixels and retains
+all crop proposals before cross-crop deduplication. Calibration is used to construct
+an ROI, never to project an airborne ball onto the court plane. Raw ball detections
+contain no temporal identity or semantic event.
+
+The local annotation-review interface is an adapter over fixed split records,
+human annotation JSON, source images, and optional raw detector suggestions. It binds
+only to loopback and introduces no product backend. Suggestions stay in their raw
+detection artifact; only explicit human actions write annotation records. Each save
+is atomic, source images remain read-only, and a separate progress summary makes
+long-running review resumable and inspectable.
+
 ## Execution model
 
 During the local-pipeline milestones, the CLI is the executable boundary.

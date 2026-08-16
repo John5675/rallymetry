@@ -5,9 +5,10 @@ typed executable infrastructure, audio-aware FFmpeg/OpenCV media ingestion,
 lossless analysis-audio extraction, manual multi-point court calibration,
 pretrained person detection, court-aware manual primary-player isolation,
 persistent logical-player tracking, and Release 0.1 player court-position analytics.
-It also provides model-free ball dataset extraction, review clips, and leakage-safe
-split assignment. Ball detection, audio-event detection, and later match analytics
-remain unimplemented.
+It also provides ball dataset extraction, review clips, leakage-safe split assignment,
+versioned custom pickleball training, raw spatial inference, and fixed-split detector
+evaluation, plus a local resumable human-review UI for detector annotations. Ball
+tracking, audio-event detection, and later match analytics remain unimplemented.
 
 ```bash
 uv sync --locked --extra dev
@@ -37,6 +38,15 @@ uv run pickleball-vision dataset extract-frames /absolute/path/to/match.mp4 \
   --output-dir ../../ml/datasets/match-unlabeled \
   --every 30 \
   --label-group unlabeled
+uv run pickleball-vision ball compare \
+  --config ../../ml/training/ball-detector.example.json \
+  --weights /absolute/path/to/best.pt \
+  --partition validation \
+  --output-dir ../../ml/evaluation/strategy-comparison
+uv run pickleball-vision ball review ../../ml/datasets/match-splits.json \
+  --annotations ../../ml/datasets/match-annotations.json \
+  --dataset-version match-v1 \
+  --predictions ../../output/ball-detection/match/detections.json
 ```
 
 Calibration uses a local OpenCV window. See `docs/court-calibration.md` from the
@@ -55,6 +65,13 @@ Ball dataset tooling never loads a model. It preserves source/frame provenance a
 keeps neighboring frames together during video/clip/group splitting; see the
 [dataset guide](../../docs/ball-dataset-tooling.md) and
 [annotation policy](../../docs/annotation-guide.md).
+The custom detector refuses unreviewed ground truth and records dataset/model versions,
+content hashes, experiment configuration, and metrics. Its full-frame, court-ROI,
+tiled, and court-tiled inference modes preserve source pixels and perform no temporal
+tracking; see [the detector guide](../../docs/ball-detector.md).
+The detector guide also documents the loopback-only manual review UI. Yellow model
+suggestions never become training labels until explicitly accepted and saved by a
+human reviewer.
 
 Audio is optional. Extraction preserves source sample rate and channels by default
 and writes a timing/conversion sidecar next to the PCM WAV. See

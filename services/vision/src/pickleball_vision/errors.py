@@ -26,6 +26,10 @@ class ErrorCode(StrEnum):
     AUDIO_STREAM_NOT_FOUND = "audio_stream_not_found"
     AUDIO_EXTRACTION = "audio_extraction_error"
     AUDIO_CONVERSION_INVALID = "audio_conversion_invalid"
+    BALL_EVALUATION = "ball_evaluation_error"
+    BALL_INFERENCE = "ball_inference_error"
+    BALL_MODEL = "ball_model_error"
+    BALL_TRAINING = "ball_training_error"
     OUTPUT_WRITE = "output_write_error"
     PLAYER_ASSIGNMENT_IO = "player_assignment_io_error"
     PLAYER_ISOLATION_CANCELLED = "player_isolation_cancelled"
@@ -284,6 +288,50 @@ class DetectionIoError(PickleballVisionError):
             f"Unable to load person detections {path}: {reason}",
             code=ErrorCode.DETECTION_IO,
             details={"path": path, "reason": reason},
+        )
+
+
+class BallModelError(PickleballVisionError):
+    """Raised when custom pickleball model loading or inference fails."""
+
+    def __init__(self, reason: str, *, operation: str) -> None:
+        super().__init__(
+            f"Pickleball detector failed during {operation}: {reason}",
+            code=ErrorCode.BALL_MODEL,
+            details={"operation": operation, "reason": reason},
+        )
+
+
+class BallInferenceError(PickleballVisionError):
+    """Raised when spatial ball inference cannot preserve its contract."""
+
+    def __init__(self, reason: str, *, operation: str) -> None:
+        super().__init__(
+            f"Pickleball inference failed during {operation}: {reason}",
+            code=ErrorCode.BALL_INFERENCE,
+            details={"operation": operation, "reason": reason},
+        )
+
+
+class BallTrainingError(PickleballVisionError):
+    """Raised when a custom model experiment cannot complete safely."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Pickleball detector training failed: {reason}",
+            code=ErrorCode.BALL_TRAINING,
+            details={"reason": reason},
+        )
+
+
+class BallEvaluationError(PickleballVisionError):
+    """Raised when fixed-split detector evaluation cannot complete safely."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Pickleball detector evaluation failed: {reason}",
+            code=ErrorCode.BALL_EVALUATION,
+            details={"reason": reason},
         )
 
 

@@ -54,6 +54,12 @@ secrets/
 ml/datasets/**
 !ml/datasets/README.md
 
+# Local training and evaluation runs; commit only the directory documentation
+ml/experiments/**
+!ml/experiments/README.md
+ml/evaluation/**
+!ml/evaluation/README.md
+
 # Local sample inputs and generated outputs
 sample-data/**
 !sample-data/README.md

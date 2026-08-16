@@ -106,6 +106,49 @@ def test_no_command_prints_help(capsys: pytest.CaptureFixture[str]) -> None:
     assert "doctor" in captured.out
 
 
+def test_ball_annotation_template_command_preserves_unreviewed_state(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _clear_settings(monkeypatch)
+    split_path = tmp_path / "split.json"
+    split_path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "record_type": "ball_dataset_split_assignments",
+                "frames": [
+                    {"record_id": "source:frame:1"},
+                    {"record_id": "source:frame:2"},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    output_path = tmp_path / "annotations.json"
+
+    exit_code = main(
+        [
+            "ball",
+            "create-annotation-template",
+            str(split_path),
+            "--dataset-version",
+            "dataset-v1",
+            "--output",
+            str(output_path),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+    annotations = json.loads(output_path.read_text(encoding="utf-8"))
+    assert exit_code == EXIT_OK
+    assert report["frame_count"] == 2
+    assert annotations["dataset_version"] == "dataset-v1"
+    assert all(frame["review_status"] == "unreviewed" for frame in annotations["frames"])
+
+
 def test_inspect_command_outputs_video_metadata(
     synthetic_video: Path,
     monkeypatch: pytest.MonkeyPatch,

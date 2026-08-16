@@ -11,10 +11,20 @@ from pathlib import Path
 from typing import cast
 
 from pickleball_vision import __version__
+from pickleball_vision.ball_config import load_ball_experiment_configuration
+from pickleball_vision.ball_dataset import create_ball_annotation_template
+from pickleball_vision.ball_detection_workflow import detect_balls_in_video
+from pickleball_vision.ball_evaluation import (
+    compare_ball_inference_strategies,
+    evaluate_ball_detector,
+)
+from pickleball_vision.ball_review import serve_ball_annotation_review
+from pickleball_vision.ball_training import train_ball_detector
 from pickleball_vision.calibration_workflow import calibrate_video
 from pickleball_vision.config import Settings
 from pickleball_vision.dataset import (
     DatasetLabelGroup,
+    DatasetSplit,
     FrameSelectionSettings,
     SplitRatios,
     SplitUnit,
@@ -353,6 +363,102 @@ def build_parser() -> argparse.ArgumentParser:
     dataset_split_parser.add_argument("--validation", type=float, default=0.15)
     dataset_split_parser.add_argument("--test", type=float, default=0.15)
     dataset_split_parser.add_argument("--seed", type=int, default=0)
+
+    ball_parser = subparsers.add_parser(
+        "ball",
+        help="prepare, train, infer, and evaluate the custom pickleball detector",
+    )
+    ball_subparsers = ball_parser.add_subparsers(dest="ball_command")
+    annotation_template_parser = ball_subparsers.add_parser(
+        "create-annotation-template",
+        help="create unreviewed annotation records for a fixed dataset split",
+    )
+    annotation_template_parser.add_argument("split_manifest", type=Path)
+    annotation_template_parser.add_argument("--dataset-version", required=True)
+    annotation_template_parser.add_argument("--output", type=Path, required=True)
+
+    review_ball_parser = ball_subparsers.add_parser(
+        "review",
+        help="launch a local resumable browser UI for human ball annotation review",
+    )
+    review_ball_parser.add_argument("split_manifest", type=Path)
+    review_ball_parser.add_argument(
+        "--annotations",
+        type=Path,
+        required=True,
+        help="annotation JSON to create or resume",
+    )
+    review_ball_parser.add_argument(
+        "--dataset-version",
+        help="required only when --annotations does not exist; otherwise validates its version",
+    )
+    review_ball_parser.add_argument(
+        "--predictions",
+        type=Path,
+        action="append",
+        default=[],
+        help="optional raw detections.json suggestion file; repeat for multiple source videos",
+    )
+    review_ball_parser.add_argument(
+        "--port",
+        type=int,
+        default=8765,
+        help="loopback review server port; use 0 to select an available port",
+    )
+    review_ball_parser.add_argument(
+        "--no-open",
+        action="store_true",
+        help="do not open the default browser automatically",
+    )
+
+    train_ball_parser = ball_subparsers.add_parser(
+        "train",
+        help="train one custom model from a versioned experiment configuration",
+    )
+    train_ball_parser.add_argument("--config", type=Path, required=True)
+    train_ball_parser.add_argument("--output-dir", type=Path, required=True)
+
+    detect_ball_parser = ball_subparsers.add_parser(
+        "detect",
+        help="write raw frame-local pickleball detections without tracking",
+    )
+    detect_ball_parser.add_argument("video", type=Path)
+    detect_ball_parser.add_argument("--config", type=Path, required=True)
+    detect_ball_parser.add_argument("--weights", type=Path, required=True)
+    detect_ball_parser.add_argument("--strategy", required=True)
+    detect_ball_parser.add_argument("--output-dir", type=Path, required=True)
+    detect_ball_parser.add_argument("--calibration", type=Path)
+    detect_ball_parser.add_argument("--device", default="auto")
+
+    evaluate_ball_parser = ball_subparsers.add_parser(
+        "evaluate",
+        help="evaluate one strategy on the fixed validation or test partition",
+    )
+    evaluate_ball_parser.add_argument("--config", type=Path, required=True)
+    evaluate_ball_parser.add_argument("--weights", type=Path, required=True)
+    evaluate_ball_parser.add_argument("--strategy", required=True)
+    evaluate_ball_parser.add_argument(
+        "--partition", choices=("validation", "test"), default="validation"
+    )
+    evaluate_ball_parser.add_argument("--output-dir", type=Path, required=True)
+    evaluate_ball_parser.add_argument("--device", default="auto")
+
+    compare_ball_parser = ball_subparsers.add_parser(
+        "compare",
+        help="compare multiple strategies on exactly the same fixed frames",
+    )
+    compare_ball_parser.add_argument("--config", type=Path, required=True)
+    compare_ball_parser.add_argument("--weights", type=Path, required=True)
+    compare_ball_parser.add_argument(
+        "--partition", choices=("validation", "test"), default="validation"
+    )
+    compare_ball_parser.add_argument(
+        "--strategies",
+        nargs="+",
+        help="strategy names from config (default: every configured strategy)",
+    )
+    compare_ball_parser.add_argument("--output-dir", type=Path, required=True)
+    compare_ball_parser.add_argument("--device", default="auto")
     return parser
 
 
@@ -716,6 +822,139 @@ def _run_dataset_split(
     return EXIT_OK
 
 
+def _run_ball_annotation_template(
+    split_manifest_path: Path,
+    *,
+    dataset_version: str,
+    output_path: Path,
+) -> int:
+    artifact = create_ball_annotation_template(
+        split_manifest_path,
+        dataset_version=dataset_version,
+        output_path=output_path,
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "ball_annotation_template_created",
+        extra={"context": artifact.as_dict()},
+    )
+    _print_json(artifact.as_dict())
+    return EXIT_OK
+
+
+def _run_ball_review(
+    split_manifest_path: Path,
+    *,
+    annotations_path: Path,
+    dataset_version: str | None,
+    prediction_paths: tuple[Path, ...],
+    port: int,
+    open_browser: bool,
+) -> int:
+    artifacts = serve_ball_annotation_review(
+        split_manifest_path,
+        annotations_path=annotations_path,
+        dataset_version=dataset_version,
+        prediction_paths=prediction_paths,
+        port=port,
+        open_browser=open_browser,
+        on_started=lambda url: print(f"Ball review interface: {url}", file=sys.stderr),
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "ball_annotation_review_stopped",
+        extra={"context": artifacts.as_dict()},
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
+def _run_train_ball(config_path: Path, *, output_dir: Path) -> int:
+    artifacts = train_ball_detector(config_path, output_dir=output_dir)
+    logging.getLogger("pickleball_vision.cli").info(
+        "ball_detector_trained",
+        extra={"context": artifacts.as_dict()},
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
+def _run_detect_ball(
+    video_path: Path,
+    *,
+    config_path: Path,
+    weights_path: Path,
+    strategy_name: str,
+    output_dir: Path,
+    calibration_path: Path | None,
+    device: str,
+) -> int:
+    config = load_ball_experiment_configuration(config_path)
+    artifacts = detect_balls_in_video(
+        video_path,
+        weights_path=weights_path,
+        model_version=config.model.version,
+        strategy=config.strategy(strategy_name),
+        output_dir=output_dir,
+        calibration_path=calibration_path,
+        device=device,
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "balls_detected",
+        extra={"context": {**artifacts.as_dict(), "strategy": strategy_name}},
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
+def _run_evaluate_ball(
+    config_path: Path,
+    *,
+    weights_path: Path,
+    strategy_name: str,
+    partition: str,
+    output_dir: Path,
+    device: str,
+) -> int:
+    artifacts = evaluate_ball_detector(
+        config_path,
+        weights_path=weights_path,
+        strategy_name=strategy_name,
+        partition=DatasetSplit(partition),
+        output_dir=output_dir,
+        device=device,
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "ball_detector_evaluated",
+        extra={"context": artifacts.as_dict()},
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
+def _run_compare_ball(
+    config_path: Path,
+    *,
+    weights_path: Path,
+    partition: str,
+    strategy_names: tuple[str, ...] | None,
+    output_dir: Path,
+    device: str,
+) -> int:
+    artifacts = compare_ball_inference_strategies(
+        config_path,
+        weights_path=weights_path,
+        partition=DatasetSplit(partition),
+        output_dir=output_dir,
+        strategy_names=strategy_names,
+        device=device,
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "ball_inference_strategies_compared",
+        extra={"context": artifacts.as_dict()},
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command and translate failures into stable process exit codes."""
 
@@ -819,6 +1058,61 @@ def main(argv: Sequence[str] | None = None) -> int:
                     validation_ratio=cast(float, args.validation),
                     test_ratio=cast(float, args.test),
                     random_seed=cast(int, args.seed),
+                )
+            parser.print_help()
+            return EXIT_OK
+        if args.command == "ball":
+            if args.ball_command == "create-annotation-template":
+                return _run_ball_annotation_template(
+                    cast(Path, args.split_manifest),
+                    dataset_version=cast(str, args.dataset_version),
+                    output_path=cast(Path, args.output),
+                )
+            if args.ball_command == "review":
+                return _run_ball_review(
+                    cast(Path, args.split_manifest),
+                    annotations_path=cast(Path, args.annotations),
+                    dataset_version=cast(str | None, args.dataset_version),
+                    prediction_paths=tuple(cast(list[Path], args.predictions)),
+                    port=cast(int, args.port),
+                    open_browser=not cast(bool, args.no_open),
+                )
+            if args.ball_command == "train":
+                return _run_train_ball(
+                    cast(Path, args.config),
+                    output_dir=cast(Path, args.output_dir),
+                )
+            if args.ball_command == "detect":
+                return _run_detect_ball(
+                    cast(Path, args.video),
+                    config_path=cast(Path, args.config),
+                    weights_path=cast(Path, args.weights),
+                    strategy_name=cast(str, args.strategy),
+                    output_dir=cast(Path, args.output_dir),
+                    calibration_path=cast(Path | None, args.calibration),
+                    device=cast(str, args.device),
+                )
+            if args.ball_command == "evaluate":
+                return _run_evaluate_ball(
+                    cast(Path, args.config),
+                    weights_path=cast(Path, args.weights),
+                    strategy_name=cast(str, args.strategy),
+                    partition=cast(str, args.partition),
+                    output_dir=cast(Path, args.output_dir),
+                    device=cast(str, args.device),
+                )
+            if args.ball_command == "compare":
+                return _run_compare_ball(
+                    cast(Path, args.config),
+                    weights_path=cast(Path, args.weights),
+                    partition=cast(str, args.partition),
+                    strategy_names=(
+                        tuple(cast(list[str], args.strategies))
+                        if args.strategies is not None
+                        else None
+                    ),
+                    output_dir=cast(Path, args.output_dir),
+                    device=cast(str, args.device),
                 )
             parser.print_help()
             return EXIT_OK

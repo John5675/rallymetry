@@ -119,3 +119,8 @@ together. `--by group` requires every record to have a `group_id` and keeps each
 rally/group together. The ratios must sum to 1.0. Assignment is deterministic for a
 seed and balances frame counts approximately because provenance units are never
 split. Images are not copied or moved.
+
+The split manifest becomes immutable input to custom detector annotation, training,
+and evaluation. Generate explicit unreviewed annotation records and follow the next
+stage in [the custom detector guide](ball-detector.md); never train directly from the
+positive/negative/unlabeled directory names.

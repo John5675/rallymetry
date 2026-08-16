@@ -27,6 +27,14 @@ and the relevant design document before changing code.
 - An unlabeled dataset frame is not a negative example.
 - A visible neighboring-court pickleball remains a pickleball annotation with
   explicit scope; do not turn it into a visual negative.
+- Detector experiments must retain dataset/model versions, fixed validation/test
+  record IDs, configuration, metrics, and weights provenance.
+- Near/far ball evaluation uses human annotation context; never infer an airborne
+  ball's court side by projecting it through court homography.
+- Model-suggested ball boxes remain predictions until a human explicitly reviews
+  and accepts them; never silently promote suggestions to ground truth.
+- Manual annotation work must be resumable and written atomically without changing
+  source images or raw detector output.
 - Audio is optional.
 - The vision pipeline must work when audio is missing.
 - Preserve audio/video synchronization.

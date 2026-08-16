@@ -1,0 +1,80 @@
+{
+  "schema_version": 1,
+  "record_type": "pickleball_detector_experiment_configuration",
+  "experiment_name": "pickleball-yolo26s-baseline",
+  "dataset": {
+    "version": "vid-v1",
+    "split_manifest": "../datasets/vid-splits.json",
+    "annotations": "../datasets/vid-annotations.json"
+  },
+  "model": {
+    "version": "pickleball-yolo26s-v1",
+    "base_model": "yolo26s.pt"
+  },
+  "training": {
+    "epochs": 100,
+    "image_size_px": 1280,
+    "batch_size": -1,
+    "device": "auto",
+    "workers": 4,
+    "seed": 2026,
+    "deterministic": true,
+    "patience_epochs": 25
+  },
+  "inference": {
+    "strategies": [
+      {
+        "name": "full-1920",
+        "mode": "full_frame",
+        "inference_size_px": 1920,
+        "minimum_confidence": 0.1,
+        "model_nms_iou_threshold": 0.5,
+        "maximum_detections": 100,
+        "tile_size_px": null,
+        "tile_overlap_fraction": 0.2,
+        "court_roi_margin_px": 96,
+        "merge_iou_threshold": 0.5
+      },
+      {
+        "name": "court-roi-1920",
+        "mode": "court_roi",
+        "inference_size_px": 1920,
+        "minimum_confidence": 0.1,
+        "model_nms_iou_threshold": 0.5,
+        "maximum_detections": 100,
+        "tile_size_px": null,
+        "tile_overlap_fraction": 0.2,
+        "court_roi_margin_px": 128,
+        "merge_iou_threshold": 0.5
+      },
+      {
+        "name": "tiled-1280",
+        "mode": "tiled",
+        "inference_size_px": 1280,
+        "minimum_confidence": 0.1,
+        "model_nms_iou_threshold": 0.5,
+        "maximum_detections": 100,
+        "tile_size_px": 960,
+        "tile_overlap_fraction": 0.2,
+        "court_roi_margin_px": 96,
+        "merge_iou_threshold": 0.5
+      },
+      {
+        "name": "court-tiled-1280",
+        "mode": "court_tiled",
+        "inference_size_px": 1280,
+        "minimum_confidence": 0.1,
+        "model_nms_iou_threshold": 0.5,
+        "maximum_detections": 100,
+        "tile_size_px": 960,
+        "tile_overlap_fraction": 0.2,
+        "court_roi_margin_px": 128,
+        "merge_iou_threshold": 0.5
+      }
+    ]
+  },
+  "evaluation": {
+    "matching_iou_threshold": 0.5,
+    "calibrations_by_source_id": {}
+  }
+}

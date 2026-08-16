@@ -46,6 +46,7 @@ select = ["B", "E", "F", "I", "LOG", "RUF", "SIM", "UP"]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**/*.py" = ["S101"]
+"src/pickleball_vision/ball_review.py" = ["E501"] # Embedded local HTML/CSS/JavaScript.
 
 [tool.mypy]
 python_version = "3.11"

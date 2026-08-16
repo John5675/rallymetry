@@ -1,8 +1,9 @@
 # Annotation Guide
 
 This is the durable labeling policy for dataset and evaluation milestones. Ball
-dataset extraction and leakage-safe split tooling are implemented; detector
-training and model-generated annotations are not.
+dataset extraction, leakage-safe splitting, detector training, and local
+human-review tooling are implemented. Model suggestions are never ground truth
+until a human explicitly accepts them and marks the frame reviewed.
 
 ## General rules
 
@@ -58,6 +59,11 @@ homography. Each object should retain:
 - annotation confidence and annotator/review state; and
 - a stable within-clip object reference only when visually supportable.
 
+For detector evaluation, add human-owned `court_side=near|far|unknown`. This describes
+which side the visible ball belongs to based on review context; it must not be generated
+by projecting an airborne image point through court homography. Unknown is valid and is
+included in overall metrics but excluded from near/far subtotals.
+
 Use these case rules:
 
 - **Partially visible ball:** annotate only the visible pixels with
@@ -97,6 +103,10 @@ intervals remain missing unless image evidence supports an annotation.
 
 Positive/negative directories are curation queues. The annotation record remains
 the source of truth, especially for multiple balls and neighboring-court scope.
+Detector training requires an explicit `review_status=reviewed` record for every fixed
+split frame. An empty objects array is a detector negative only in such a reviewed
+record. Ambiguous objects remain review material and are rejected as detector ground
+truth.
 
 ## Events
 
