@@ -5,7 +5,7 @@ doubles pickleball matches into inspectable, structured match data. The long-ter
 goal includes court and player tracking, ball trajectories, rally and shot events,
 match analytics, and AI-assisted coaching.
 
-The current milestone is **Custom pickleball detector**. The local
+The current milestone is **Ball trajectory reconstruction**. The local
 CLI can inspect video plus optional synchronized audio, extract lossless analysis
 audio, calibrate the court, detect people broadly, derive court-aware candidates,
 manually assign the four logical match roles, and track those identities separately
@@ -15,7 +15,9 @@ full-resolution ball-annotation frames and lossless review clips, then assign
 leakage-safe dataset splits. It now supports versioned single-class ball training,
 high-resolution/ROI/tiled raw inference, fixed-split evaluation, and strategy
 comparison, plus a resumable local interface for human correction of training
-annotations. Ball tracking and pickleball event inference remain unimplemented.
+annotations. It now reconstructs a conservative primary-match image-space ball path
+with explicit observed, interpolated, and unknown states. Pickleball event inference
+remains unimplemented.
 
 ## Repository map
 
@@ -95,6 +97,10 @@ uv run pickleball-vision ball review ../../ml/datasets/match-splits.json \
   --annotations ../../ml/datasets/match-annotations.json \
   --dataset-version match-v1 \
   --predictions ../../output/ball-detection/match/detections.json
+uv run pickleball-vision track-ball /absolute/path/to/match.mp4 \
+  --detections ../../output/ball-detection/match/detections.json \
+  --calibration ../../output/calibration/calibration.json \
+  --output-dir ../../output/ball-tracking
 ```
 
 Command results are emitted as JSON on standard output. Diagnostic structured
@@ -172,6 +178,13 @@ box annotations; unreviewed frames are rejected rather than treated as negatives
 Inference supports high-resolution full-frame, calibrated court ROI, tiled, and
 court-tiled strategies while retaining source-pixel proposals and detections without
 temporal tracking. See [the custom detector guide](docs/ball-detector.md).
+
+Ball trajectory reconstruction associates raw candidates using image-space motion,
+acceleration plausibility, temporal persistence, confidence, and a calibrated
+primary-court image envelope. It retains raw observations separately from bounded
+smoothing, marks only short internal gaps as interpolated, and leaves longer gaps
+unknown. Airborne ball points are never projected through court homography. See
+[the ball trajectory guide](docs/ball-tracking.md).
 
 ## Verify the setup
 

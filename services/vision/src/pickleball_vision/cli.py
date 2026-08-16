@@ -19,6 +19,7 @@ from pickleball_vision.ball_evaluation import (
     evaluate_ball_detector,
 )
 from pickleball_vision.ball_review import serve_ball_annotation_review
+from pickleball_vision.ball_tracking_workflow import track_ball_in_video
 from pickleball_vision.ball_training import train_ball_detector
 from pickleball_vision.calibration_workflow import calibrate_video
 from pickleball_vision.config import Settings
@@ -459,6 +460,30 @@ def build_parser() -> argparse.ArgumentParser:
     )
     compare_ball_parser.add_argument("--output-dir", type=Path, required=True)
     compare_ball_parser.add_argument("--device", default="auto")
+
+    track_ball_parser = subparsers.add_parser(
+        "track-ball",
+        help="reconstruct the primary-match ball trajectory from raw candidates",
+    )
+    track_ball_parser.add_argument("video", type=Path, help="source video used for detection")
+    track_ball_parser.add_argument(
+        "--detections",
+        type=Path,
+        required=True,
+        help="raw detections.json from ball detect",
+    )
+    track_ball_parser.add_argument(
+        "--calibration",
+        type=Path,
+        required=True,
+        help="court calibration used only for an image-space relevance envelope",
+    )
+    track_ball_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=True,
+        help="directory for ball_tracks.json, ball-debug.mp4, and tracking summary",
+    )
     return parser
 
 
@@ -955,6 +980,29 @@ def _run_compare_ball(
     return EXIT_OK
 
 
+def _run_track_ball(
+    video_path: Path,
+    *,
+    detections_path: Path,
+    calibration_path: Path,
+    output_dir: Path,
+    settings: Settings,
+) -> int:
+    artifacts = track_ball_in_video(
+        video_path,
+        detections_path=detections_path,
+        calibration_path=calibration_path,
+        output_dir=output_dir,
+        settings=settings.ball_tracking,
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "primary_match_ball_tracked",
+        extra={"context": artifacts.as_dict()},
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command and translate failures into stable process exit codes."""
 
@@ -1116,6 +1164,14 @@ def main(argv: Sequence[str] | None = None) -> int:
                 )
             parser.print_help()
             return EXIT_OK
+        if args.command == "track-ball":
+            return _run_track_ball(
+                cast(Path, args.video),
+                detections_path=cast(Path, args.detections),
+                calibration_path=cast(Path, args.calibration),
+                output_dir=cast(Path, args.output_dir),
+                settings=settings,
+            )
         parser.error(f"unsupported command: {args.command}")
     except PickleballVisionError as error:
         print(f"error [{error.code}]: {error}", file=sys.stderr)

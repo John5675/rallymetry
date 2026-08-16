@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from pickleball_vision.config import (
+    BallTrackingSettings,
     Environment,
     LogFormat,
     MediaSettings,
@@ -27,6 +28,7 @@ def test_settings_have_safe_development_defaults() -> None:
     assert settings.player_isolation == PlayerIsolationSettings()
     assert settings.player_tracking == PlayerTrackingSettings()
     assert settings.player_analysis == PlayerAnalysisSettings()
+    assert settings.ball_tracking == BallTrackingSettings()
 
 
 def test_settings_load_prefixed_environment_values() -> None:
@@ -57,6 +59,10 @@ def test_settings_load_prefixed_environment_values() -> None:
             "PICKLEBALL_VISION_ANALYSIS_MINIMUM_TRACKING_CONFIDENCE": "0.6",
             "PICKLEBALL_VISION_ANALYSIS_SMOOTHING_WINDOW_FRAMES": "7",
             "PICKLEBALL_VISION_ANALYSIS_MAXIMUM_STEP_GAP_SECONDS": "0.3",
+            "PICKLEBALL_VISION_BALL_TRACKING_MAX_ASSOCIATION_GAP_SECONDS": "0.25",
+            "PICKLEBALL_VISION_BALL_TRACKING_MAX_INTERPOLATION_GAP_SECONDS": "0.05",
+            "PICKLEBALL_VISION_BALL_TRACKING_MINIMUM_SEGMENT_OBSERVATIONS": "3",
+            "PICKLEBALL_VISION_BALL_TRACKING_SMOOTHING_WINDOW_FRAMES": "7",
         }
     )
 
@@ -92,6 +98,12 @@ def test_settings_load_prefixed_environment_values() -> None:
         minimum_tracking_confidence=0.6,
         smoothing_window_frames=7,
         maximum_step_gap_seconds=0.3,
+    )
+    assert settings.ball_tracking == BallTrackingSettings(
+        max_association_gap_seconds=0.25,
+        max_interpolation_gap_seconds=0.05,
+        minimum_segment_observations=3,
+        smoothing_window_frames=7,
     )
 
 
@@ -154,6 +166,17 @@ def test_settings_load_prefixed_environment_values() -> None:
         (
             {"PICKLEBALL_VISION_ANALYSIS_SMOOTHING_WINDOW_FRAMES": "4"},
             "PICKLEBALL_VISION_ANALYSIS_SMOOTHING_WINDOW_FRAMES",
+        ),
+        (
+            {
+                "PICKLEBALL_VISION_BALL_TRACKING_MAX_ASSOCIATION_GAP_SECONDS": "0.1",
+                "PICKLEBALL_VISION_BALL_TRACKING_MAX_INTERPOLATION_GAP_SECONDS": "0.2",
+            },
+            "PICKLEBALL_VISION_BALL_TRACKING_MAX_INTERPOLATION_GAP_SECONDS",
+        ),
+        (
+            {"PICKLEBALL_VISION_BALL_TRACKING_SMOOTHING_WINDOW_FRAMES": "4"},
+            "PICKLEBALL_VISION_BALL_TRACKING_SMOOTHING_WINDOW_FRAMES",
         ),
     ],
 )

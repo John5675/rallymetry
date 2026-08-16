@@ -29,6 +29,7 @@ class ErrorCode(StrEnum):
     BALL_EVALUATION = "ball_evaluation_error"
     BALL_INFERENCE = "ball_inference_error"
     BALL_MODEL = "ball_model_error"
+    BALL_TRACKING_INPUT = "ball_tracking_input_error"
     BALL_TRAINING = "ball_training_error"
     OUTPUT_WRITE = "output_write_error"
     PLAYER_ASSIGNMENT_IO = "player_assignment_io_error"
@@ -331,6 +332,17 @@ class BallEvaluationError(PickleballVisionError):
         super().__init__(
             f"Pickleball detector evaluation failed: {reason}",
             code=ErrorCode.BALL_EVALUATION,
+            details={"reason": reason},
+        )
+
+
+class BallTrackingInputError(PickleballVisionError):
+    """Raised when raw detections, calibration, or video cannot be tracked safely."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Invalid ball-trajectory reconstruction input: {reason}",
+            code=ErrorCode.BALL_TRACKING_INPUT,
             details={"reason": reason},
         )
 

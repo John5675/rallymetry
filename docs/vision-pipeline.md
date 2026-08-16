@@ -4,8 +4,9 @@ This document describes stable stage boundaries. A stage may be introduced only
 when its matching milestone is current. Audio-aware media ingestion, manual court
 calibration, broad person detection, primary-player isolation, and persistent
 logical-player tracking are implemented. Ball dataset extraction, custom detector
-training, raw spatial ball inference, and fixed-split evaluation are also implemented;
-ball trajectories and all later event stages remain contracts only.
+training, raw spatial ball inference, fixed-split evaluation, and conservative
+image-space ball trajectory reconstruction are also implemented. Audio observations
+and all semantic event stages remain contracts only.
 
 ## Intended flow
 
@@ -169,6 +170,28 @@ automatically copies a suggestion into ground truth. Human-reviewed positive and
 negative frames, draft annotations, per-ball context, and review progress are saved
 atomically in the annotation boundary. No temporal ball path or event is inferred.
 
+## Ball trajectory reconstruction contract
+
+Trajectory reconstruction consumes the immutable `raw_pickleball_detections`
+artifact and emits a separate, frame-complete `primary_match_ball_trajectory`.
+Candidate association combines predicted image location, velocity, acceleration
+plausibility, temporal support, detector confidence, and primary-court relevance;
+confidence alone never selects the ball. Rejected candidates remain referenced by
+detection ID and the detector artifact is not mutated.
+
+Primary-court relevance uses only a projected image outline of known court geometry
+with conservative side and airborne margins. This is an image-space association
+heuristic, not a ball court coordinate. No observed, interpolated, or smoothed
+airborne point is transformed through homography.
+
+Every source frame is `OBSERVED`, `INTERPOLATED`, or `UNKNOWN`. Observed records
+retain the raw box-center point and source detection. Interpolation has no raw point
+and is limited to configured short gaps inside a single persistent segment. Bounded
+smoothing is a separate value and cannot cross unknown periods. Longer or ambiguous
+gaps remain unknown. `ball-debug.mp4` visualizes these distinctions, while
+`ball_tracks.json` remains the structured source of truth. Exact fields, metrics,
+configuration, and review guidance are defined in `ball-tracking.md`.
+
 ## Primary-player isolation contract
 
 Isolation derives, but never adds fields to, raw person observations. The initial
@@ -226,11 +249,11 @@ frame ranges. Heatmaps and animations are debug/presentation artifacts; computed
 remains the analytics source of truth. Exact formulas and court-region boundaries are
 defined in `analytics-definitions.md`.
 
-Ball records distinguish at minimum:
+Ball records distinguish:
 
-- `observed`: supported directly by image evidence;
-- `interpolated`: estimated only between sufficiently close supported points; and
-- `missing`: no defensible position.
+- `OBSERVED`: supported directly by one linked raw detection;
+- `INTERPOLATED`: estimated only between sufficiently close supported points; and
+- `UNKNOWN`: no defensible position.
 
 Interpolation must retain its method, support interval, and confidence. Long gaps
 remain missing.

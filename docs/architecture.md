@@ -91,6 +91,14 @@ all crop proposals before cross-crop deduplication. Calibration is used to const
 an ROI, never to project an airborne ball onto the court plane. Raw ball detections
 contain no temporal identity or semantic event.
 
+Ball trajectory reconstruction is a derived image-space tracking layer. It links at
+most one primary-match candidate per frame using motion, acceleration, persistence,
+confidence, and an image-space court envelope while leaving ambiguous periods
+unknown. `ball_tracks.json` references selected and rejected detector IDs, retains raw
+observed points separately from interpolation and smoothing, and contains no semantic
+pickleball events. Calibration projects only known court geometry into the image for
+relevance; airborne ball points never pass through court homography.
+
 The local annotation-review interface is an adapter over fixed split records,
 human annotation JSON, source images, and optional raw detector suggestions. It binds
 only to loopback and introduces no product backend. Suggestions stay in their raw

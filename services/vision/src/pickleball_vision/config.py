@@ -562,6 +562,234 @@ class PlayerAnalysisSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class BallTrackingSettings:
+    """Validated image-space association, interpolation, and smoothing settings."""
+
+    max_association_gap_seconds: float = 0.20
+    max_interpolation_gap_seconds: float = 0.10
+    maximum_speed_diagonals_per_second: float = 3.0
+    maximum_acceleration_diagonals_per_second_squared: float = 80.0
+    association_base_gate_diagonal_fraction: float = 0.012
+    primary_court_side_margin_fraction: float = 0.12
+    primary_court_air_margin_fraction: float = 0.50
+    primary_court_bottom_margin_fraction: float = 0.06
+    minimum_start_score: float = 0.40
+    minimum_association_score: float = 0.32
+    minimum_segment_observations: int = 2
+    smoothing_window_frames: int = 5
+    maximum_smoothing_adjustment_diagonal_fraction: float = 0.015
+    debug_trail_seconds: float = 0.75
+
+    @classmethod
+    def from_env(
+        cls,
+        environ: Mapping[str, str] | None = None,
+    ) -> BallTrackingSettings:
+        """Load conservative ball-trajectory settings from prefixed variables."""
+
+        source = os.environ if environ is None else environ
+        defaults = cls()
+        values: dict[str, float | int] = {
+            "max_association_gap_seconds": _float_setting(
+                source,
+                "BALL_TRACKING_MAX_ASSOCIATION_GAP_SECONDS",
+                defaults.max_association_gap_seconds,
+            ),
+            "max_interpolation_gap_seconds": _float_setting(
+                source,
+                "BALL_TRACKING_MAX_INTERPOLATION_GAP_SECONDS",
+                defaults.max_interpolation_gap_seconds,
+            ),
+            "maximum_speed_diagonals_per_second": _float_setting(
+                source,
+                "BALL_TRACKING_MAX_SPEED_DIAGONALS_PER_SECOND",
+                defaults.maximum_speed_diagonals_per_second,
+            ),
+            "maximum_acceleration_diagonals_per_second_squared": _float_setting(
+                source,
+                "BALL_TRACKING_MAX_ACCELERATION_DIAGONALS_PER_SECOND_SQUARED",
+                defaults.maximum_acceleration_diagonals_per_second_squared,
+            ),
+            "association_base_gate_diagonal_fraction": _float_setting(
+                source,
+                "BALL_TRACKING_BASE_GATE_DIAGONAL_FRACTION",
+                defaults.association_base_gate_diagonal_fraction,
+            ),
+            "primary_court_side_margin_fraction": _float_setting(
+                source,
+                "BALL_TRACKING_COURT_SIDE_MARGIN_FRACTION",
+                defaults.primary_court_side_margin_fraction,
+            ),
+            "primary_court_air_margin_fraction": _float_setting(
+                source,
+                "BALL_TRACKING_COURT_AIR_MARGIN_FRACTION",
+                defaults.primary_court_air_margin_fraction,
+            ),
+            "primary_court_bottom_margin_fraction": _float_setting(
+                source,
+                "BALL_TRACKING_COURT_BOTTOM_MARGIN_FRACTION",
+                defaults.primary_court_bottom_margin_fraction,
+            ),
+            "minimum_start_score": _float_setting(
+                source,
+                "BALL_TRACKING_MINIMUM_START_SCORE",
+                defaults.minimum_start_score,
+            ),
+            "minimum_association_score": _float_setting(
+                source,
+                "BALL_TRACKING_MINIMUM_ASSOCIATION_SCORE",
+                defaults.minimum_association_score,
+            ),
+            "minimum_segment_observations": _int_setting(
+                source,
+                "BALL_TRACKING_MINIMUM_SEGMENT_OBSERVATIONS",
+                defaults.minimum_segment_observations,
+            ),
+            "smoothing_window_frames": _int_setting(
+                source,
+                "BALL_TRACKING_SMOOTHING_WINDOW_FRAMES",
+                defaults.smoothing_window_frames,
+            ),
+            "maximum_smoothing_adjustment_diagonal_fraction": _float_setting(
+                source,
+                "BALL_TRACKING_MAXIMUM_SMOOTHING_ADJUSTMENT_DIAGONAL_FRACTION",
+                defaults.maximum_smoothing_adjustment_diagonal_fraction,
+            ),
+            "debug_trail_seconds": _float_setting(
+                source,
+                "BALL_TRACKING_DEBUG_TRAIL_SECONDS",
+                defaults.debug_trail_seconds,
+            ),
+        }
+        positive_fields = (
+            "max_association_gap_seconds",
+            "max_interpolation_gap_seconds",
+            "maximum_speed_diagonals_per_second",
+            "maximum_acceleration_diagonals_per_second_squared",
+            "association_base_gate_diagonal_fraction",
+            "primary_court_side_margin_fraction",
+            "primary_court_air_margin_fraction",
+            "primary_court_bottom_margin_fraction",
+            "maximum_smoothing_adjustment_diagonal_fraction",
+            "debug_trail_seconds",
+        )
+        for field_name in positive_fields:
+            if float(values[field_name]) <= 0:
+                suffix = {
+                    "max_association_gap_seconds": "BALL_TRACKING_MAX_ASSOCIATION_GAP_SECONDS",
+                    "max_interpolation_gap_seconds": "BALL_TRACKING_MAX_INTERPOLATION_GAP_SECONDS",
+                    "maximum_speed_diagonals_per_second": (
+                        "BALL_TRACKING_MAX_SPEED_DIAGONALS_PER_SECOND"
+                    ),
+                    "maximum_acceleration_diagonals_per_second_squared": (
+                        "BALL_TRACKING_MAX_ACCELERATION_DIAGONALS_PER_SECOND_SQUARED"
+                    ),
+                    "association_base_gate_diagonal_fraction": (
+                        "BALL_TRACKING_BASE_GATE_DIAGONAL_FRACTION"
+                    ),
+                    "primary_court_side_margin_fraction": (
+                        "BALL_TRACKING_COURT_SIDE_MARGIN_FRACTION"
+                    ),
+                    "primary_court_air_margin_fraction": (
+                        "BALL_TRACKING_COURT_AIR_MARGIN_FRACTION"
+                    ),
+                    "primary_court_bottom_margin_fraction": (
+                        "BALL_TRACKING_COURT_BOTTOM_MARGIN_FRACTION"
+                    ),
+                    "maximum_smoothing_adjustment_diagonal_fraction": (
+                        "BALL_TRACKING_MAXIMUM_SMOOTHING_ADJUSTMENT_DIAGONAL_FRACTION"
+                    ),
+                    "debug_trail_seconds": "BALL_TRACKING_DEBUG_TRAIL_SECONDS",
+                }[field_name]
+                setting = f"{ENV_PREFIX}{suffix}"
+                raise ConfigurationError(f"{setting} must be positive", setting=setting)
+        for field_name, suffix in (
+            ("minimum_start_score", "BALL_TRACKING_MINIMUM_START_SCORE"),
+            ("minimum_association_score", "BALL_TRACKING_MINIMUM_ASSOCIATION_SCORE"),
+        ):
+            if not 0 <= float(values[field_name]) <= 1:
+                setting = f"{ENV_PREFIX}{suffix}"
+                raise ConfigurationError(
+                    f"{setting} must be between 0 and 1 inclusive",
+                    setting=setting,
+                )
+        minimum_observations = int(values["minimum_segment_observations"])
+        if minimum_observations < 2:
+            setting = f"{ENV_PREFIX}BALL_TRACKING_MINIMUM_SEGMENT_OBSERVATIONS"
+            raise ConfigurationError(f"{setting} must be at least 2", setting=setting)
+        smoothing_window = int(values["smoothing_window_frames"])
+        if smoothing_window < 3 or smoothing_window % 2 == 0:
+            setting = f"{ENV_PREFIX}BALL_TRACKING_SMOOTHING_WINDOW_FRAMES"
+            raise ConfigurationError(
+                f"{setting} must be an odd integer of at least 3",
+                setting=setting,
+            )
+        if float(values["max_interpolation_gap_seconds"]) > float(
+            values["max_association_gap_seconds"]
+        ):
+            setting = f"{ENV_PREFIX}BALL_TRACKING_MAX_INTERPOLATION_GAP_SECONDS"
+            raise ConfigurationError(
+                f"{setting} must not exceed {ENV_PREFIX}BALL_TRACKING_MAX_ASSOCIATION_GAP_SECONDS",
+                setting=setting,
+            )
+        return cls(
+            max_association_gap_seconds=float(values["max_association_gap_seconds"]),
+            max_interpolation_gap_seconds=float(values["max_interpolation_gap_seconds"]),
+            maximum_speed_diagonals_per_second=float(values["maximum_speed_diagonals_per_second"]),
+            maximum_acceleration_diagonals_per_second_squared=float(
+                values["maximum_acceleration_diagonals_per_second_squared"]
+            ),
+            association_base_gate_diagonal_fraction=float(
+                values["association_base_gate_diagonal_fraction"]
+            ),
+            primary_court_side_margin_fraction=float(values["primary_court_side_margin_fraction"]),
+            primary_court_air_margin_fraction=float(values["primary_court_air_margin_fraction"]),
+            primary_court_bottom_margin_fraction=float(
+                values["primary_court_bottom_margin_fraction"]
+            ),
+            minimum_start_score=float(values["minimum_start_score"]),
+            minimum_association_score=float(values["minimum_association_score"]),
+            minimum_segment_observations=minimum_observations,
+            smoothing_window_frames=smoothing_window,
+            maximum_smoothing_adjustment_diagonal_fraction=float(
+                values["maximum_smoothing_adjustment_diagonal_fraction"]
+            ),
+            debug_trail_seconds=float(values["debug_trail_seconds"]),
+        )
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "max_association_gap_seconds": self.max_association_gap_seconds,
+            "max_interpolation_gap_seconds": self.max_interpolation_gap_seconds,
+            "maximum_speed_diagonals_per_second": self.maximum_speed_diagonals_per_second,
+            "maximum_acceleration_diagonals_per_second_squared": (
+                self.maximum_acceleration_diagonals_per_second_squared
+            ),
+            "association_base_gate_diagonal_fraction": (
+                self.association_base_gate_diagonal_fraction
+            ),
+            "primary_court_image_envelope": {
+                "side_margin_frame_fraction": self.primary_court_side_margin_fraction,
+                "air_margin_frame_fraction": self.primary_court_air_margin_fraction,
+                "bottom_margin_frame_fraction": self.primary_court_bottom_margin_fraction,
+                "airborne_points_projected_through_homography": False,
+            },
+            "minimum_start_score": self.minimum_start_score,
+            "minimum_association_score": self.minimum_association_score,
+            "minimum_segment_observations": self.minimum_segment_observations,
+            "smoothing": {
+                "method": "bounded_centered_confidence_weighted_mean",
+                "window_frames": self.smoothing_window_frames,
+                "maximum_adjustment_diagonal_fraction": (
+                    self.maximum_smoothing_adjustment_diagonal_fraction
+                ),
+                "overwrites_raw_observations": False,
+            },
+            "debug_trail_seconds": self.debug_trail_seconds,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class Settings:
     """Validated settings loaded once at an executable boundary."""
 
@@ -574,6 +802,7 @@ class Settings:
     player_isolation: PlayerIsolationSettings = field(default_factory=PlayerIsolationSettings)
     player_tracking: PlayerTrackingSettings = field(default_factory=PlayerTrackingSettings)
     player_analysis: PlayerAnalysisSettings = field(default_factory=PlayerAnalysisSettings)
+    ball_tracking: BallTrackingSettings = field(default_factory=BallTrackingSettings)
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> Settings:
@@ -623,6 +852,7 @@ class Settings:
             player_isolation=PlayerIsolationSettings.from_env(source),
             player_tracking=PlayerTrackingSettings.from_env(source),
             player_analysis=PlayerAnalysisSettings.from_env(source),
+            ball_tracking=BallTrackingSettings.from_env(source),
         )
 
     def public_values(self) -> dict[str, object]:
@@ -638,4 +868,5 @@ class Settings:
             "player_isolation": self.player_isolation.as_dict(),
             "player_tracking": self.player_tracking.as_dict(),
             "player_analysis": self.player_analysis.as_dict(),
+            "ball_tracking": self.ball_tracking.as_dict(),
         }

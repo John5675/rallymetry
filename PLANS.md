@@ -256,7 +256,7 @@ Exit criteria:
 - No ball detector training, inference, trajectory reconstruction, or pickleball
   event inference is implemented.
 
-## 8. Ball detector — current
+## 8. Ball detector — complete
 
 Train and evaluate a custom single-class `pickleball` detector from human-reviewed,
 versioned datasets. Preserve raw frame-local observations and compare spatial
@@ -297,9 +297,40 @@ Exit criteria:
 - No ball trajectory reconstruction, audio-event extraction, or semantic event
   inference is implemented.
 
+## 9. Ball trajectory reconstruction — current
+
+Associate immutable frame-local ball candidates into conservative, inspectable
+primary-match image-space trajectories. Prefer explicit unknown periods over weak
+association, retain observed and interpolated provenance separately, and use court
+calibration only for image-space relevance—not airborne court-plane projection.
+
+Exit criteria:
+
+- `pickleball-vision track-ball <video> --detections <json> --calibration <json>
+  --output-dir <dir>` validates source/calibration provenance and consumes raw
+  detector artifacts without modifying them.
+- Candidate association combines predicted image location, velocity, acceleration
+  plausibility, temporal support, confidence, and an expanded image-space primary-
+  court envelope; it never selects a candidate by confidence alone.
+- Implausible candidates remain rejected evidence, short gaps may be interpolated,
+  and gaps beyond the configured limit remain explicitly unknown.
+- Every frame is `OBSERVED`, `INTERPOLATED`, or `UNKNOWN`; observed records retain
+  their raw detection and image point while smoothing is stored separately.
+- Calibration may project known court geometry into the image only to define a
+  relevance envelope. No airborne ball point is transformed through homography.
+- `ball_tracks.json`, `ball-debug.mp4`, and `ball-tracking-summary.json` retain
+  configuration/input provenance and report coverage, longest missing interval,
+  interpolation fraction, and candidate rejection count.
+- Synthetic tests cover distractor rejection, velocity/acceleration gating,
+  short-gap interpolation, long unknown gaps, raw-point preservation, provenance
+  validation, serialization, rendering, and summary metrics.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- No audio-event extraction, bounce/contact inference, rally inference, or later
+  semantic event behavior is implemented.
+
 ## Future milestones — not current
 
-9. Ball trajectory reconstruction
 10. Audio event extraction
 11. Manual event annotation
 12. Rally segmentation
