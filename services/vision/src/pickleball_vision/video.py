@@ -110,6 +110,40 @@ def _codec_name(fourcc_value: float) -> str | None:
     return codec
 
 
+def _decodable_frame_count(
+    capture: cv2.VideoCapture,
+    *,
+    reported_frame_count: int,
+    fps: float,
+) -> int:
+    """Correct container-derived frame counts against the decodable video tail.
+
+    Some MP4 files have an audio stream or container duration that extends a few
+    samples beyond the video stream. OpenCV can then derive ``CAP_PROP_FRAME_COUNT``
+    from that longer duration and report video frames that do not exist. Decode a
+    bounded tail window and expand it only when the whole initial window lies past
+    the real end of the video.
+    """
+
+    window_size = max(1, math.ceil(fps))
+    while True:
+        start_index = max(0, reported_frame_count - window_size)
+        capture.set(cv2.CAP_PROP_POS_FRAMES, float(start_index))
+        decoded_count = 0
+        for _ in range(start_index, reported_frame_count):
+            try:
+                success, frame = capture.read()
+            except cv2.error:
+                success, frame = False, None
+            if not success or frame is None:
+                break
+            decoded_count += 1
+
+        if decoded_count > 0 or start_index == 0:
+            return start_index + decoded_count
+        window_size = min(reported_frame_count, window_size * 2)
+
+
 def _validated_metadata(capture: cv2.VideoCapture, path: Path) -> VideoMetadata:
     try:
         fps = float(capture.get(cv2.CAP_PROP_FPS))
@@ -126,7 +160,7 @@ def _validated_metadata(capture: cv2.VideoCapture, path: Path) -> VideoMetadata:
     if not math.isfinite(raw_frame_count) or raw_frame_count < 1:
         raise VideoUnreadableError(str(path), reason="video reports no decodable frames")
 
-    frame_count = round(raw_frame_count)
+    reported_frame_count = round(raw_frame_count)
     if not success or first_frame is None:
         raise VideoUnreadableError(str(path), reason="the first frame could not be decoded")
 
@@ -134,6 +168,13 @@ def _validated_metadata(capture: cv2.VideoCapture, path: Path) -> VideoMetadata:
     if frame.ndim < 2 or frame.size == 0:
         raise VideoUnreadableError(str(path), reason="the first frame has invalid dimensions")
     height, width = (int(value) for value in frame.shape[:2])
+    frame_count = _decodable_frame_count(
+        capture,
+        reported_frame_count=reported_frame_count,
+        fps=fps,
+    )
+    if frame_count < 1:
+        raise VideoUnreadableError(str(path), reason="video reports no decodable frames")
 
     return VideoMetadata(
         filename=path.name,

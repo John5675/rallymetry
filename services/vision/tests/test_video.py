@@ -16,6 +16,7 @@ from pickleball_vision.errors import (
 )
 from pickleball_vision.video import (
     VideoMetadata,
+    _decodable_frame_count,
     _read_frame,
     decode_video_frame,
     extract_frame,
@@ -56,6 +57,30 @@ def test_inspect_video_rejects_missing_non_file_and_corrupt_inputs(tmp_path: Pat
     corrupt_video.write_bytes(b"not a video")
     with pytest.raises(VideoUnreadableError, match="OpenCV could not open"):
         inspect_video(corrupt_video)
+
+
+def test_decodable_frame_count_corrects_an_overreported_media_tail() -> None:
+    class OverreportedCapture:
+        def __init__(self) -> None:
+            self.position = 0
+
+        def set(self, _property_id: int, value: float) -> bool:
+            self.position = int(value)
+            return True
+
+        def read(self) -> tuple[bool, np.ndarray | None]:
+            if self.position >= 97:
+                return False, None
+            self.position += 1
+            return True, np.zeros((2, 2, 3), dtype=np.uint8)
+
+    frame_count = _decodable_frame_count(
+        cast(cv2.VideoCapture, OverreportedCapture()),
+        reported_frame_count=100,
+        fps=29.97,
+    )
+
+    assert frame_count == 97
 
 
 def test_extract_frame_preserves_source_resolution(synthetic_video: Path, tmp_path: Path) -> None:
