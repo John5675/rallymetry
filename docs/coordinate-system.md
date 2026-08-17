@@ -112,6 +112,18 @@ does not become a physical position. The player's physical court estimate remain
 the bottom-center ground point. An airborne contact candidate is not assigned a
 court side or location through homography.
 
+Hitter identification may compare incoming/outgoing image-space ball direction with
+the tracked player's near/far ground side as a consistency signal. It does not turn
+the airborne ball into a court coordinate. Near/far hitter evaluation uses the
+human-labeled player's tracked ground point at the matched contact when available.
+
+Shot reconstruction retains image-space ball trajectory segments without treating
+them as court-plane paths. `landingCourtPosition` can exist only when copied from an
+accepted bounce that already passed visual court-contact and projection gates.
+`hitterCourtPosition` comes from the logical player's raw bottom-center ground point
+at contact time. Image-space velocity is stored in frame-diagonal fractions per
+second and must not be interpreted as true 3D ball speed.
+
 ## Time coordinates
 
 Keep an integer zero-based decoded `frame_index` and an explicit `timestamp_s` when

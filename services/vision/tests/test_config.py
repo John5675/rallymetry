@@ -9,6 +9,7 @@ from pickleball_vision.config import (
     BounceDetectionSettings,
     ContactDetectionSettings,
     Environment,
+    HitterIdentificationSettings,
     LogFormat,
     MediaSettings,
     PersonDetectionSettings,
@@ -17,6 +18,7 @@ from pickleball_vision.config import (
     PlayerTrackingSettings,
     RallySegmentationSettings,
     Settings,
+    ShotClassificationSettings,
 )
 from pickleball_vision.errors import ConfigurationError, ErrorCode
 
@@ -38,6 +40,8 @@ def test_settings_have_safe_development_defaults() -> None:
     assert settings.rally_segmentation == RallySegmentationSettings()
     assert settings.bounce_detection == BounceDetectionSettings()
     assert settings.contact_detection == ContactDetectionSettings()
+    assert settings.hitter_identification == HitterIdentificationSettings()
+    assert settings.shot_classification == ShotClassificationSettings()
 
 
 def test_settings_load_prefixed_environment_values() -> None:
@@ -88,6 +92,12 @@ def test_settings_load_prefixed_environment_values() -> None:
             "PICKLEBALL_VISION_BOUNCE_EVALUATION_TOLERANCE_MS": "100",
             "PICKLEBALL_VISION_CONTACT_ACCEPTED_CONFIDENCE": "0.82",
             "PICKLEBALL_VISION_CONTACT_AUDIO_CONFIDENCE_WEIGHT": "0.3",
+            "PICKLEBALL_VISION_HITTER_MINIMUM_ASSIGNMENT_CONFIDENCE": "0.7",
+            "PICKLEBALL_VISION_HITTER_DIRECTION_WEIGHT": "0.2",
+            "PICKLEBALL_VISION_SHOT_MINIMUM_TRAJECTORY_COVERAGE": "0.65",
+            "PICKLEBALL_VISION_SHOT_MINIMUM_KNOWN_TRAJECTORY_POINTS": "5",
+            "PICKLEBALL_VISION_SHOT_DRIVE_MINIMUM_SPEED_DIAGONALS_PER_SECOND": "0.55",
+            "PICKLEBALL_VISION_SHOT_DEBUG_TRAIL_SECONDS": "1.25",
         }
     )
 
@@ -155,6 +165,16 @@ def test_settings_load_prefixed_environment_values() -> None:
     assert settings.contact_detection == ContactDetectionSettings(
         accepted_confidence=0.82,
         audio_confidence_weight=0.3,
+    )
+    assert settings.hitter_identification == HitterIdentificationSettings(
+        minimum_assignment_confidence=0.7,
+        direction_weight=0.2,
+    )
+    assert settings.shot_classification == ShotClassificationSettings(
+        minimum_trajectory_coverage=0.65,
+        minimum_known_trajectory_points=5,
+        drive_minimum_speed_diagonals_per_second=0.55,
+        debug_trail_seconds=1.25,
     )
 
 
@@ -271,6 +291,29 @@ def test_settings_load_prefixed_environment_values() -> None:
         (
             {"PICKLEBALL_VISION_CONTACT_MINIMUM_OBSERVATIONS_EACH_SIDE": "1"},
             "PICKLEBALL_VISION_CONTACT_MINIMUM_OBSERVATIONS_EACH_SIDE",
+        ),
+        (
+            {"PICKLEBALL_VISION_HITTER_MINIMUM_ASSIGNMENT_MARGIN": "0"},
+            "PICKLEBALL_VISION_HITTER_MINIMUM_ASSIGNMENT_MARGIN",
+        ),
+        (
+            {"PICKLEBALL_VISION_HITTER_DIRECTION_WEIGHT": "-0.1"},
+            "PICKLEBALL_VISION_HITTER_DIRECTION_WEIGHT",
+        ),
+        (
+            {"PICKLEBALL_VISION_SHOT_MINIMUM_KNOWN_TRAJECTORY_POINTS": "1"},
+            "PICKLEBALL_VISION_SHOT_MINIMUM_KNOWN_TRAJECTORY_POINTS",
+        ),
+        (
+            {
+                "PICKLEBALL_VISION_SHOT_DINK_MAXIMUM_SPEED_DIAGONALS_PER_SECOND": "0.5",
+                "PICKLEBALL_VISION_SHOT_DROP_MAXIMUM_SPEED_DIAGONALS_PER_SECOND": "0.4",
+            },
+            "PICKLEBALL_VISION_SHOT_DINK_MAXIMUM_SPEED_DIAGONALS_PER_SECOND",
+        ),
+        (
+            {"PICKLEBALL_VISION_SHOT_DEBUG_TRAIL_SECONDS": "0"},
+            "PICKLEBALL_VISION_SHOT_DEBUG_TRAIL_SECONDS",
         ),
         (
             {"PICKLEBALL_VISION_FUSION_TOLERANCE_MS": "0"},

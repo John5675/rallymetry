@@ -274,6 +274,22 @@ court-position estimate. Candidate-player rankings are not hitter assignments;
 ball points are never projected through court homography. Human contact annotations
 are isolated to post-inference temporal evaluation.
 
+Hitter identification consumes that immutable candidate layer plus the exact
+logical-player track artifact recorded in its provenance. It emits a separate
+logical role or `UNKNOWN`, confidence, alternatives, and supporting visual/player
+signals. Previous-hitter and rally-order context are bounded and reset after an
+uncertain eligible contact. Audio makes no identity contribution, and hitter
+resolution never projects the airborne ball through court homography. Human player
+labels remain isolated to post-inference evaluation.
+
+Shot reconstruction consumes those exact compatible artifacts and emits a separate
+rally-local shot layer. It references rather than rewrites the frame-complete ball
+trajectory, copies a landing court point only from an accepted visually plane-gated
+bounce, and copies hitter location only from a bottom-center player ground point.
+Its initial classifier is an ordered, configured domain rule set with a fixed small
+vocabulary and explicit `UNKNOWN`; no new neural network is introduced. Human shot
+labels remain post-inference evaluation inputs. See `shot-reconstruction.md`.
+
 The local annotation-review interface is an adapter over fixed split records,
 human annotation JSON, source images, and optional raw detector suggestions. It binds
 only to loopback and introduces no product backend. Suggestions stay in their raw

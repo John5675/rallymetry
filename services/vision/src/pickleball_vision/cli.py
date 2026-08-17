@@ -38,6 +38,7 @@ from pickleball_vision.dataset_workflow import (
     split_ball_dataset,
 )
 from pickleball_vision.errors import ErrorCode, PickleballVisionError
+from pickleball_vision.hitter_identification_workflow import identify_hitters_in_video
 from pickleball_vision.logging import configure_logging
 from pickleball_vision.match_annotation_ui import serve_match_annotation
 from pickleball_vision.media import (
@@ -51,6 +52,7 @@ from pickleball_vision.player_analysis_workflow import analyze_players_in_video
 from pickleball_vision.player_isolation_workflow import isolate_primary_players
 from pickleball_vision.player_tracking_workflow import track_players_in_video
 from pickleball_vision.rally_segmentation_workflow import segment_rallies_in_video
+from pickleball_vision.shot_reconstruction_workflow import reconstruct_shots_in_video
 from pickleball_vision.video import extract_frame, sample_frames
 
 EXIT_OK = 0
@@ -687,6 +689,101 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         required=True,
         help="directory for contacts.json, contact-debug.mp4, and contact-evaluation.json",
+    )
+    identify_hitters_parser = subparsers.add_parser(
+        "identify-hitters",
+        help="resolve contact candidates to logical players or UNKNOWN",
+    )
+    identify_hitters_parser.add_argument(
+        "video",
+        type=Path,
+        help="source video represented by the contact and player-track artifacts",
+    )
+    identify_hitters_parser.add_argument(
+        "--contacts",
+        type=Path,
+        required=True,
+        help="source-compatible contacts.json from detect-contacts",
+    )
+    identify_hitters_parser.add_argument(
+        "--player-tracks",
+        type=Path,
+        required=True,
+        help="exact logical tracks.json used to generate the contact artifact",
+    )
+    identify_hitters_parser.add_argument(
+        "--annotations",
+        type=Path,
+        help="optional human contact player labels used only for evaluation",
+    )
+    identify_hitters_parser.add_argument(
+        "--evaluation-partition",
+        choices=("development", "validation", "test"),
+        default="validation",
+        help="provenance label only; the command never tunes thresholds automatically",
+    )
+    identify_hitters_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=True,
+        help="directory for hitters.json, hitter-debug.mp4, and hitter-evaluation.json",
+    )
+    reconstruct_shots_parser = subparsers.add_parser(
+        "reconstruct-shots",
+        help="reconstruct rally-local shots and apply documented rule-based classes",
+    )
+    reconstruct_shots_parser.add_argument("video", type=Path, help="source match video")
+    reconstruct_shots_parser.add_argument(
+        "--ball-tracks",
+        type=Path,
+        required=True,
+        help="frame-complete ball_tracks.json",
+    )
+    reconstruct_shots_parser.add_argument(
+        "--rallies",
+        type=Path,
+        required=True,
+        help="source-compatible automatic rallies.json",
+    )
+    reconstruct_shots_parser.add_argument(
+        "--contacts",
+        type=Path,
+        required=True,
+        help="source-compatible contacts.json",
+    )
+    reconstruct_shots_parser.add_argument(
+        "--bounces",
+        type=Path,
+        help="optional source-compatible bounces.json for landing linkage",
+    )
+    reconstruct_shots_parser.add_argument(
+        "--hitters",
+        type=Path,
+        required=True,
+        help="source-compatible hitters.json",
+    )
+    reconstruct_shots_parser.add_argument(
+        "--player-tracks",
+        type=Path,
+        required=True,
+        help="exact tracks.json referenced by contacts and hitters",
+    )
+    reconstruct_shots_parser.add_argument(
+        "--annotations",
+        type=Path,
+        help="optional human shotType labels used only for evaluation",
+    )
+    reconstruct_shots_parser.add_argument(
+        "--evaluation-partition",
+        choices=("development", "validation", "test"),
+        default="validation",
+        help="provenance label only; thresholds are never tuned automatically",
+    )
+    reconstruct_shots_parser.add_argument(
+        "--output-dir",
+        type=Path,
+        required=True,
+        help="directory for shots.json, shot-debug.mp4, and shot-evaluation.json",
     )
     return parser
 
@@ -1357,6 +1454,68 @@ def _run_detect_contacts(
     return EXIT_OK
 
 
+def _run_identify_hitters(
+    video_path: Path,
+    *,
+    contacts_path: Path,
+    player_tracks_path: Path,
+    annotations_path: Path | None,
+    evaluation_partition: str,
+    output_dir: Path,
+    settings: Settings,
+) -> int:
+    artifacts = identify_hitters_in_video(
+        video_path,
+        contacts_path=contacts_path,
+        player_tracks_path=player_tracks_path,
+        annotations_path=annotations_path,
+        evaluation_partition=evaluation_partition,
+        output_dir=output_dir,
+        settings=settings.hitter_identification,
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "hitters_identified",
+        extra={"context": artifacts.as_dict()},
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
+def _run_reconstruct_shots(
+    video_path: Path,
+    *,
+    ball_tracks_path: Path,
+    rallies_path: Path,
+    contacts_path: Path,
+    bounces_path: Path | None,
+    hitters_path: Path,
+    player_tracks_path: Path,
+    annotations_path: Path | None,
+    evaluation_partition: str,
+    output_dir: Path,
+    settings: Settings,
+) -> int:
+    artifacts = reconstruct_shots_in_video(
+        video_path,
+        ball_tracks_path=ball_tracks_path,
+        rallies_path=rallies_path,
+        contacts_path=contacts_path,
+        bounces_path=bounces_path,
+        hitters_path=hitters_path,
+        player_tracks_path=player_tracks_path,
+        annotations_path=annotations_path,
+        evaluation_partition=evaluation_partition,
+        output_dir=output_dir,
+        settings=settings.shot_classification,
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "shots_reconstructed",
+        extra={"context": artifacts.as_dict()},
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command and translate failures into stable process exit codes."""
 
@@ -1576,6 +1735,30 @@ def main(argv: Sequence[str] | None = None) -> int:
                 audio_events_path=cast(Path | None, args.audio_events),
                 annotations_path=cast(Path | None, args.annotations),
                 annotations_complete=cast(bool, args.annotations_complete),
+                evaluation_partition=cast(str, args.evaluation_partition),
+                output_dir=cast(Path, args.output_dir),
+                settings=settings,
+            )
+        if args.command == "identify-hitters":
+            return _run_identify_hitters(
+                cast(Path, args.video),
+                contacts_path=cast(Path, args.contacts),
+                player_tracks_path=cast(Path, args.player_tracks),
+                annotations_path=cast(Path | None, args.annotations),
+                evaluation_partition=cast(str, args.evaluation_partition),
+                output_dir=cast(Path, args.output_dir),
+                settings=settings,
+            )
+        if args.command == "reconstruct-shots":
+            return _run_reconstruct_shots(
+                cast(Path, args.video),
+                ball_tracks_path=cast(Path, args.ball_tracks),
+                rallies_path=cast(Path, args.rallies),
+                contacts_path=cast(Path, args.contacts),
+                bounces_path=cast(Path | None, args.bounces),
+                hitters_path=cast(Path, args.hitters),
+                player_tracks_path=cast(Path, args.player_tracks),
+                annotations_path=cast(Path | None, args.annotations),
                 evaluation_partition=cast(str, args.evaluation_partition),
                 output_dir=cast(Path, args.output_dir),
                 settings=settings,

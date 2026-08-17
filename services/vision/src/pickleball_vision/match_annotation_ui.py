@@ -111,7 +111,7 @@ MATCH_ANNOTATION_UI_HTML = r"""<!doctype html>
         <datalist id="players"><option>ME</option><option>PARTNER</option><option>OPPONENT_1</option><option>OPPONENT_2</option></datalist>
         <label>Team<input id="team" placeholder="optional"></label>
         <label>Shot type<input id="shot-type" list="shots" placeholder="optional"></label>
-        <datalist id="shots"><option>SERVE</option><option>RETURN</option><option>DRIVE</option><option>DROP</option><option>DINK</option><option>VOLLEY</option><option>RESET</option><option>LOB</option><option>OVERHEAD</option></datalist>
+        <datalist id="shots"><option>SERVE</option><option>RETURN</option><option>DINK</option><option>DROP</option><option>DRIVE</option><option>VOLLEY</option><option>OVERHEAD</option><option>OTHER</option><option>UNKNOWN</option></datalist>
         <label>Audio label<select id="audio-label"><option value="">None (normal)</option></select></label>
         <label>Annotator<input id="annotator" value="local-annotator"></label>
         <label>Court X (meters)<input id="court-x" type="number" step="0.01" placeholder="optional"></label>

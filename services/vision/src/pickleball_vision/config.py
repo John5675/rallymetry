@@ -1416,6 +1416,287 @@ class ContactDetectionSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class HitterIdentificationSettings:
+    """Validated visual/player evidence thresholds for hitter resolution."""
+
+    minimum_contact_confidence: float = 0.78
+    minimum_assignment_confidence: float = 0.62
+    minimum_assignment_margin: float = 0.08
+    maximum_player_distance_diagonal_fraction: float = 0.12
+    minimum_tracking_confidence: float = 0.45
+    minimum_direction_speed_diagonal_fraction_per_second: float = 0.015
+    previous_hitter_minimum_confidence: float = 0.70
+    maximum_sequence_gap_seconds: float = 4.0
+    evaluation_tolerance_ms: float = 100.0
+    proximity_weight: float = 0.35
+    tracking_weight: float = 0.17
+    direction_weight: float = 0.18
+    contact_weight: float = 0.12
+    court_context_weight: float = 0.08
+    sequence_weight: float = 0.10
+
+    @classmethod
+    def from_env(
+        cls,
+        environ: Mapping[str, str] | None = None,
+    ) -> HitterIdentificationSettings:
+        """Load hitter-decision thresholds and evidence weights from the environment."""
+
+        source = os.environ if environ is None else environ
+        defaults = cls()
+        suffixes = {
+            "minimum_contact_confidence": "HITTER_MINIMUM_CONTACT_CONFIDENCE",
+            "minimum_assignment_confidence": "HITTER_MINIMUM_ASSIGNMENT_CONFIDENCE",
+            "minimum_assignment_margin": "HITTER_MINIMUM_ASSIGNMENT_MARGIN",
+            "maximum_player_distance_diagonal_fraction": (
+                "HITTER_MAXIMUM_PLAYER_DISTANCE_DIAGONAL_FRACTION"
+            ),
+            "minimum_tracking_confidence": "HITTER_MINIMUM_TRACKING_CONFIDENCE",
+            "minimum_direction_speed_diagonal_fraction_per_second": (
+                "HITTER_MINIMUM_DIRECTION_SPEED_DIAGONAL_FRACTION_PER_SECOND"
+            ),
+            "previous_hitter_minimum_confidence": ("HITTER_PREVIOUS_HITTER_MINIMUM_CONFIDENCE"),
+            "maximum_sequence_gap_seconds": "HITTER_MAXIMUM_SEQUENCE_GAP_SECONDS",
+            "evaluation_tolerance_ms": "HITTER_EVALUATION_TOLERANCE_MS",
+            "proximity_weight": "HITTER_PROXIMITY_WEIGHT",
+            "tracking_weight": "HITTER_TRACKING_WEIGHT",
+            "direction_weight": "HITTER_DIRECTION_WEIGHT",
+            "contact_weight": "HITTER_CONTACT_WEIGHT",
+            "court_context_weight": "HITTER_COURT_CONTEXT_WEIGHT",
+            "sequence_weight": "HITTER_SEQUENCE_WEIGHT",
+        }
+        values = {
+            name: _float_setting(source, suffix, getattr(defaults, name))
+            for name, suffix in suffixes.items()
+        }
+        fraction_fields = (
+            "minimum_contact_confidence",
+            "minimum_assignment_confidence",
+            "minimum_assignment_margin",
+            "maximum_player_distance_diagonal_fraction",
+            "minimum_tracking_confidence",
+            "previous_hitter_minimum_confidence",
+        )
+        for name in fraction_fields:
+            value = values[name]
+            if not math.isfinite(value) or not 0 <= value <= 1:
+                setting = f"{ENV_PREFIX}{suffixes[name]}"
+                raise ConfigurationError(
+                    f"{setting} must be between 0 and 1 inclusive",
+                    setting=setting,
+                )
+        positive_fields = (
+            "minimum_contact_confidence",
+            "minimum_assignment_confidence",
+            "minimum_assignment_margin",
+            "maximum_player_distance_diagonal_fraction",
+            "minimum_tracking_confidence",
+            "minimum_direction_speed_diagonal_fraction_per_second",
+            "previous_hitter_minimum_confidence",
+            "maximum_sequence_gap_seconds",
+            "evaluation_tolerance_ms",
+        )
+        for name in positive_fields:
+            value = values[name]
+            if not math.isfinite(value) or value <= 0:
+                setting = f"{ENV_PREFIX}{suffixes[name]}"
+                raise ConfigurationError(
+                    f"{setting} must be finite and positive",
+                    setting=setting,
+                )
+        weight_fields = (
+            "proximity_weight",
+            "tracking_weight",
+            "direction_weight",
+            "contact_weight",
+            "court_context_weight",
+            "sequence_weight",
+        )
+        for name in weight_fields:
+            value = values[name]
+            if not math.isfinite(value) or value < 0:
+                setting = f"{ENV_PREFIX}{suffixes[name]}"
+                raise ConfigurationError(
+                    f"{setting} must be finite and nonnegative",
+                    setting=setting,
+                )
+        if sum(values[name] for name in weight_fields) <= 0:
+            setting = f"{ENV_PREFIX}HITTER_PROXIMITY_WEIGHT"
+            raise ConfigurationError(
+                "At least one hitter-identification evidence weight must be positive",
+                setting=setting,
+            )
+        return cls(**values)
+
+    def as_dict(self) -> dict[str, object]:
+        """Return complete, non-secret hitter configuration for provenance."""
+
+        return {
+            "minimumContactConfidence": self.minimum_contact_confidence,
+            "minimumAssignmentConfidence": self.minimum_assignment_confidence,
+            "minimumAssignmentMargin": self.minimum_assignment_margin,
+            "maximumPlayerDistanceDiagonalFraction": (
+                self.maximum_player_distance_diagonal_fraction
+            ),
+            "minimumTrackingConfidence": self.minimum_tracking_confidence,
+            "minimumDirectionSpeedDiagonalFractionPerSecond": (
+                self.minimum_direction_speed_diagonal_fraction_per_second
+            ),
+            "previousHitterMinimumConfidence": self.previous_hitter_minimum_confidence,
+            "maximumSequenceGapSeconds": self.maximum_sequence_gap_seconds,
+            "evaluationToleranceMs": self.evaluation_tolerance_ms,
+            "evidenceWeights": {
+                "proximity": self.proximity_weight,
+                "tracking": self.tracking_weight,
+                "trajectoryDirection": self.direction_weight,
+                "contactConfidence": self.contact_weight,
+                "courtContext": self.court_context_weight,
+                "sequence": self.sequence_weight,
+            },
+        }
+
+
+@dataclass(frozen=True, slots=True)
+class ShotClassificationSettings:
+    """Validated thresholds for structured shot reconstruction and rule classification."""
+
+    minimum_hitter_confidence: float = 0.62
+    minimum_trajectory_coverage: float = 0.50
+    minimum_known_trajectory_points: int = 3
+    serve_minimum_backcourt_distance_m: float = 1.20
+    kitchen_proximity_m: float = 0.90
+    drop_minimum_backcourt_distance_m: float = 0.90
+    dink_maximum_speed_diagonals_per_second: float = 0.28
+    drop_maximum_speed_diagonals_per_second: float = 0.38
+    drive_minimum_speed_diagonals_per_second: float = 0.45
+    overhead_minimum_speed_diagonals_per_second: float = 0.35
+    overhead_maximum_contact_height_ratio: float = 0.45
+    evaluation_tolerance_ms: float = 120.0
+    debug_trail_seconds: float = 0.75
+
+    @classmethod
+    def from_env(
+        cls,
+        environ: Mapping[str, str] | None = None,
+    ) -> ShotClassificationSettings:
+        """Load documented shot-rule thresholds from prefixed environment variables."""
+
+        source = os.environ if environ is None else environ
+        defaults = cls()
+        float_suffixes = {
+            "minimum_hitter_confidence": "SHOT_MINIMUM_HITTER_CONFIDENCE",
+            "minimum_trajectory_coverage": "SHOT_MINIMUM_TRAJECTORY_COVERAGE",
+            "serve_minimum_backcourt_distance_m": ("SHOT_SERVE_MINIMUM_BACKCOURT_DISTANCE_METERS"),
+            "kitchen_proximity_m": "SHOT_KITCHEN_PROXIMITY_METERS",
+            "drop_minimum_backcourt_distance_m": ("SHOT_DROP_MINIMUM_BACKCOURT_DISTANCE_METERS"),
+            "dink_maximum_speed_diagonals_per_second": (
+                "SHOT_DINK_MAXIMUM_SPEED_DIAGONALS_PER_SECOND"
+            ),
+            "drop_maximum_speed_diagonals_per_second": (
+                "SHOT_DROP_MAXIMUM_SPEED_DIAGONALS_PER_SECOND"
+            ),
+            "drive_minimum_speed_diagonals_per_second": (
+                "SHOT_DRIVE_MINIMUM_SPEED_DIAGONALS_PER_SECOND"
+            ),
+            "overhead_minimum_speed_diagonals_per_second": (
+                "SHOT_OVERHEAD_MINIMUM_SPEED_DIAGONALS_PER_SECOND"
+            ),
+            "overhead_maximum_contact_height_ratio": ("SHOT_OVERHEAD_MAXIMUM_CONTACT_HEIGHT_RATIO"),
+            "evaluation_tolerance_ms": "SHOT_EVALUATION_TOLERANCE_MS",
+            "debug_trail_seconds": "SHOT_DEBUG_TRAIL_SECONDS",
+        }
+        values = {
+            name: _float_setting(source, suffix, getattr(defaults, name))
+            for name, suffix in float_suffixes.items()
+        }
+        fraction_fields = (
+            "minimum_hitter_confidence",
+            "minimum_trajectory_coverage",
+            "overhead_maximum_contact_height_ratio",
+        )
+        for name in fraction_fields:
+            value = values[name]
+            if not math.isfinite(value) or not 0 < value <= 1:
+                setting = f"{ENV_PREFIX}{float_suffixes[name]}"
+                raise ConfigurationError(
+                    f"{setting} must be greater than zero and at most 1",
+                    setting=setting,
+                )
+        for name, suffix in float_suffixes.items():
+            if name in fraction_fields:
+                continue
+            value = values[name]
+            if not math.isfinite(value) or value <= 0:
+                setting = f"{ENV_PREFIX}{suffix}"
+                raise ConfigurationError(
+                    f"{setting} must be finite and positive",
+                    setting=setting,
+                )
+        points_suffix = "SHOT_MINIMUM_KNOWN_TRAJECTORY_POINTS"
+        points = _int_setting(
+            source,
+            points_suffix,
+            defaults.minimum_known_trajectory_points,
+        )
+        if points < 2:
+            setting = f"{ENV_PREFIX}{points_suffix}"
+            raise ConfigurationError(f"{setting} must be at least 2", setting=setting)
+        if (
+            values["dink_maximum_speed_diagonals_per_second"]
+            > values["drop_maximum_speed_diagonals_per_second"]
+        ):
+            setting = f"{ENV_PREFIX}SHOT_DINK_MAXIMUM_SPEED_DIAGONALS_PER_SECOND"
+            raise ConfigurationError(
+                f"{setting} must not exceed the drop maximum speed",
+                setting=setting,
+            )
+        return cls(
+            minimum_hitter_confidence=values["minimum_hitter_confidence"],
+            minimum_trajectory_coverage=values["minimum_trajectory_coverage"],
+            minimum_known_trajectory_points=points,
+            serve_minimum_backcourt_distance_m=values["serve_minimum_backcourt_distance_m"],
+            kitchen_proximity_m=values["kitchen_proximity_m"],
+            drop_minimum_backcourt_distance_m=values["drop_minimum_backcourt_distance_m"],
+            dink_maximum_speed_diagonals_per_second=values[
+                "dink_maximum_speed_diagonals_per_second"
+            ],
+            drop_maximum_speed_diagonals_per_second=values[
+                "drop_maximum_speed_diagonals_per_second"
+            ],
+            drive_minimum_speed_diagonals_per_second=values[
+                "drive_minimum_speed_diagonals_per_second"
+            ],
+            overhead_minimum_speed_diagonals_per_second=values[
+                "overhead_minimum_speed_diagonals_per_second"
+            ],
+            overhead_maximum_contact_height_ratio=values["overhead_maximum_contact_height_ratio"],
+            evaluation_tolerance_ms=values["evaluation_tolerance_ms"],
+            debug_trail_seconds=values["debug_trail_seconds"],
+        )
+
+    def as_dict(self) -> dict[str, object]:
+        """Return the complete rule configuration for artifact provenance."""
+
+        return {
+            "minimumHitterConfidence": self.minimum_hitter_confidence,
+            "minimumTrajectoryCoverage": self.minimum_trajectory_coverage,
+            "minimumKnownTrajectoryPoints": self.minimum_known_trajectory_points,
+            "serveMinimumBackcourtDistanceMeters": self.serve_minimum_backcourt_distance_m,
+            "kitchenProximityMeters": self.kitchen_proximity_m,
+            "dropMinimumBackcourtDistanceMeters": self.drop_minimum_backcourt_distance_m,
+            "dinkMaximumSpeedDiagonalsPerSecond": (self.dink_maximum_speed_diagonals_per_second),
+            "dropMaximumSpeedDiagonalsPerSecond": (self.drop_maximum_speed_diagonals_per_second),
+            "driveMinimumSpeedDiagonalsPerSecond": (self.drive_minimum_speed_diagonals_per_second),
+            "overheadMinimumSpeedDiagonalsPerSecond": (
+                self.overhead_minimum_speed_diagonals_per_second
+            ),
+            "overheadMaximumContactHeightRatio": self.overhead_maximum_contact_height_ratio,
+            "evaluationToleranceMs": self.evaluation_tolerance_ms,
+            "debugTrailSeconds": self.debug_trail_seconds,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class Settings:
     """Validated settings loaded once at an executable boundary."""
 
@@ -1433,6 +1714,12 @@ class Settings:
     rally_segmentation: RallySegmentationSettings = field(default_factory=RallySegmentationSettings)
     bounce_detection: BounceDetectionSettings = field(default_factory=BounceDetectionSettings)
     contact_detection: ContactDetectionSettings = field(default_factory=ContactDetectionSettings)
+    hitter_identification: HitterIdentificationSettings = field(
+        default_factory=HitterIdentificationSettings
+    )
+    shot_classification: ShotClassificationSettings = field(
+        default_factory=ShotClassificationSettings
+    )
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> Settings:
@@ -1487,6 +1774,8 @@ class Settings:
             rally_segmentation=RallySegmentationSettings.from_env(source),
             bounce_detection=BounceDetectionSettings.from_env(source),
             contact_detection=ContactDetectionSettings.from_env(source),
+            hitter_identification=HitterIdentificationSettings.from_env(source),
+            shot_classification=ShotClassificationSettings.from_env(source),
         )
 
     def public_values(self) -> dict[str, object]:
@@ -1507,4 +1796,6 @@ class Settings:
             "rally_segmentation": self.rally_segmentation.as_dict(),
             "bounce_detection": self.bounce_detection.as_dict(),
             "contact_detection": self.contact_detection.as_dict(),
+            "hitter_identification": self.hitter_identification.as_dict(),
+            "shot_classification": self.shot_classification.as_dict(),
         }

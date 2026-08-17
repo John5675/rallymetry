@@ -504,7 +504,7 @@ Exit criteria:
 - No paddle-contact detection, hitter identification, shot reconstruction,
   classification, line calling, or analytics is implemented.
 
-## 15. Multimodal paddle-contact detection — current
+## 15. Multimodal paddle-contact detection — complete
 
 Derive inspectable paddle-contact candidates from visual ball-trajectory
 discontinuities and source-compatible logical-player tracks, then optionally fuse
@@ -545,10 +545,79 @@ Exit criteria:
 - No hitter identification, shot reconstruction/classification, line calling, or
   analytics is implemented.
 
+## 16. Hitter identification — complete
+
+Resolve each paddle-contact candidate to the most plausible logical match player,
+or retain `UNKNOWN` when visual/player evidence is insufficient. Identity inference
+uses the existing contact and logical-player artifacts without mutating either one;
+audio is explicitly excluded from hitter scoring.
+
+Exit criteria:
+
+- `pickleball-vision identify-hitters <video> --contacts <json> --player-tracks
+  <json> --output-dir <dir>` validates source and artifact provenance before
+  producing a separate hitter-identification layer.
+- Each result retains the source contact ID, logical `playerId` or `UNKNOWN`,
+  confidence, ranked alternatives, and separately inspectable supporting signals.
+- Candidate scoring combines ball/player proximity, player tracking confidence,
+  court side, visual trajectory direction, prior credible hitter, rally ordering,
+  and source contact confidence. Audio contributes exactly zero to identity.
+- Minimum contact confidence, player distance, tracking confidence, assignment
+  confidence, and assignment-margin gates are externalized. Ambiguous or missing
+  evidence produces `UNKNOWN` rather than a forced role.
+- Previous-hitter context is conservative, resets across rally boundaries or
+  uncertain contacts, and cannot silently propagate one weak assignment through a
+  rally.
+- Human `SERVE_CONTACT` and `PADDLE_CONTACT` player labels are isolated to
+  post-inference evaluation. Evaluation reports assignment coverage and accuracy
+  overall and by observed near/far player court side when available.
+- `hitters.json`, `hitter-debug.mp4`, and `hitter-evaluation.json` are written
+  atomically without changing source video, contact candidates, or player tracks.
+- Synthetic tests cover clear proximity, ambiguous evidence, tracking/contact
+  confidence gates, court-side trajectory direction, conservative sequence
+  context, `UNKNOWN`, evaluation, provenance, CLI routing, and debug rendering.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- No shot reconstruction/classification, line calling, analytics, backend, worker,
+  or web behavior is implemented.
+
+## 17. Shot reconstruction and classification — complete
+
+Reconstruct a structured shot interval from accepted rally/contact, ball-trajectory,
+bounce, hitter, and logical-player evidence, then apply a small documented set of
+interpretable classification rules. Preserve `UNKNOWN` whenever the source event or
+feature evidence is insufficient; do not train a new classifier in this milestone.
+
+Exit criteria:
+
+- `pickleball-vision reconstruct-shots <video>` consumes source-compatible rally,
+  ball trajectory, contact, bounce, hitter, and logical-player artifacts and writes
+  a separate derived shot layer without mutating any input.
+- Every shot retains `shotId`, `rallyId`, one-based `shotIndex`, hitter/contact
+  linkage, contact timestamp, a source trajectory-frame segment, optional accepted
+  bounce and defensible landing court point, raw hitter ground/court position,
+  `shotType`, confidence, and inspectable classification evidence.
+- The only supported classes are `SERVE`, `RETURN`, `DINK`, `DROP`, `DRIVE`,
+  `VOLLEY`, `OVERHEAD`, `OTHER`, and `UNKNOWN`.
+- Classification rules use explicit shot order, hitter position and kitchen
+  distance, incoming/outgoing bounce state, landing point, trajectory coverage and
+  image velocity, prior shot, and available opponent ground positions. The airborne
+  ball is never projected through court homography.
+- Human shot labels remain post-inference evaluation inputs. Evaluation reports
+  overall accuracy, per-class precision/recall/F1, a fixed-label confusion matrix,
+  and unknown rate without tuning thresholds on validation or test data.
+- `shots.json`, `shot-debug.mp4`, and `shot-evaluation.json` are generated
+  atomically; every effective threshold and artifact hash is persisted.
+- Synthetic tests cover shot boundaries, bounce/landing linking, ground-position
+  preservation, each initial rule family, conservative `UNKNOWN`, evaluation,
+  incompatible provenance, CLI routing, and debug rendering.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- No new neural network, exotic shot class, match analytics, AI coaching, backend,
+  worker, or web behavior is implemented.
+
 ## Future milestones — not current
 
-16. Hitter identification
-17. Shot reconstruction and classification
 18. Match analytics
 19. MongoDB + Vercel Blob persistence
 20. FastAPI application API

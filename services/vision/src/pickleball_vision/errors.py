@@ -36,6 +36,8 @@ class ErrorCode(StrEnum):
     BALL_TRAINING = "ball_training_error"
     BOUNCE_DETECTION_INPUT = "bounce_detection_input_error"
     CONTACT_DETECTION_INPUT = "contact_detection_input_error"
+    HITTER_IDENTIFICATION_INPUT = "hitter_identification_input_error"
+    SHOT_RECONSTRUCTION_INPUT = "shot_reconstruction_input_error"
     OUTPUT_WRITE = "output_write_error"
     PLAYER_ASSIGNMENT_IO = "player_assignment_io_error"
     PLAYER_ISOLATION_CANCELLED = "player_isolation_cancelled"
@@ -469,5 +471,27 @@ class ContactDetectionInputError(PickleballVisionError):
         super().__init__(
             f"Invalid paddle-contact detection input: {reason}",
             code=ErrorCode.CONTACT_DETECTION_INPUT,
+            details={"reason": reason},
+        )
+
+
+class HitterIdentificationInputError(PickleballVisionError):
+    """Raised when hitter-identification artifacts are incompatible or malformed."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Invalid hitter-identification input: {reason}",
+            code=ErrorCode.HITTER_IDENTIFICATION_INPUT,
+            details={"reason": reason},
+        )
+
+
+class ShotReconstructionInputError(PickleballVisionError):
+    """Raised when shot reconstruction artifacts are incompatible or malformed."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Invalid shot-reconstruction input: {reason}",
+            code=ErrorCode.SHOT_RECONSTRUCTION_INPUT,
             details={"reason": reason},
         )

@@ -205,9 +205,14 @@ corrected-and-smoothed court point as a filled dot.
   represented by explicit boundary evidence and confidence.
 - **Bounce location:** a court-plane location associated with a bounce event; it is
   not the projection of an arbitrary airborne ball observation.
-- **Shot:** an interval anchored by a paddle-contact event and ending at the next
-  contact, bounce, or rally end according to a versioned rule set.
-- **Hitter:** player identity associated with a contact event, retaining assignment
-  confidence and allowing `unknown`.
+- **Shot:** a rally-local interval anchored by an accepted paddle-contact candidate
+  and ending at the next accepted contact frame or rally end. It references the
+  immutable ball-trajectory range, may link the first accepted outgoing bounce, and
+  retains its logical hitter, evidence, class, and confidence.
+- **Hitter:** logical player identity associated with a contact candidate, retaining
+  assignment confidence, ranked alternatives, and `UNKNOWN` when evidence gates do
+  not pass. Audio does not select the hitter.
 
-These event concepts are not implemented in Release 0.1.
+These definitions originated in Release 0.1. Rally, bounce, contact, hitter, and
+initial shot reconstruction/classification are now separate implemented derived
+layers. Shot classes are interpretive labels, not match statistics.

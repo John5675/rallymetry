@@ -5,8 +5,8 @@ doubles pickleball matches into inspectable, structured match data. The long-ter
 goal includes court and player tracking, ball trajectories, rally and shot events,
 match analytics, and AI-assisted coaching.
 
-The current milestone is **Multimodal paddle-contact detection**. Milestones 0–14 are
-complete. The local
+The latest completed milestone is **Shot reconstruction and classification**.
+Milestones 0–17 are complete. The local
 CLI can inspect video plus optional synchronized audio, extract lossless analysis
 audio, calibrate the court, detect people broadly, derive court-aware candidates,
 manually assign the four logical match roles, and track those identities separately
@@ -29,7 +29,13 @@ trajectory reversal, continuity, and optional synchronized audio support while
 gating court projection behind plane-contact plausibility. Visual-first paddle-
 contact candidates now combine trajectory velocity/direction discontinuity,
 logical-player proximity, rally/event-state context, and optional synchronized
-audio support without assigning a hitter.
+audio support without assigning a hitter. The separate hitter-identification stage
+now combines logical-player proximity, tracking confidence, court side, visual
+trajectory direction, prior credible hitter, rally order, and visual contact
+confidence. It retains `UNKNOWN` when evidence is insufficient and never uses audio
+to choose a player. Accepted rally-local contacts can now be reconstructed into
+structured shots and assigned one of nine deliberately small, rule-based classes,
+including `OTHER` and `UNKNOWN`.
 
 ## Repository map
 
@@ -142,6 +148,20 @@ uv run pickleball-vision detect-contacts /absolute/path/to/match.mp4 \
   --audio-events ../../output/audio-analysis/audio-events.json \
   --annotations ../../output/match-annotations.json \
   --output-dir ../../output/contact-detection
+uv run pickleball-vision identify-hitters /absolute/path/to/match.mp4 \
+  --contacts ../../output/contact-detection/contacts.json \
+  --player-tracks ../../output/player-tracking/tracks.json \
+  --annotations ../../output/match-annotations.json \
+  --output-dir ../../output/hitter-identification
+uv run pickleball-vision reconstruct-shots /absolute/path/to/match.mp4 \
+  --ball-tracks ../../output/ball-tracking/ball_tracks.json \
+  --rallies ../../output/rally-segmentation/rallies.json \
+  --contacts ../../output/contact-detection/contacts.json \
+  --bounces ../../output/bounce-detection/bounces.json \
+  --hitters ../../output/hitter-identification/hitters.json \
+  --player-tracks ../../output/player-tracking/tracks.json \
+  --annotations ../../output/match-annotations.json \
+  --output-dir ../../output/shot-reconstruction
 ```
 
 Command results are emitted as JSON on standard output. Diagnostic structured
@@ -260,6 +280,22 @@ confidence. Candidate-player rankings retain logical roles and proximity evidenc
 but never assign a hitter. Audio alone creates no contact. Evaluation compares
 visual-only and fused thresholds over the same candidate set. See
 [the paddle-contact detection guide](docs/contact-detection.md).
+
+Hitter identification is a separate derived layer and never writes into source
+contact candidates. It uses visual contact confidence, player proximity/position,
+court side, tracking quality, trajectory direction, previous credible hitter, and
+rally order. All assignment gates and weights are recorded; ambiguous cases remain
+`UNKNOWN`. Human player labels are used only for post-inference accuracy evaluation.
+See [the hitter-identification guide](docs/hitter-identification.md).
+
+Shot reconstruction groups accepted contacts inside predicted rallies and links a
+bounded source-trajectory segment, optional accepted bounce/landing, logical hitter,
+and raw bottom-center hitter position. The ordered classifier supports only
+`SERVE`, `RETURN`, `DINK`, `DROP`, `DRIVE`, `VOLLEY`, `OVERHEAD`, `OTHER`, and
+`UNKNOWN`; it stores every tested feature and rule. See
+[the shot-reconstruction guide](docs/shot-reconstruction.md).
+The shot debug video also retains the recent image-space ball trail, with observed
+and interpolated points distinguished and unknown gaps left disconnected.
 
 ## Verify the setup
 

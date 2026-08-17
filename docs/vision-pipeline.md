@@ -9,7 +9,8 @@ image-space ball trajectory reconstruction are also implemented. Synchronized ra
 audio features, generic transient candidates, versioned human multimodal event
 ground truth, and structured automatic rally segmentation are implemented. Automatic
 visual-first multimodal bounce detection and paddle-contact detection are also
-implemented. Hitter and shot inference remain contracts only.
+implemented. Conservative logical hitter identification and interpretable initial
+shot reconstruction/classification are implemented.
 
 ## Intended flow
 
@@ -30,7 +31,8 @@ source media metadata (video + optional audio)
       -> automatic rally intervals
       -> visual-first bounce candidates + optional audio confidence support
       -> visual-first paddle-contact candidates + optional audio confidence support
-      -> hitter/shot events
+      -> logical hitter assignment or UNKNOWN
+      -> rally-local reconstructed and rule-classified shots
       -> structured match data
       -> analytics
 ```
@@ -198,6 +200,39 @@ court-side context, and proximity evidence. They do not assign a hitter. The sta
 does not project an airborne ball through homography or infer a true 3D position.
 Human `SERVE_CONTACT` and `PADDLE_CONTACT` events remain post-inference evaluation
 inputs. Exact commands and thresholds are defined in `contact-detection.md`.
+
+## Hitter-identification contract
+
+Hitter identification is a separate derived layer over immutable contact candidates
+and the exact logical-player track artifact recorded by them. It combines player-box
+proximity, bottom-center player ground evidence, tracking confidence/state, observed
+player court side, image-space trajectory direction, visual contact confidence,
+prior credible hitter, and rally ordering. The airborne ball is never projected
+through homography.
+
+Visual contact confidence—not audio-fused confidence—is used for identity scoring
+and gating. Audio identity contribution is always zero. Minimum confidence,
+distance, tracking, score, and margin gates preserve `UNKNOWN` whenever evidence is
+insufficient. An uncertain eligible contact resets sequence context to avoid error
+propagation. Human player labels are loaded only after inference for time-matched
+overall and observed near/far accuracy. Exact fields and thresholds are defined in
+`hitter-identification.md`.
+
+## Shot reconstruction and classification contract
+
+Only accepted contacts inside non-overlapping automatic rallies create shots. Each
+shot references its immutable ball-trajectory frame range, accepted contact and
+logical hitter, optional first outgoing accepted bounce, and raw bottom-center
+hitter ground position. Landing court coordinates are copied only from a bounce that
+already passed visual plane-contact projection gates; airborne trajectory points are
+never projected through homography.
+
+The initial ordered classifier supports only `SERVE`, `RETURN`, `DINK`, `DROP`,
+`DRIVE`, `VOLLEY`, `OVERHEAD`, `OTHER`, and `UNKNOWN`. It uses explicit domain
+features and stores every tested rule and threshold; no new neural network is used.
+Missing or weak hitter, player-position, or trajectory evidence produces `UNKNOWN`.
+Human shot labels are isolated to post-inference evaluation. Exact reconstruction,
+rules, configuration, and metrics are defined in `shot-reconstruction.md`.
 
 ## Court calibration contract
 

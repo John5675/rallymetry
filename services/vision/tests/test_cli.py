@@ -15,6 +15,7 @@ from pickleball_vision.config import (
 )
 from pickleball_vision.contact_detection_workflow import ContactDetectionArtifacts
 from pickleball_vision.court import CourtDimensions, ImagePoint, court_landmarks
+from pickleball_vision.hitter_identification_workflow import HitterIdentificationArtifacts
 from pickleball_vision.match_annotation import MatchAnnotationArtifacts
 from pickleball_vision.media import MediaTimeline
 from pickleball_vision.person_detection_pipeline import PersonDetectionArtifacts
@@ -22,6 +23,7 @@ from pickleball_vision.player_analysis_workflow import PlayerAnalysisArtifacts
 from pickleball_vision.player_isolation import LOGICAL_PLAYER_ROLES
 from pickleball_vision.player_isolation_workflow import PlayerIsolationArtifacts
 from pickleball_vision.rally_segmentation_workflow import RallySegmentationArtifacts
+from pickleball_vision.shot_reconstruction_workflow import ShotReconstructionArtifacts
 
 
 def _clear_settings(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -127,6 +129,51 @@ def _clear_settings(monkeypatch: pytest.MonkeyPatch) -> None:
         "BOUNCE_RALLY_SEQUENCE_CONFIDENCE_BOOST",
         "BOUNCE_EVALUATION_TOLERANCE_MS",
         "BOUNCE_SPARSE_EVALUATION_MARGIN_SECONDS",
+        "CONTACT_TRAJECTORY_WINDOW_SECONDS",
+        "CONTACT_MINIMUM_OBSERVATIONS_EACH_SIDE",
+        "CONTACT_MINIMUM_VELOCITY_CHANGE_DIAGONALS_PER_SECOND",
+        "CONTACT_MINIMUM_DIRECTION_CHANGE_DEGREES",
+        "CONTACT_MINIMUM_SPEED_CHANGE_RATIO",
+        "CONTACT_MINIMUM_CONTINUITY_FRACTION",
+        "CONTACT_MAXIMUM_PLAYER_PROXIMITY_DIAGONAL_FRACTION",
+        "CONTACT_MINIMUM_VISUAL_CANDIDATE_CONFIDENCE",
+        "CONTACT_ACCEPTED_CONFIDENCE",
+        "CONTACT_MINIMUM_BETWEEN_SECONDS",
+        "CONTACT_BOUNCE_EXCLUSION_WINDOW_SECONDS",
+        "CONTACT_MAXIMUM_PREVIOUS_BOUNCE_GAP_SECONDS",
+        "CONTACT_AUDIO_CONFIDENCE_WEIGHT",
+        "CONTACT_RALLY_SEQUENCE_CONFIDENCE_BOOST",
+        "CONTACT_PREVIOUS_BOUNCE_CONFIDENCE_BOOST",
+        "CONTACT_EVALUATION_TOLERANCE_MS",
+        "CONTACT_SPARSE_EVALUATION_MARGIN_SECONDS",
+        "HITTER_MINIMUM_CONTACT_CONFIDENCE",
+        "HITTER_MINIMUM_ASSIGNMENT_CONFIDENCE",
+        "HITTER_MINIMUM_ASSIGNMENT_MARGIN",
+        "HITTER_MAXIMUM_PLAYER_DISTANCE_DIAGONAL_FRACTION",
+        "HITTER_MINIMUM_TRACKING_CONFIDENCE",
+        "HITTER_MINIMUM_DIRECTION_SPEED_DIAGONAL_FRACTION_PER_SECOND",
+        "HITTER_PREVIOUS_HITTER_MINIMUM_CONFIDENCE",
+        "HITTER_MAXIMUM_SEQUENCE_GAP_SECONDS",
+        "HITTER_EVALUATION_TOLERANCE_MS",
+        "HITTER_PROXIMITY_WEIGHT",
+        "HITTER_TRACKING_WEIGHT",
+        "HITTER_DIRECTION_WEIGHT",
+        "HITTER_CONTACT_WEIGHT",
+        "HITTER_COURT_CONTEXT_WEIGHT",
+        "HITTER_SEQUENCE_WEIGHT",
+        "SHOT_MINIMUM_HITTER_CONFIDENCE",
+        "SHOT_MINIMUM_TRAJECTORY_COVERAGE",
+        "SHOT_MINIMUM_KNOWN_TRAJECTORY_POINTS",
+        "SHOT_SERVE_MINIMUM_BACKCOURT_DISTANCE_METERS",
+        "SHOT_KITCHEN_PROXIMITY_METERS",
+        "SHOT_DROP_MINIMUM_BACKCOURT_DISTANCE_METERS",
+        "SHOT_DINK_MAXIMUM_SPEED_DIAGONALS_PER_SECOND",
+        "SHOT_DROP_MAXIMUM_SPEED_DIAGONALS_PER_SECOND",
+        "SHOT_DRIVE_MINIMUM_SPEED_DIAGONALS_PER_SECOND",
+        "SHOT_OVERHEAD_MINIMUM_SPEED_DIAGONALS_PER_SECOND",
+        "SHOT_OVERHEAD_MAXIMUM_CONTACT_HEIGHT_RATIO",
+        "SHOT_EVALUATION_TOLERANCE_MS",
+        "SHOT_DEBUG_TRAIL_SECONDS",
     ):
         monkeypatch.delenv(f"{ENV_PREFIX}{suffix}", raising=False)
 
@@ -1008,3 +1055,138 @@ def test_detect_contacts_command_routes_visual_and_optional_multimodal_inputs(
     timeline = cast(MediaTimeline, received["timeline"])
     assert timeline.audio_video_offset_ms == 35.0
     assert log_record["event"] == "contacts_detected"
+
+
+def test_identify_hitters_command_routes_contacts_tracks_and_annotations(
+    synthetic_video: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _clear_settings(monkeypatch)
+    contacts = tmp_path / "contacts.json"
+    player_tracks = tmp_path / "tracks.json"
+    annotations = tmp_path / "annotations.json"
+    output_dir = tmp_path / "hitters"
+    received: dict[str, object] = {}
+
+    def fake_identify_hitters(video_path: Path, **kwargs: object) -> HitterIdentificationArtifacts:
+        received["video_path"] = video_path
+        received.update(kwargs)
+        return HitterIdentificationArtifacts(
+            hitters_path=output_dir / "hitters.json",
+            debug_video_path=output_dir / "hitter-debug.mp4",
+            evaluation_path=output_dir / "hitter-evaluation.json",
+            contact_count=12,
+            assigned_count=8,
+            unknown_count=4,
+        )
+
+    monkeypatch.setattr("pickleball_vision.cli.identify_hitters_in_video", fake_identify_hitters)
+    exit_code = main(
+        [
+            "identify-hitters",
+            str(synthetic_video),
+            "--contacts",
+            str(contacts),
+            "--player-tracks",
+            str(player_tracks),
+            "--annotations",
+            str(annotations),
+            "--evaluation-partition",
+            "test",
+            "--output-dir",
+            str(output_dir),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+    log_record = json.loads(captured.err)
+    assert exit_code == EXIT_OK
+    assert report["assignedCount"] == 8
+    assert report["unknownCount"] == 4
+    assert received["video_path"] == synthetic_video
+    assert received["contacts_path"] == contacts
+    assert received["player_tracks_path"] == player_tracks
+    assert received["annotations_path"] == annotations
+    assert received["evaluation_partition"] == "test"
+    assert log_record["event"] == "hitters_identified"
+
+
+def test_reconstruct_shots_command_routes_all_domain_artifacts(
+    synthetic_video: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _clear_settings(monkeypatch)
+    paths = {
+        name: tmp_path / f"{name}.json"
+        for name in (
+            "ball_tracks",
+            "rallies",
+            "contacts",
+            "bounces",
+            "hitters",
+            "tracks",
+            "annotations",
+        )
+    }
+    output_dir = tmp_path / "shots"
+    received: dict[str, object] = {}
+
+    def fake_reconstruct(video_path: Path, **kwargs: object) -> ShotReconstructionArtifacts:
+        received["video_path"] = video_path
+        received.update(kwargs)
+        return ShotReconstructionArtifacts(
+            shots_path=output_dir / "shots.json",
+            debug_video_path=output_dir / "shot-debug.mp4",
+            evaluation_path=output_dir / "shot-evaluation.json",
+            shot_count=17,
+            unknown_count=3,
+            outside_rally_contact_count=2,
+        )
+
+    monkeypatch.setattr("pickleball_vision.cli.reconstruct_shots_in_video", fake_reconstruct)
+    exit_code = main(
+        [
+            "reconstruct-shots",
+            str(synthetic_video),
+            "--ball-tracks",
+            str(paths["ball_tracks"]),
+            "--rallies",
+            str(paths["rallies"]),
+            "--contacts",
+            str(paths["contacts"]),
+            "--bounces",
+            str(paths["bounces"]),
+            "--hitters",
+            str(paths["hitters"]),
+            "--player-tracks",
+            str(paths["tracks"]),
+            "--annotations",
+            str(paths["annotations"]),
+            "--evaluation-partition",
+            "test",
+            "--output-dir",
+            str(output_dir),
+        ]
+    )
+
+    captured = capsys.readouterr()
+    report = json.loads(captured.out)
+    log_record = json.loads(captured.err)
+    assert exit_code == EXIT_OK
+    assert report["shotCount"] == 17
+    assert report["unknownCount"] == 3
+    assert received["video_path"] == synthetic_video
+    assert received["ball_tracks_path"] == paths["ball_tracks"]
+    assert received["rallies_path"] == paths["rallies"]
+    assert received["contacts_path"] == paths["contacts"]
+    assert received["bounces_path"] == paths["bounces"]
+    assert received["hitters_path"] == paths["hitters"]
+    assert received["player_tracks_path"] == paths["tracks"]
+    assert received["annotations_path"] == paths["annotations"]
+    assert received["evaluation_partition"] == "test"
+    assert log_record["event"] == "shots_reconstructed"
