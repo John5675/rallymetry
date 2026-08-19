@@ -20,6 +20,15 @@ and the relevant design document before changing code.
 - Never fabricate long missing ball trajectories.
 - Every uncertain ML-derived event should retain confidence.
 - LLMs must never invent match statistics.
+- Treat a spoken doubles score as `serving-team score`, `receiving-team score`,
+  then `server number`; preserve the raw call because players may misspeak or
+  correct themselves.
+- A side-out reverses the spoken team-score order without awarding a point. The
+  new side normally starts with server one; the opening game call is `0-0-2`.
+- A regulation game ends at 11 when the losing score is at most 9. At 10-10 or
+  later, play continues until one team leads by two.
+- Never force score continuity by silently repairing a contradictory call. Any
+  inferred score or game result must retain its evidence and confidence.
 - Analytics should operate on structured match data rather than raw model
   outputs.
 - Never split individual neighboring video frames randomly across dataset

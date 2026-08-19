@@ -136,6 +136,40 @@ excluded. Mark complete-video coverage explicitly only after a human has reviewe
 the entire recording for missing rally boundaries. Thresholds may be developed on a
 development partition but must remain frozen for held-out validation/test clips.
 
+### Score calls and completed games
+
+A doubles score call is recorded in server-first order:
+
+```text
+serving-team score, receiving-team score, server number
+```
+
+For example, `1-2-2` means the team with one point is serving with its second
+server. If that team loses the rally and side-outs, the unchanged team totals are
+called `2-1-1` by the new serving team. This reorder is not a point or a
+contradiction. The initial serving turn is the special `0-0-2` opening call; later
+side-outs normally begin with server one.
+
+Keep the exact heard words and interpreted numbers as separate fields. Players may
+misspeak, question the score, or correct themselves. Retain such observations as
+`CONTRADICTORY`, `SELF_CORRECTED`, or `UNRESOLVED`; never rewrite the raw call to
+make the sequence look consistent.
+
+A completed regulation game has one of these terminal forms:
+
+```text
+11-x, where x <= 9
+n-(n-2), where n >= 12
+```
+
+The second form represents play continuing from 10-10 until one team leads by two,
+such as 14-12 or 16-14. A complete-video review must link the terminal state to the
+last accepted rally and record the winning side, fixed-team score, source frame and
+timestamp, evidence, and confidence. If the final number is not spoken, it may be
+marked `INFERRED` only when a defensible pre-rally score plus the visually reviewed
+final point uniquely determines it. Recording duration or an expected final score
+is never sufficient evidence by itself.
+
 ## Quality control
 
 Prefer train/validation/test separation at the whole-video level. Clip or rally/group
