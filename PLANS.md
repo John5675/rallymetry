@@ -616,9 +616,43 @@ Exit criteria:
 - No new neural network, exotic shot class, match analytics, AI coaching, backend,
   worker, or web behavior is implemented.
 
+## 18. Deterministic match analytics — complete
+
+Aggregate the structured rally, shot, logical-player, and player-position layers
+into one inspectable match analytics document. Calculations are deterministic,
+confidence-aware, and explicitly defined; they never consume detector tensors,
+YOLO output, raw audio, or prose.
+
+Exit criteria:
+
+- `pickleball-vision analyze-match <video> --rallies <json> --shots <json>
+  --player-positions <json> --output <json>` validates source and artifact
+  provenance before calculating metrics.
+- Match metrics include rally count, shot count, mean rally duration, mean rally
+  length, and a deterministically selected longest rally.
+- Per-player metrics include total known hits; dink, drive, drop, volley, and
+  overhead counts/rates; quality-gated court occupancy; approximate distance
+  traveled; and average partner spacing.
+- Tactical metrics include third-shot drop/drive rates, shot selection by
+  quality-gated hitter court region, and a conservative team kitchen-arrival rate
+  with explicit eligibility and coverage.
+- `UNKNOWN` hitter/type/position evidence is retained and reported, never coerced
+  into a player, class, region, zero value, or denominator silently.
+- Every metric documents its formula, structured inputs, denominator, `UNKNOWN`
+  handling, confidence limitations, and known inaccuracies in
+  `docs/analytics-definitions.md` and records its calculation version.
+- `match-analytics.json` retains input hashes, source metadata, effective
+  configuration, data-quality counts, and the complete deterministic results.
+- Synthetic tests cover formulas, empty populations, `UNKNOWN`, confidence
+  reporting, region classification, movement gates, partner spacing, tactical
+  metrics, provenance rejection, serialization, and CLI routing.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- No persistence, FastAPI, worker, queue, React/Vite, hosted media, correction
+  workflow, or AI coaching behavior is implemented.
+
 ## Future milestones — not current
 
-18. Match analytics
 19. MongoDB + Vercel Blob persistence
 20. FastAPI application API
 21. Background analysis worker + MongoDB job queue

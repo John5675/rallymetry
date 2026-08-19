@@ -1697,6 +1697,49 @@ class ShotClassificationSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class MatchAnalyticsSettings:
+    """Validated tactical definitions unique to deterministic match analytics."""
+
+    kitchen_arrival_distance_m: float = 0.90
+    minimum_kitchen_arrival_joint_coverage_ratio: float = 0.50
+
+    @classmethod
+    def from_env(
+        cls,
+        environ: Mapping[str, str] | None = None,
+    ) -> MatchAnalyticsSettings:
+        """Load match-analytics definitions from prefixed environment variables."""
+
+        source = os.environ if environ is None else environ
+        defaults = cls()
+        distance_m = _float_setting(
+            source,
+            "MATCH_ANALYTICS_KITCHEN_ARRIVAL_DISTANCE_METERS",
+            defaults.kitchen_arrival_distance_m,
+        )
+        coverage = _float_setting(
+            source,
+            "MATCH_ANALYTICS_MINIMUM_KITCHEN_ARRIVAL_JOINT_COVERAGE_RATIO",
+            defaults.minimum_kitchen_arrival_joint_coverage_ratio,
+        )
+        if not math.isfinite(distance_m) or distance_m < 0:
+            setting = f"{ENV_PREFIX}MATCH_ANALYTICS_KITCHEN_ARRIVAL_DISTANCE_METERS"
+            raise ConfigurationError(f"{setting} must be finite and nonnegative", setting=setting)
+        if not math.isfinite(coverage) or not 0 <= coverage <= 1:
+            setting = f"{ENV_PREFIX}MATCH_ANALYTICS_MINIMUM_KITCHEN_ARRIVAL_JOINT_COVERAGE_RATIO"
+            raise ConfigurationError(f"{setting} must be between 0 and 1", setting=setting)
+        return cls(distance_m, coverage)
+
+    def as_dict(self) -> dict[str, object]:
+        return {
+            "kitchenArrivalDistanceMeters": self.kitchen_arrival_distance_m,
+            "minimumKitchenArrivalJointCoverageRatio": (
+                self.minimum_kitchen_arrival_joint_coverage_ratio
+            ),
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class Settings:
     """Validated settings loaded once at an executable boundary."""
 
@@ -1720,6 +1763,7 @@ class Settings:
     shot_classification: ShotClassificationSettings = field(
         default_factory=ShotClassificationSettings
     )
+    match_analytics: MatchAnalyticsSettings = field(default_factory=MatchAnalyticsSettings)
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> Settings:
@@ -1776,6 +1820,7 @@ class Settings:
             contact_detection=ContactDetectionSettings.from_env(source),
             hitter_identification=HitterIdentificationSettings.from_env(source),
             shot_classification=ShotClassificationSettings.from_env(source),
+            match_analytics=MatchAnalyticsSettings.from_env(source),
         )
 
     def public_values(self) -> dict[str, object]:
@@ -1798,4 +1843,5 @@ class Settings:
             "contact_detection": self.contact_detection.as_dict(),
             "hitter_identification": self.hitter_identification.as_dict(),
             "shot_classification": self.shot_classification.as_dict(),
+            "match_analytics": self.match_analytics.as_dict(),
         }

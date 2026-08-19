@@ -216,3 +216,188 @@ corrected-and-smoothed court point as a filled dot.
 These definitions originated in Release 0.1. Rally, bounce, contact, hitter, and
 initial shot reconstruction/classification are now separate implemented derived
 layers. Shot classes are interpretive labels, not match statistics.
+
+## Deterministic match analytics 1.0
+
+Milestone 18 adds `match_analytics_1.0`. It consumes only validated, versioned
+`Rally`, `Shot`, and `PlayerPosition` records from `rallies.json`, `shots.json`, and
+`player_positions.json`. A `Shot` retains its `Contact` link and optional `Bounce`
+link, so contact and bounce evidence remain available through the structured domain
+model without analytics reading their raw artifacts. The stage never reads model
+tensors, YOLO output, raw audio waveforms, or detector observations.
+
+The workflow verifies that all three inputs describe the requested source video,
+that the supplied rally file has the content hash recorded by the shot artifact,
+and that shots and player positions derive from the same persistent-player track
+path. It records input paths and SHA-256 hashes and does not modify an input.
+
+### Shared UNKNOWN and confidence policy
+
+Event counts count complete structured records; confidence never creates a
+fractional rally, shot, or hit. Mean upstream rally, shot, and known-hitter
+confidence are reported under `dataQuality`, alongside unknown and position-coverage
+counts. These values describe uncertainty; they are not calibrated probabilities
+that the final statistic is correct.
+
+`UNKNOWN` is never silently assigned to a player or shot class:
+
+- a shot with `hitterId: UNKNOWN` contributes to match shot/rally-length metrics but
+  not to any player's hit or shot-type metrics;
+- a hit with `shotType: UNKNOWN` contributes to its known hitter's `totalHits`, but
+  is excluded from that player's classified shot-type-rate denominator;
+- an unknown third-shot type is excluded from third-shot drop/drive denominators;
+- a shot with unknown type or missing/ambiguous hitter position is excluded from
+  the relevant position-selection rate, with its exclusion count reported; and
+- a missing position stays missing. It contributes neither movement nor occupancy,
+  and missing spans are not bridged.
+
+When a denominator is zero, the metric value is `null`, not zero. Each rate reports
+its integer numerator and denominator so the population is inspectable.
+
+### Match metrics
+
+Inputs for these metrics are validated `Rally` and `Shot` records.
+
+- **Rally count:** `count(Rally)`. A predicted false rally remains a counted rally;
+  upstream segmentation error is not repaired here. No `UNKNOWN` category applies.
+- **Shot count:** `count(Shot)`. All shot types and hitter identities, including
+  `UNKNOWN`, count because the upstream pipeline still asserted a shot event.
+- **Average rally duration (seconds):**
+  `sum(rally.endTimestamp - rally.startTimestamp) / rally_count`. A zero-rally
+  population yields `null`. Boundary uncertainty and false/missed rally segments
+  directly bias the result.
+- **Average rally length (shots/rally):** `shot_count / rally_count`. Every shot
+  references exactly one supplied rally, and rallies with no shots contribute zero
+  to the numerator. A zero-rally population yields `null`. Missed/false contacts,
+  rally splitting, and rally merging bias this metric.
+- **Longest rally:** choose the rally with maximum linked shot count; break ties by
+  longer duration and then earlier start frame. The output retains rally ID, shot
+  count, duration, and frames. With no rallies the value is `null`. This is longest
+  by reconstructed shots, not elapsed duration.
+
+### Player hit and shot-type metrics
+
+Input is each structured `Shot.hitterId` and `Shot.shotType`.
+
+- **Total hits:** for player `p`, `count(shots where hitterId == p)`, including
+  `shotType: UNKNOWN`. `hitterId: UNKNOWN` is excluded from all players and counted
+  in data quality. Hitter-identification error can transfer a hit between players.
+- **Dink/drop/drive/volley/overhead count:** for player `p` and class `c`,
+  `count(shots where hitterId == p and shotType == c)`.
+- **Dink/drop/drive/volley/overhead rate:** `class_count /
+  classified_hit_count`, where `classified_hit_count` is that player's hit count
+  excluding `shotType: UNKNOWN`. The denominator includes other supported known
+  classes such as serve, return, and other. It is `null` when no hit has a known
+  class. Classification and hitter errors affect both numerator and denominator.
+
+These are inferred contact/shot counts, not scorebook totals. Confidence gates and
+missed ball observations upstream may reduce coverage non-uniformly between near and
+far players.
+
+### Position metrics in match analytics
+
+Inputs are structured smoothed court coordinates and raw `inside`/`near` membership
+states from `player_positions.json`. Match analytics deliberately reuses that
+artifact's recorded maximum step gap, maximum step speed, and transition-zone depth
+instead of changing Release 0.1 definitions.
+
+- **Distance traveled:** identical to [Approximate distance traveled](#approximate-distance-traveled).
+  The value is `null` when no step passes quality gates; this distinguishes missing
+  evidence from a measured zero-distance trajectory.
+- **Kitchen/transition/backcourt occupancy:** identical to
+  [Court occupancy](#court-occupancy), including in-court population and boundary
+  priority. Each region reports frame count, approximate seconds, denominator, and
+  share. Shares are `null` when no in-court position exists.
+- **Average partner spacing:** identical to
+  [Average partner spacing](#average-partner-spacing). Team members receive the same
+  value. It is `null` without a joint quality-gated frame.
+
+These metrics inherit bottom-center ground-point, calibration, tracking,
+recording-local correction, and smoothing error. Frame-based occupancy overweights
+time spans with better tracking coverage. Distance normally underestimates movement
+through missing spans and may retain residual foot-box jitter despite smoothing.
+
+### Third-shot selection
+
+Inputs are `Shot.shotIndex` and `Shot.shotType`. The third shot is strictly the shot
+whose rally-local one-based index is `3`; it is not inferred from hitter team.
+
+```text
+classified_third_shots = shots where shotIndex == 3 and shotType != UNKNOWN
+third_shot_drop_rate = count(classified_third_shots labeled DROP)
+                       / count(classified_third_shots)
+third_shot_drive_rate = count(classified_third_shots labeled DRIVE)
+                        / count(classified_third_shots)
+```
+
+The rates do not have to sum to one because another supported class can occupy the
+third shot. A zero classified-third-shot denominator yields `null`; unknown third
+shots are reported separately. Missed contacts can shift every later `shotIndex`, so
+these metrics are reliable only when early-rally contact coverage is manually
+validated.
+
+### Shot selection by court position
+
+Inputs are the hitter court point and court-region state retained on each structured
+`Shot`, plus `Shot.shotType`. Only `inside` or `near` points are eligible. The point
+is assigned to kitchen, transition zone, or backcourt using the same longitudinal
+boundaries and transition depth as occupancy.
+
+For region `r` and known class `c`:
+
+```text
+selection_count(r, c) = count(eligible shots in r with shotType == c)
+selection_rate(r, c) = selection_count(r, c)
+                       / count(eligible shots in r with shotType != UNKNOWN)
+```
+
+All supported known classes are reported. A zero regional denominator yields
+`null` rates. Missing/ambiguous hitter positions and unknown classes are excluded
+and counted separately. Contact-time player positioning comes from a bottom-center
+ground estimate; it does not locate the paddle, and a `near` point can sit slightly
+outside the painted boundary because of calibration uncertainty.
+
+### Team kitchen arrival rate
+
+Inputs are a rally interval and simultaneous structured positions for the team's two
+fixed logical players. `ME`/`PARTNER` are the near team and
+`OPPONENT_1`/`OPPONENT_2` are the far team for this stationary recording.
+
+A rally is evaluable when both teammates have trajectory-eligible positions on at
+least the configured fraction of rally frames (default `0.50`). The team arrives if,
+on any one shared eligible frame in that rally, both players are simultaneously on
+their expected court half and no farther behind their applicable kitchen line than
+`kitchenArrivalDistanceMeters` (default `0.90 m`). A player already inside the
+non-volley zone satisfies the distance criterion; this is positional proximity, not
+a claim about volley legality.
+
+```text
+kitchen_arrival_rate = evaluable rallies where both teammates arrive
+                       / rallies meeting joint-position coverage threshold
+```
+
+The value is `null` when no rally is evaluable. Per-rally coverage, eligibility,
+arrival result, and first arrival frame are retained; low-coverage exclusions are
+reported. This metric cannot distinguish a deliberate strategic arrival from a
+player merely standing near the line, can miss asynchronous arrivals, assumes fixed
+near/far team sides, and inherits rally-boundary and player-position error. For these
+reasons it is reported only with explicit coverage evidence.
+
+### Artifact and repeatability contract
+
+Run:
+
+```bash
+pickleball-vision analyze-match /absolute/path/to/match.mp4 \
+  --rallies /absolute/path/to/rallies.json \
+  --shots /absolute/path/to/shots.json \
+  --player-positions /absolute/path/to/player_positions.json \
+  --output /absolute/path/to/match-analytics.json
+```
+
+The command refuses to overwrite an existing output. For identical JSON inputs and
+configuration, every metric is deterministic; only the artifact creation timestamp
+changes between separate new output paths. Configuration may override the kitchen
+arrival distance and minimum joint coverage through
+`PICKLEBALL_VISION_MATCH_ANALYTICS_KITCHEN_ARRIVAL_DISTANCE_METERS` and
+`PICKLEBALL_VISION_MATCH_ANALYTICS_MINIMUM_KITCHEN_ARRIVAL_JOINT_COVERAGE_RATIO`.

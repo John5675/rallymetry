@@ -40,6 +40,7 @@ from pickleball_vision.dataset_workflow import (
 from pickleball_vision.errors import ErrorCode, PickleballVisionError
 from pickleball_vision.hitter_identification_workflow import identify_hitters_in_video
 from pickleball_vision.logging import configure_logging
+from pickleball_vision.match_analytics_workflow import analyze_match
 from pickleball_vision.match_annotation_ui import serve_match_annotation
 from pickleball_vision.media import (
     AudioExtractionOptions,
@@ -785,6 +786,35 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="directory for shots.json, shot-debug.mp4, and shot-evaluation.json",
     )
+    analyze_match_parser = subparsers.add_parser(
+        "analyze-match",
+        help="compute deterministic match analytics from structured domain artifacts",
+    )
+    analyze_match_parser.add_argument("video", type=Path, help="source match video")
+    analyze_match_parser.add_argument(
+        "--rallies",
+        type=Path,
+        required=True,
+        help="source-compatible automatic rallies.json",
+    )
+    analyze_match_parser.add_argument(
+        "--shots",
+        type=Path,
+        required=True,
+        help="source-compatible reconstructed shots.json",
+    )
+    analyze_match_parser.add_argument(
+        "--player-positions",
+        type=Path,
+        required=True,
+        help="source-compatible structured player_positions.json",
+    )
+    analyze_match_parser.add_argument(
+        "--output",
+        type=Path,
+        required=True,
+        help="new match-analytics.json output path",
+    )
     return parser
 
 
@@ -1516,6 +1546,31 @@ def _run_reconstruct_shots(
     return EXIT_OK
 
 
+def _run_analyze_match(
+    video_path: Path,
+    *,
+    rallies_path: Path,
+    shots_path: Path,
+    player_positions_path: Path,
+    output_path: Path,
+    settings: Settings,
+) -> int:
+    artifacts = analyze_match(
+        video_path,
+        rallies_path=rallies_path,
+        shots_path=shots_path,
+        player_positions_path=player_positions_path,
+        output_path=output_path,
+        settings=settings.match_analytics,
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "match_analytics_computed",
+        extra={"context": artifacts.as_dict()},
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command and translate failures into stable process exit codes."""
 
@@ -1761,6 +1816,15 @@ def main(argv: Sequence[str] | None = None) -> int:
                 annotations_path=cast(Path | None, args.annotations),
                 evaluation_partition=cast(str, args.evaluation_partition),
                 output_dir=cast(Path, args.output_dir),
+                settings=settings,
+            )
+        if args.command == "analyze-match":
+            return _run_analyze_match(
+                cast(Path, args.video),
+                rallies_path=cast(Path, args.rallies),
+                shots_path=cast(Path, args.shots),
+                player_positions_path=cast(Path, args.player_positions),
+                output_path=cast(Path, args.output),
                 settings=settings,
             )
         parser.error(f"unsupported command: {args.command}")

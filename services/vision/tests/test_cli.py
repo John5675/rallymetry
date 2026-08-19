@@ -9,6 +9,7 @@ from pickleball_vision.calibration import CalibrationCorrespondence
 from pickleball_vision.cli import EXIT_OK, EXIT_USAGE_ERROR, main
 from pickleball_vision.config import (
     ENV_PREFIX,
+    MatchAnalyticsSettings,
     PersonDetectionSettings,
     PlayerAnalysisSettings,
     PlayerIsolationSettings,
@@ -16,6 +17,7 @@ from pickleball_vision.config import (
 from pickleball_vision.contact_detection_workflow import ContactDetectionArtifacts
 from pickleball_vision.court import CourtDimensions, ImagePoint, court_landmarks
 from pickleball_vision.hitter_identification_workflow import HitterIdentificationArtifacts
+from pickleball_vision.match_analytics_workflow import MatchAnalyticsArtifacts
 from pickleball_vision.match_annotation import MatchAnnotationArtifacts
 from pickleball_vision.media import MediaTimeline
 from pickleball_vision.person_detection_pipeline import PersonDetectionArtifacts
@@ -75,6 +77,8 @@ def _clear_settings(monkeypatch: pytest.MonkeyPatch) -> None:
         "ANALYSIS_MAXIMUM_STEP_SPEED_MPS",
         "ANALYSIS_TRANSITION_ZONE_DEPTH_METERS",
         "ANALYSIS_TOPDOWN_TRAIL_SECONDS",
+        "MATCH_ANALYTICS_KITCHEN_ARRIVAL_DISTANCE_METERS",
+        "MATCH_ANALYTICS_MINIMUM_KITCHEN_ARRIVAL_JOINT_COVERAGE_RATIO",
         "BALL_TRACKING_MAX_ASSOCIATION_GAP_SECONDS",
         "BALL_TRACKING_MAX_INTERPOLATION_GAP_SECONDS",
         "BALL_TRACKING_MAX_SPEED_DIAGONALS_PER_SECOND",
@@ -697,6 +701,65 @@ def test_analyze_players_command_dispatches_release_workflow(
     assert received["position_corrections_path"] == corrections_path
     received_settings = cast(PlayerAnalysisSettings, received["settings"])
     assert received_settings.smoothing_window_frames == 7
+
+
+def test_analyze_match_command_dispatches_structured_analytics(
+    synthetic_video: Path,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    _clear_settings(monkeypatch)
+    monkeypatch.setenv(
+        "PICKLEBALL_VISION_MATCH_ANALYTICS_KITCHEN_ARRIVAL_DISTANCE_METERS",
+        "0.75",
+    )
+    rallies = tmp_path / "rallies.json"
+    shots = tmp_path / "shots.json"
+    positions = tmp_path / "player_positions.json"
+    output = tmp_path / "match-analytics.json"
+    received: dict[str, object] = {}
+
+    def fake_analyze_match(
+        video_path: Path,
+        *,
+        rallies_path: Path,
+        shots_path: Path,
+        player_positions_path: Path,
+        output_path: Path,
+        settings: MatchAnalyticsSettings,
+    ) -> MatchAnalyticsArtifacts:
+        received.update(locals())
+        return MatchAnalyticsArtifacts(output_path.resolve(), 3, 17)
+
+    monkeypatch.setattr("pickleball_vision.cli.analyze_match", fake_analyze_match)
+
+    exit_code = main(
+        [
+            "analyze-match",
+            str(synthetic_video),
+            "--rallies",
+            str(rallies),
+            "--shots",
+            str(shots),
+            "--player-positions",
+            str(positions),
+            "--output",
+            str(output),
+        ]
+    )
+
+    report = json.loads(capsys.readouterr().out)
+    assert exit_code == EXIT_OK
+    assert report["rallyCount"] == 3
+    assert report["shotCount"] == 17
+    assert received["video_path"] == synthetic_video
+    assert received["rallies_path"] == rallies
+    assert received["shots_path"] == shots
+    assert received["player_positions_path"] == positions
+    assert received["output_path"] == output
+    received_settings = cast(MatchAnalyticsSettings, received["settings"])
+    assert received_settings.kitchen_arrival_distance_m == pytest.approx(0.75)
 
 
 def test_dataset_commands_extract_and_split_without_model_inference(

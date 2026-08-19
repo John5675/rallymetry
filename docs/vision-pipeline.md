@@ -11,6 +11,8 @@ ground truth, and structured automatic rally segmentation are implemented. Autom
 visual-first multimodal bounce detection and paddle-contact detection are also
 implemented. Conservative logical hitter identification and interpretable initial
 shot reconstruction/classification are implemented.
+Deterministic match analytics over structured rallies, shots, and player positions
+are implemented as the final local analysis stage.
 
 ## Intended flow
 
@@ -34,7 +36,7 @@ source media metadata (video + optional audio)
       -> logical hitter assignment or UNKNOWN
       -> rally-local reconstructed and rule-classified shots
       -> structured match data
-      -> analytics
+      -> deterministic match-analytics.json
 ```
 
 ## Video source contract
@@ -233,6 +235,24 @@ features and stores every tested rule and threshold; no new neural network is us
 Missing or weak hitter, player-position, or trajectory evidence produces `UNKNOWN`.
 Human shot labels are isolated to post-inference evaluation. Exact reconstruction,
 rules, configuration, and metrics are defined in `shot-reconstruction.md`.
+
+## Deterministic match analytics contract
+
+`analyze-match` consumes source-compatible `rallies.json`, `shots.json`, and
+`player_positions.json`. It validates source metadata, rally content-hash provenance,
+and the shared persistent-player-track lineage before calculating anything. Its
+domain boundary includes structured Rally, Shot, Contact/Bounce references carried
+by a Shot, and PlayerPosition records; it has no dependency on detector adapters,
+raw tensors, YOLO records, audio feature windows, or waveforms.
+
+All output is deterministic for identical input contents and configuration. Unknown
+hitters/classes remain explicit, zero-denominator rates are `null`, input confidence
+is reported as data quality rather than used as fractional counts, and every input
+path/hash is retained without mutation. Match totals, per-player shot selection,
+quality-gated position metrics, third-shot selection, regional shot selection, and
+coverage-gated team kitchen arrival are defined precisely in
+`analytics-definitions.md`. `match-analytics.json` completes the local analysis
+pipeline and does not introduce hosted persistence or product services.
 
 ## Court calibration contract
 

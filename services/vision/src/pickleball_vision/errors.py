@@ -25,6 +25,7 @@ class ErrorCode(StrEnum):
     MEDIA_INSPECTION = "media_inspection_error"
     MATCH_ANNOTATION_INPUT = "match_annotation_input_error"
     MATCH_ANNOTATION_IO = "match_annotation_io_error"
+    MATCH_ANALYTICS_INPUT = "match_analytics_input_error"
     AUDIO_STREAM_NOT_FOUND = "audio_stream_not_found"
     AUDIO_EXTRACTION = "audio_extraction_error"
     AUDIO_ANALYSIS = "audio_analysis_error"
@@ -493,5 +494,16 @@ class ShotReconstructionInputError(PickleballVisionError):
         super().__init__(
             f"Invalid shot-reconstruction input: {reason}",
             code=ErrorCode.SHOT_RECONSTRUCTION_INPUT,
+            details={"reason": reason},
+        )
+
+
+class MatchAnalyticsInputError(PickleballVisionError):
+    """Raised when deterministic analytics artifacts are incompatible or malformed."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Invalid match-analytics input: {reason}",
+            code=ErrorCode.MATCH_ANALYTICS_INPUT,
             details={"reason": reason},
         )

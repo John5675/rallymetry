@@ -217,6 +217,15 @@ manual court-position correction, and then adds a separate bounded smoothing res
 Missing frames and suspected identity switches remain gaps in trajectories and
 metrics.
 
+Deterministic match analytics is the terminal local derived-data layer.
+`match-analytics.json` validates and summarizes only structured rally, shot, and
+player-position artifacts. Contact and bounce relationships are consumed only as
+references already retained by a structured shot. It never reaches backward into
+raw model tensors, YOLO records, audio waveforms, or detector adapters. Input hashes,
+explicit denominators, `UNKNOWN` exclusions, coverage, and confidence limitations
+keep every statistic inspectable; this artifact is suitable for future product
+adapters without making those adapters part of the analytical source of truth.
+
 Ball dataset tooling is an offline curation boundary. It reads local source media,
 writes full-resolution frame images and optional lossless review clips, and records
 content hashes plus frame/time provenance in `dataset-manifest.json`. Split manifests

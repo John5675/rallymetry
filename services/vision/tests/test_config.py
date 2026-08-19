@@ -11,6 +11,7 @@ from pickleball_vision.config import (
     Environment,
     HitterIdentificationSettings,
     LogFormat,
+    MatchAnalyticsSettings,
     MediaSettings,
     PersonDetectionSettings,
     PlayerAnalysisSettings,
@@ -42,6 +43,7 @@ def test_settings_have_safe_development_defaults() -> None:
     assert settings.contact_detection == ContactDetectionSettings()
     assert settings.hitter_identification == HitterIdentificationSettings()
     assert settings.shot_classification == ShotClassificationSettings()
+    assert settings.match_analytics == MatchAnalyticsSettings()
 
 
 def test_settings_load_prefixed_environment_values() -> None:
@@ -98,6 +100,10 @@ def test_settings_load_prefixed_environment_values() -> None:
             "PICKLEBALL_VISION_SHOT_MINIMUM_KNOWN_TRAJECTORY_POINTS": "5",
             "PICKLEBALL_VISION_SHOT_DRIVE_MINIMUM_SPEED_DIAGONALS_PER_SECOND": "0.55",
             "PICKLEBALL_VISION_SHOT_DEBUG_TRAIL_SECONDS": "1.25",
+            "PICKLEBALL_VISION_MATCH_ANALYTICS_KITCHEN_ARRIVAL_DISTANCE_METERS": "0.75",
+            (
+                "PICKLEBALL_VISION_MATCH_ANALYTICS_MINIMUM_KITCHEN_ARRIVAL_JOINT_COVERAGE_RATIO"
+            ): "0.6",
         }
     )
 
@@ -175,6 +181,10 @@ def test_settings_load_prefixed_environment_values() -> None:
         minimum_known_trajectory_points=5,
         drive_minimum_speed_diagonals_per_second=0.55,
         debug_trail_seconds=1.25,
+    )
+    assert settings.match_analytics == MatchAnalyticsSettings(
+        kitchen_arrival_distance_m=0.75,
+        minimum_kitchen_arrival_joint_coverage_ratio=0.6,
     )
 
 
@@ -314,6 +324,13 @@ def test_settings_load_prefixed_environment_values() -> None:
         (
             {"PICKLEBALL_VISION_SHOT_DEBUG_TRAIL_SECONDS": "0"},
             "PICKLEBALL_VISION_SHOT_DEBUG_TRAIL_SECONDS",
+        ),
+        (
+            {
+                "PICKLEBALL_VISION_MATCH_ANALYTICS_"
+                "MINIMUM_KITCHEN_ARRIVAL_JOINT_COVERAGE_RATIO": "1.1"
+            },
+            ("PICKLEBALL_VISION_MATCH_ANALYTICS_MINIMUM_KITCHEN_ARRIVAL_JOINT_COVERAGE_RATIO"),
         ),
         (
             {"PICKLEBALL_VISION_FUSION_TOLERANCE_MS": "0"},

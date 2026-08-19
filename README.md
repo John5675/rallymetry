@@ -162,6 +162,11 @@ uv run pickleball-vision reconstruct-shots /absolute/path/to/match.mp4 \
   --player-tracks ../../output/player-tracking/tracks.json \
   --annotations ../../output/match-annotations.json \
   --output-dir ../../output/shot-reconstruction
+uv run pickleball-vision analyze-match /absolute/path/to/match.mp4 \
+  --rallies ../../output/rally-segmentation/rallies.json \
+  --shots ../../output/shot-reconstruction/shots.json \
+  --player-positions ../../output/player-analysis/player_positions.json \
+  --output ../../output/match-analytics.json
 ```
 
 Command results are emitted as JSON on standard output. Diagnostic structured
@@ -237,6 +242,13 @@ court-plane corrections and bounded smoothed coordinates. It generates
 movement/occupancy metrics, per-player heatmaps, a source overlay, and a top-down
 animation. See [the analytics definitions](docs/analytics-definitions.md) for exact
 formulas, region boundaries, quality gates, correction format, and limitations.
+
+Deterministic match analytics consume only the structured rally, shot, and player
+position artifacts. The stage verifies source/provenance compatibility, preserves
+unknown hitters and shot classes, and writes a complete `match-analytics.json`
+without consulting detector tensors, YOLO output, or raw audio. The same
+[analytics definitions](docs/analytics-definitions.md) specify every formula,
+denominator, missing-data rule, confidence limitation, and known inaccuracy.
 
 Ball dataset extraction supports deterministic cadence, seeded random sampling,
 half-open time ranges, named clip/rally groups, optional synchronized lossless review
