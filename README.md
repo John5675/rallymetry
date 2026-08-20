@@ -5,8 +5,8 @@ doubles pickleball matches into inspectable, structured match data. The long-ter
 goal includes court and player tracking, ball trajectories, rally and shot events,
 match analytics, and AI-assisted coaching.
 
-The latest completed milestone is **MongoDB job queue + separate analysis worker**.
-Milestones 0–21 are complete. The local
+The latest completed milestone is **React/Vite match dashboard**.
+Milestones 0–22 are complete. The local
 CLI can inspect video plus optional synchronized audio, extract lossless analysis
 audio, calibrate the court, detect people broadly, derive court-aware candidates,
 manually assign the four logical match roles, and track those identities separately
@@ -45,10 +45,14 @@ A separate outbound-only worker now atomically claims those MongoDB jobs, mainta
 bounded leases and heartbeats, stages local or Blob media, invokes an explicit
 operator-controlled plan of existing CLI stages, persists compact structured
 results, and publishes selected artifacts through the configured store.
+The strict TypeScript browser application presents match status, public review
+media, structured timelines, rallies, shots, player metrics, deterministic analytics,
+heatmaps, and defensible court-plane landing maps through the FastAPI contract.
 
 ## Repository map
 
 - `services/vision/`: typed Python package and `pickleball-vision` CLI
+- `apps/web/`: strict TypeScript React/Vite match dashboard
 - `docs/`: architecture, coordinate, annotation, and analytics contracts
 - `ml/`: local datasets plus versioned training, evaluation, and experiment workspaces
 - `scripts/`: future repository-level utilities
@@ -61,12 +65,14 @@ The locked product stack is a React/Vite/TypeScript frontend, a FastAPI product 
 MongoDB Atlas for hosted structured data and the initial small-scale job queue,
 Vercel Blob for hosted media/artifacts, and a separate Python analysis worker that
 invokes the existing pipeline. Heavy analysis will not run in Vercel Functions or
-inside FastAPI HTTP requests. The persistence adapters, FastAPI control plane, and
-analysis worker are now implemented; the browser application remains deferred. See
+inside FastAPI HTTP requests. The persistence adapters, FastAPI control plane,
+analysis worker, and browser dashboard are implemented; hosted deployment remains
+deferred to Milestone 23. See
 the
 [architecture contract](docs/architecture.md) and
 [hosted persistence contract](docs/persistence.md), plus the
-[API contract](docs/api.md) and [worker contract](docs/worker.md).
+[API contract](docs/api.md), [worker contract](docs/worker.md), and
+[web dashboard guide](docs/web.md).
 
 ## Optional hosted persistence
 
@@ -109,10 +115,26 @@ uv run pickleball-vision worker \
 Omit `--once` for continuous single-concurrency polling. The worker only needs
 outbound MongoDB Atlas and Vercel Blob access; it opens no inbound server.
 
+## Run the web dashboard
+
+Start FastAPI on port 8000 using the command above, then in another terminal run:
+
+```bash
+cd apps/web
+cp .env.example .env.local
+npm ci
+npm run dev
+```
+
+Open `http://localhost:5173`. `VITE_API_BASE_URL` controls the API origin and must
+not contain MongoDB or Vercel Blob credentials. See the
+[web dashboard guide](docs/web.md) for route, media-access, and API data contracts.
+
 ## Prerequisites
 
 - Python 3.11 or newer
 - [uv](https://docs.astral.sh/uv/) (recommended)
+- Node.js 22 or newer and npm
 
 The locked Python environment supplies the FFmpeg libraries and extraction binary;
 a separate system FFmpeg installation is not required.
@@ -375,6 +397,13 @@ uv run ruff check .
 uv run ruff format --check .
 uv run mypy src tests
 uv run pickleball-vision doctor
+
+cd ../../apps/web
+npm ci
+npm run lint
+npm run typecheck
+npm test
+npm run build
 ```
 
 Read [PLANS.md](PLANS.md) before starting work. Only its current milestone may be

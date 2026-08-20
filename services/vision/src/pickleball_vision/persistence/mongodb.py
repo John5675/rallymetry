@@ -445,6 +445,34 @@ class MongoPersistence:
             offset=offset,
         )
 
+    async def list_match_contacts(
+        self,
+        match_id: str,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[tuple[Document, ...], int]:
+        return await self._list_match_domain_records(
+            StructuredCollection.CONTACTS,
+            match_id,
+            limit=limit,
+            offset=offset,
+        )
+
+    async def list_match_bounces(
+        self,
+        match_id: str,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[tuple[Document, ...], int]:
+        return await self._list_match_domain_records(
+            StructuredCollection.BOUNCES,
+            match_id,
+            limit=limit,
+            offset=offset,
+        )
+
     async def get_latest_match_analytics(self, match_id: str) -> Document | None:
         documents, _ = await self._list_documents(
             "analytics",

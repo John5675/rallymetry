@@ -61,6 +61,8 @@ browser code.
 | `GET` | `/api/matches/{matchId}/players` | Logical players |
 | `GET` | `/api/matches/{matchId}/rallies` | Paginated structured rallies |
 | `GET` | `/api/matches/{matchId}/shots` | Paginated structured shots |
+| `GET` | `/api/matches/{matchId}/contacts` | Paginated structured paddle contacts |
+| `GET` | `/api/matches/{matchId}/bounces` | Paginated structured bounces |
 | `GET` | `/api/matches/{matchId}/analytics` | Latest deterministic analytics record |
 | `GET` | `/api/matches/{matchId}/artifacts` | Artifact manifests, not artifact bytes |
 | `POST` | `/api/matches/{matchId}/process` | Persist a queued analysis job (`202`) |
@@ -70,6 +72,10 @@ List endpoints use `limit` (default 50, maximum 100) and `offset` where the
 collection can grow. API schemas expose application IDs such as `matchId`, `jobId`,
 and `recordId`; MongoDB `_id`, BSON types, driver errors, and credentials are not part
 of the response contract.
+
+`youtubeVideoId`, when provided, is the exact 11-character YouTube video ID using
+letters, numbers, `_`, or `-`. It is metadata for browser embedding; the API does
+not download the video.
 
 ## Process submission
 

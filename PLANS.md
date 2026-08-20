@@ -758,9 +758,42 @@ Exit criteria:
 - Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
   pass.
 
+## 22. React/Vite match dashboard — complete
+
+Add a strict TypeScript React application under `apps/web` that reads the FastAPI
+application contract and presents matches, processing state, playable hosted media,
+structured events, deterministic analytics, and court visualizations without
+recomputing pickleball domain metrics in the browser.
+
+Exit criteria:
+
+- `apps/web` is a Vite-powered React application with strict TypeScript, an
+  environment-configured `VITE_API_BASE_URL`, and no Next.js or direct MongoDB/Blob
+  credential access.
+- Declarative routes cover `/`, `/matches`, `/matches/:matchId`, and
+  `/matches/:matchId/analysis` without introducing an application framework beyond
+  the needs of this dashboard.
+- The match list shows title/date, logical players, processing state, and a public
+  thumbnail when the API provides one, with inspectable empty/error/loading states.
+- Match detail sections cover overview, video, players, rallies, shots, and court
+  maps using only structured API records and artifact references.
+- YouTube IDs embed without downloading media; public annotated Blob videos play
+  directly, while private artifacts remain inaccessible to browser code.
+- Rally boundaries, contacts, bounces, and shots appear on an event timeline, and
+  event interaction seeks the active seekable video where the media surface permits.
+- Rally data is sortable/filterable; shot data retains index, hitter, class,
+  timestamp, confidence, and defensible landing location.
+- Court views render available heatmaps/top-down media and structured shot landing
+  positions without projecting airborne observations or inventing missing data.
+- The API client is typed against the documented camelCase FastAPI responses and
+  has consistent request/error handling.
+- Frontend unit/component tests, ESLint, strict type checking, and the production
+  Vite build pass; the existing Python verification suite remains green.
+- No deployment, hosted-media upload UI, authentication, human correction, or AI
+  coaching is implemented.
+
 ## Future milestones — not current
 
-22. React/Vite match dashboard
 23. Vercel deployment + hosted media
 24. Human correction workflow
 25. AI coaching

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import uuid
 from datetime import UTC, datetime
-from typing import TypeVar
+from typing import Literal, TypeVar
 
 from pydantic import BaseModel, ValidationError
 
@@ -131,6 +131,29 @@ class MatchApplicationService:
             limit=limit,
             offset=offset,
         )
+        return self._domain_page(documents, total=total, limit=limit, offset=offset)
+
+    async def list_events(
+        self,
+        match_id: str,
+        *,
+        event_type: Literal["contacts", "bounces"],
+        limit: int,
+        offset: int,
+    ) -> DomainRecordListResponse:
+        await self._require_match(match_id)
+        if event_type == "contacts":
+            documents, total = await self._persistence.list_match_contacts(
+                match_id,
+                limit=limit,
+                offset=offset,
+            )
+        else:
+            documents, total = await self._persistence.list_match_bounces(
+                match_id,
+                limit=limit,
+                offset=offset,
+            )
         return self._domain_page(documents, total=total, limit=limit, offset=offset)
 
     async def get_analytics(self, match_id: str) -> AnalyticsResponse:

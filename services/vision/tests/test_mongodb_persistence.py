@@ -320,6 +320,20 @@ def test_mongodb_adapter_lists_and_patches_api_records() -> None:
         timestamp_seconds=1.2,
         created_at=NOW,
     )
+    contact = StructuredDomainRecord(
+        match_id="match-1",
+        record_id="contact-1",
+        payload={"playerId": "JOHN"},
+        timestamp_seconds=1.2,
+        created_at=NOW,
+    )
+    bounce = StructuredDomainRecord(
+        match_id="match-1",
+        record_id="bounce-1",
+        payload={"courtPosition": {"x": 2.0, "y": 8.0}},
+        timestamp_seconds=1.8,
+        created_at=NOW,
+    )
     analytics = AnalyticsRecord(
         match_id="match-1",
         analytics_id="analytics-1",
@@ -333,6 +347,8 @@ def test_mongodb_adapter_lists_and_patches_api_records() -> None:
     asyncio.run(persistence.save_players([player]))
     asyncio.run(persistence.save_rallies([rally]))
     asyncio.run(persistence.save_shots([shot]))
+    asyncio.run(persistence.save_contacts([contact]))
+    asyncio.run(persistence.save_bounces([bounce]))
     asyncio.run(persistence.save_analytics(analytics))
 
     matches, total = asyncio.run(persistence.list_matches(limit=1, offset=0))
@@ -348,6 +364,12 @@ def test_mongodb_adapter_lists_and_patches_api_records() -> None:
         persistence.list_match_rallies("match-1", limit=50, offset=0)
     )
     shots, shot_total = asyncio.run(persistence.list_match_shots("match-1", limit=50, offset=0))
+    contacts, contact_total = asyncio.run(
+        persistence.list_match_contacts("match-1", limit=50, offset=0)
+    )
+    bounces, bounce_total = asyncio.run(
+        persistence.list_match_bounces("match-1", limit=50, offset=0)
+    )
     latest_analytics = asyncio.run(persistence.get_latest_match_analytics("match-1"))
 
     assert total == 2
@@ -358,5 +380,7 @@ def test_mongodb_adapter_lists_and_patches_api_records() -> None:
     assert len(players) == 1
     assert rally_total == 1 and rallies[0]["recordId"] == "rally-1"
     assert shot_total == 1 and shots[0]["recordId"] == "shot-1"
+    assert contact_total == 1 and contacts[0]["recordId"] == "contact-1"
+    assert bounce_total == 1 and bounces[0]["recordId"] == "bounce-1"
     assert latest_analytics is not None
     assert latest_analytics["analyticsId"] == "analytics-1"

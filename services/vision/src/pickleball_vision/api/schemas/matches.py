@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 from datetime import datetime
+from typing import Annotated
 
-from pydantic import Field, model_validator
+from pydantic import Field, StringConstraints, model_validator
 
 from pickleball_vision.api.schemas.common import (
     ApiInputModel,
@@ -14,16 +15,26 @@ from pickleball_vision.api.schemas.common import (
     ShortText,
 )
 
+YouTubeVideoId = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=11,
+        max_length=11,
+        pattern=r"^[A-Za-z0-9_-]{11}$",
+    ),
+]
+
 
 class MatchCreateRequest(ApiInputModel):
     title: ShortText | None = None
-    youtube_video_id: Identifier | None = None
+    youtube_video_id: YouTubeVideoId | None = None
     source_artifact_id: Identifier | None = None
 
 
 class MatchPatchRequest(ApiInputModel):
     title: ShortText | None = None
-    youtube_video_id: Identifier | None = None
+    youtube_video_id: YouTubeVideoId | None = None
     source_artifact_id: Identifier | None = None
 
     @model_validator(mode="after")

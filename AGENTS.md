@@ -86,6 +86,8 @@ and the relevant design document before changing code.
 ## Repository boundaries
 
 - `services/vision` owns local runtime code and the CLI.
+- `apps/web` owns browser presentation of FastAPI records. It must not calculate
+  domain analytics, access MongoDB directly, or receive hosted-storage credentials.
 - `ml` owns dataset, training, evaluation, and experiment assets or code once the
   relevant milestone is current.
 - `docs` owns stable contracts and definitions. Update the relevant document when
@@ -118,4 +120,14 @@ uv run ruff check .
 uv run ruff format --check .
 uv run mypy src tests
 uv run pickleball-vision doctor
+```
+
+From `apps/web`, run:
+
+```bash
+npm ci
+npm run lint
+npm run typecheck
+npm test
+npm run build
 ```

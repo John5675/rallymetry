@@ -53,6 +53,22 @@ class ApplicationPersistence(Protocol):
         offset: int,
     ) -> tuple[tuple[Document, ...], int]: ...
 
+    async def list_match_contacts(
+        self,
+        match_id: str,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[tuple[Document, ...], int]: ...
+
+    async def list_match_bounces(
+        self,
+        match_id: str,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[tuple[Document, ...], int]: ...
+
     async def get_latest_match_analytics(self, match_id: str) -> Document | None: ...
 
     async def list_match_artifacts(self, match_id: str) -> tuple[Document, ...]: ...

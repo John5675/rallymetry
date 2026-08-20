@@ -54,7 +54,7 @@ Application areas are introduced only as their milestones become current:
 
 | Area | Responsibility | Must not own |
 | --- | --- | --- |
-| React/Vite web application | Browser presentation and later human workflows | Hosted credentials, CV execution, domain truth |
+| `apps/web` React/Vite application | Browser presentation and later human workflows | Hosted credentials, CV execution, domain truth |
 | `services/vision/src/pickleball_vision/api` | FastAPI HTTP contracts, validation, compact records, artifact manifests, job submission/status | Heavy analysis inside requests |
 | Python analysis worker | Claim jobs, stage media, invoke existing pipeline, persist results | Browser presentation or synchronous request handling |
 | Hosted persistence adapters | PyMongo Async and Vercel Blob integration behind project interfaces | CV/audio domain algorithms |
@@ -64,13 +64,16 @@ MongoDB/Vercel Blob adapters; see [`persistence.md`](persistence.md). Milestone 
 adds the FastAPI control plane under the vision service; see [`api.md`](api.md).
 Milestone 21 adds the separate leased analysis process without moving analysis into
 HTTP; see [`worker.md`](worker.md).
+Milestone 22 adds the strict TypeScript dashboard under `apps/web`; see
+[`web.md`](web.md). Deployment and hosted routing remain Milestone 23 work.
 
 ## Runtime responsibilities
 
 ### Browser application
 
-The browser eventually presents match status, structured results, review media, and
-human corrections. It calls FastAPI through documented HTTP contracts. It never
+The browser presents match status, structured results, public review media, and
+deterministic analytics. Later milestones add human corrections. It calls FastAPI
+through documented HTTP contracts and never
 receives MongoDB credentials or Vercel Blob credentials. If a future direct upload
 flow is needed, FastAPI may issue a short-lived, narrowly scoped operation; permanent
 service credentials remain server-side.

@@ -4,6 +4,10 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 .mypy_cache/
+.vite/
+node_modules/
+coverage/
+apps/web/dist/
 .ruff_cache/
 .coverage
 htmlcov/

@@ -32,6 +32,8 @@ class InMemoryApplicationPersistence:
         self.players: list[Document] = []
         self.rallies: list[Document] = []
         self.shots: list[Document] = []
+        self.contacts: list[Document] = []
+        self.bounces: list[Document] = []
         self.analytics: list[Document] = []
         self.artifacts: list[Document] = []
         self.jobs: dict[str, Document] = {}
@@ -94,6 +96,24 @@ class InMemoryApplicationPersistence:
         offset: int,
     ) -> tuple[tuple[Document, ...], int]:
         return self._page(self.shots, match_id, limit=limit, offset=offset)
+
+    async def list_match_contacts(
+        self,
+        match_id: str,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[tuple[Document, ...], int]:
+        return self._page(self.contacts, match_id, limit=limit, offset=offset)
+
+    async def list_match_bounces(
+        self,
+        match_id: str,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[tuple[Document, ...], int]:
+        return self._page(self.bounces, match_id, limit=limit, offset=offset)
 
     async def get_latest_match_analytics(self, match_id: str) -> Document | None:
         matches = [item for item in self.analytics if item["matchId"] == match_id]
@@ -167,6 +187,22 @@ def seed_persistence() -> InMemoryApplicationPersistence:
         timestamp_seconds=1.2,
         created_at=NOW,
     )
+    contact = StructuredDomainRecord(
+        match_id="match_seed",
+        record_id="contact_1",
+        payload={"candidatePlayers": ["JOHN"]},
+        confidence=0.72,
+        timestamp_seconds=1.2,
+        created_at=NOW,
+    )
+    bounce = StructuredDomainRecord(
+        match_id="match_seed",
+        record_id="bounce_1",
+        payload={"courtPosition": {"x": 2.5, "y": 9.1}},
+        confidence=0.68,
+        timestamp_seconds=1.8,
+        created_at=NOW,
+    )
     analytics = AnalyticsRecord(
         match_id="match_seed",
         analytics_id="analytics_v1",
@@ -204,6 +240,8 @@ def seed_persistence() -> InMemoryApplicationPersistence:
     persistence.players.append(player.to_document())
     persistence.rallies.append(rally.to_document())
     persistence.shots.append(shot.to_document())
+    persistence.contacts.append(contact.to_document())
+    persistence.bounces.append(bounce.to_document())
     persistence.analytics.append(analytics.to_document())
     persistence.artifacts.append(artifact.to_document())
     persistence.artifacts.append(source_artifact.to_document())
@@ -283,6 +321,23 @@ def test_match_crud_uses_json_ids_and_consistent_validation_errors() -> None:
     assert missing.json()["error"]["code"] == "resource_not_found"
 
 
+def test_match_accepts_youtube_id_starting_with_underscore() -> None:
+    persistence = seed_persistence()
+    app = create_app(settings=ApiSettings(), persistence=persistence)
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/matches",
+            json={
+                "title": "Underscore video ID",
+                "youtubeVideoId": "_cPF1fTnk0Y",
+            },
+        )
+
+    assert response.status_code == 201
+    assert response.json()["youtubeVideoId"] == "_cPF1fTnk0Y"
+
+
 def test_match_scoped_structured_endpoints_do_not_expose_mongo_ids() -> None:
     persistence = seed_persistence()
     app = create_app(settings=ApiSettings(), persistence=persistence)
@@ -291,15 +346,19 @@ def test_match_scoped_structured_endpoints_do_not_expose_mongo_ids() -> None:
         players = client.get("/api/matches/match_seed/players")
         rallies = client.get("/api/matches/match_seed/rallies")
         shots = client.get("/api/matches/match_seed/shots")
+        contacts = client.get("/api/matches/match_seed/contacts")
+        bounces = client.get("/api/matches/match_seed/bounces")
         analytics = client.get("/api/matches/match_seed/analytics")
         artifacts = client.get("/api/matches/match_seed/artifacts")
 
     assert players.json()["items"][0]["logicalIdentity"] == "ME"
     assert rallies.json()["items"][0]["payload"]["startFrame"] == 10
     assert shots.json()["items"][0]["payload"]["shotType"] == "SERVE"
+    assert contacts.json()["items"][0]["recordId"] == "contact_1"
+    assert bounces.json()["items"][0]["payload"]["courtPosition"]["y"] == 9.1
     assert analytics.json()["metrics"]["rallyCount"]["value"] == 1
     assert artifacts.json()["items"][0]["access"] == "PRIVATE"
-    for response in (players, rallies, shots, analytics, artifacts):
+    for response in (players, rallies, shots, contacts, bounces, analytics, artifacts):
         assert response.status_code == 200
         assert "_id" not in response.text
 
