@@ -45,6 +45,9 @@ class ErrorCode(StrEnum):
     PLAYER_ISOLATION_INPUT = "player_isolation_input_error"
     PLAYER_ANALYSIS_INPUT = "player_analysis_input_error"
     PLAYER_TRACKING_INPUT = "player_tracking_input_error"
+    PERSISTENCE = "persistence_error"
+    PERSISTENCE_VALIDATION = "persistence_validation_error"
+    ARTIFACT_STORAGE = "artifact_storage_error"
     RALLY_SEGMENTATION_INPUT = "rally_segmentation_input_error"
     VIDEO_NOT_FOUND = "video_not_found"
     VIDEO_UNREADABLE = "video_unreadable"
@@ -73,6 +76,42 @@ class ConfigurationError(PickleballVisionError):
             message,
             code=ErrorCode.CONFIGURATION,
             details={"setting": setting},
+        )
+
+
+class PersistenceValidationError(PickleballVisionError):
+    """Raised when a record is unsafe or invalid for hosted persistence."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Invalid persistence record: {reason}",
+            code=ErrorCode.PERSISTENCE_VALIDATION,
+            details={"reason": reason},
+        )
+
+
+class PersistenceOperationError(PickleballVisionError):
+    """Raised when a MongoDB persistence operation fails."""
+
+    def __init__(self, operation: str, *, reason: str) -> None:
+        super().__init__(
+            f"Persistence operation {operation} failed: {reason}",
+            code=ErrorCode.PERSISTENCE,
+            details={"operation": operation, "reason": reason},
+        )
+
+
+class ArtifactStorageError(PickleballVisionError):
+    """Raised when an artifact-store operation fails."""
+
+    def __init__(self, operation: str, *, reason: str, pathname: str | None = None) -> None:
+        details: dict[str, object] = {"operation": operation, "reason": reason}
+        if pathname is not None:
+            details["pathname"] = pathname
+        super().__init__(
+            f"Artifact storage operation {operation} failed: {reason}",
+            code=ErrorCode.ARTIFACT_STORAGE,
+            details=details,
         )
 
 

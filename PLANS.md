@@ -651,9 +651,43 @@ Exit criteria:
 - No persistence, FastAPI, worker, queue, React/Vite, hosted media, correction
   workflow, or AI coaching behavior is implemented.
 
+## 19. MongoDB Atlas + Vercel Blob persistence — complete
+
+Add hosted structured-data and artifact-storage adapters without making the local
+analysis pipeline depend on cloud availability. MongoDB uses the official PyMongo
+Async API; Vercel Blob and the local filesystem implement one project-owned artifact
+contract.
+
+Exit criteria:
+
+- A typed persistence contract separates matches, players, rallies, contacts,
+  bounces, shots, analytics, processing-job status, corrections, and artifact
+  manifests instead of creating one unbounded match document.
+- The MongoDB adapter uses `MONGODB_URL`, creates documented collection indexes,
+  stores compact BSON-safe records, and rejects binary or oversized documents.
+- MP4 files, raw frames, audio waveforms, model weights, huge raw detections, and
+  large debug artifacts are stored only by reference, never directly in MongoDB.
+- `ArtifactStore` exposes put/get/delete/exists behavior with local-filesystem and
+  Vercel Blob implementations behind the same interface.
+- Artifact records retain category, randomized pathname, provider, access,
+  content type, byte size, checksum where available, creation time, and pipeline
+  version.
+- Source media and internal artifacts default to private access. Public access is
+  permitted only for explicitly viewable media, and Blob credentials never appear
+  in returned metadata or diagnostic configuration.
+- A match may retain a YouTube video ID as metadata, but no YouTube downloader is
+  introduced and analysis continues to consume local media paths.
+- Local development and the existing CLI remain functional without MongoDB,
+  Vercel Blob, credentials, or network connectivity.
+- Tests use in-memory/test-double database and Blob adapters; CI requires no hosted
+  account or production secret.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- No FastAPI routes, worker execution/leases, browser application, deployment,
+  authentication, or human-correction workflow is implemented.
+
 ## Future milestones — not current
 
-19. MongoDB + Vercel Blob persistence
 20. FastAPI application API
 21. Background analysis worker + MongoDB job queue
 22. React/Vite match dashboard

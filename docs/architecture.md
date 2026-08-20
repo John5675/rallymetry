@@ -60,8 +60,10 @@ milestones become current:
 | Python analysis worker | Claim jobs, stage media, invoke existing pipeline, persist results | Browser presentation or synchronous request handling |
 | Hosted persistence adapters | PyMongo Async and Vercel Blob integration behind project interfaces | CV/audio domain algorithms |
 
-Exact directories and deployment configuration belong to the corresponding product
-milestones. Milestone 11 introduces no application scaffolding.
+Exact application directories and deployment configuration belong to the
+corresponding product milestones. Milestone 19 implements only the provider-neutral
+persistence records and optional MongoDB/Vercel Blob adapters; see
+[`persistence.md`](persistence.md).
 
 ## Runtime responsibilities
 
@@ -338,6 +340,7 @@ analysis worker require independent Python-capable runtime boundaries; heavy ana
 cannot execute in Vercel Functions or in the API request process. Their exact hosting
 provider is intentionally deferred.
 
-MongoDB Atlas and Vercel Blob are hosted adapters, not prerequisites for local use.
-No application service, database integration, worker, web application, deployment,
-or authentication feature is implemented during architecture lock-in.
+MongoDB Atlas and Vercel Blob remain optional hosted adapters, not prerequisites for
+local use. Milestone 19 provides their persistence boundary, compact record schemas,
+and local/test implementations. No application service, worker execution, web
+application, deployment, authentication, or correction workflow is implemented yet.

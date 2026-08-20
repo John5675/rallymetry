@@ -3,6 +3,7 @@ from pathlib import Path
 import pytest
 
 from pickleball_vision.config import (
+    ArtifactBackend,
     AudioAnalysisChannelMode,
     AudioAnalysisSettings,
     BallTrackingSettings,
@@ -13,6 +14,7 @@ from pickleball_vision.config import (
     LogFormat,
     MatchAnalyticsSettings,
     MediaSettings,
+    PersistenceSettings,
     PersonDetectionSettings,
     PlayerAnalysisSettings,
     PlayerIsolationSettings,
@@ -44,6 +46,7 @@ def test_settings_have_safe_development_defaults() -> None:
     assert settings.hitter_identification == HitterIdentificationSettings()
     assert settings.shot_classification == ShotClassificationSettings()
     assert settings.match_analytics == MatchAnalyticsSettings()
+    assert settings.persistence == PersistenceSettings()
 
 
 def test_settings_load_prefixed_environment_values() -> None:
@@ -104,6 +107,11 @@ def test_settings_load_prefixed_environment_values() -> None:
             (
                 "PICKLEBALL_VISION_MATCH_ANALYTICS_MINIMUM_KITCHEN_ARRIVAL_JOINT_COVERAGE_RATIO"
             ): "0.6",
+            "MONGODB_URL": "mongodb+srv://user:secret@example.test/",
+            "MONGODB_DATABASE": "pickleball_test",
+            "PICKLEBALL_VISION_ARTIFACT_BACKEND": "vercel_blob",
+            "PICKLEBALL_VISION_LOCAL_ARTIFACT_ROOT": "~/pickleball-artifacts",
+            "BLOB_READ_WRITE_TOKEN": "blob-secret",
         }
     )
 
@@ -186,6 +194,23 @@ def test_settings_load_prefixed_environment_values() -> None:
         kitchen_arrival_distance_m=0.75,
         minimum_kitchen_arrival_joint_coverage_ratio=0.6,
     )
+    assert settings.persistence == PersistenceSettings(
+        mongodb_url="mongodb+srv://user:secret@example.test/",
+        mongodb_database="pickleball_test",
+        artifact_backend=ArtifactBackend.VERCEL_BLOB,
+        local_artifact_root=Path("~/pickleball-artifacts").expanduser(),
+        vercel_blob_token="blob-secret",
+    )
+    public = settings.public_values()["persistence"]
+    assert isinstance(public, dict)
+    assert public == {
+        "mongodbConfigured": True,
+        "mongodbDatabase": "pickleball_test",
+        "artifactBackend": "vercel_blob",
+        "localArtifactRoot": str(Path("~/pickleball-artifacts").expanduser()),
+        "vercelBlobConfigured": True,
+    }
+    assert "secret" not in repr(public)
 
 
 @pytest.mark.parametrize(
@@ -342,6 +367,20 @@ def test_settings_load_prefixed_environment_values() -> None:
                 "PICKLEBALL_VISION_RALLY_RESTART_QUIET_SECONDS": "0.6",
             },
             "PICKLEBALL_VISION_RALLY_RESTART_QUIET_SECONDS",
+        ),
+        ({"MONGODB_URL": "https://example.test"}, "MONGODB_URL"),
+        ({"MONGODB_DATABASE": "bad database"}, "MONGODB_DATABASE"),
+        (
+            {"PICKLEBALL_VISION_ARTIFACT_BACKEND": "s3"},
+            "PICKLEBALL_VISION_ARTIFACT_BACKEND",
+        ),
+        (
+            {"PICKLEBALL_VISION_LOCAL_ARTIFACT_ROOT": ""},
+            "PICKLEBALL_VISION_LOCAL_ARTIFACT_ROOT",
+        ),
+        (
+            {"PICKLEBALL_VISION_ARTIFACT_BACKEND": "vercel_blob"},
+            "BLOB_READ_WRITE_TOKEN",
         ),
     ],
 )

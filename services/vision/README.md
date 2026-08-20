@@ -6,9 +6,11 @@ lossless analysis-audio extraction, manual multi-point court calibration,
 pretrained person detection, court-aware manual primary-player isolation,
 persistent logical-player tracking, and Release 0.1 player court-position analytics.
 It also provides ball dataset extraction, review clips, leakage-safe split assignment,
-versioned custom pickleball training, raw spatial inference, and fixed-split detector
-evaluation, plus a local resumable human-review UI for detector annotations. Ball
-tracking, audio-event detection, and later match analytics remain unimplemented.
+versioned custom pickleball training, raw spatial inference, fixed-split detector
+evaluation, a local resumable annotation UI, derived rally/bounce/contact/hitter/shot
+records, and deterministic match analytics. Optional MongoDB Atlas and Vercel Blob
+persistence now lives behind project-owned adapters; local CLI execution still needs
+neither provider. See [`docs/persistence.md`](../../docs/persistence.md).
 
 ```bash
 uv sync --locked --extra dev

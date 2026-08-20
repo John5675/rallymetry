@@ -5,8 +5,8 @@ doubles pickleball matches into inspectable, structured match data. The long-ter
 goal includes court and player tracking, ball trajectories, rally and shot events,
 match analytics, and AI-assisted coaching.
 
-The latest completed milestone is **Shot reconstruction and classification**.
-Milestones 0–17 are complete. The local
+The latest completed milestone is **MongoDB Atlas + Vercel Blob persistence**.
+Milestones 0–19 are complete. The local
 CLI can inspect video plus optional synchronized audio, extract lossless analysis
 audio, calibrate the court, detect people broadly, derive court-aware candidates,
 manually assign the four logical match roles, and track those identities separately
@@ -35,7 +35,11 @@ trajectory direction, prior credible hitter, rally order, and visual contact
 confidence. It retains `UNKNOWN` when evidence is insufficient and never uses audio
 to choose a player. Accepted rally-local contacts can now be reconstructed into
 structured shots and assigned one of nine deliberately small, rule-based classes,
-including `OTHER` and `UNKNOWN`.
+including `OTHER` and `UNKNOWN`. Deterministic analytics now consume only those
+structured domain objects. Optional hosted persistence stores compact match records
+through the official PyMongo Async API and large artifacts through interchangeable
+local-filesystem or Vercel Blob adapters without making cloud access a CLI
+prerequisite.
 
 ## Repository map
 
@@ -52,8 +56,27 @@ The locked product stack is a React/Vite/TypeScript frontend, a FastAPI product 
 MongoDB Atlas for hosted structured data and the initial small-scale job queue,
 Vercel Blob for hosted media/artifacts, and a separate Python analysis worker that
 invokes the existing pipeline. Heavy analysis will not run in Vercel Functions or
-inside FastAPI HTTP requests. These product components remain unimplemented until
-their milestones become current; see [the architecture contract](docs/architecture.md).
+inside FastAPI HTTP requests. The persistence adapters are now implemented; the API,
+worker, and browser applications remain deferred to their milestones. See the
+[architecture contract](docs/architecture.md) and
+[hosted persistence contract](docs/persistence.md).
+
+## Optional hosted persistence
+
+Local artifacts remain the default and require no credentials. Copy `.env.example`
+as a reference, then inject real values through your shell or deployment secret
+store only when a future API or worker uses the hosted adapters:
+
+```bash
+export MONGODB_URL='mongodb+srv://<user>:<password>@<cluster>/'
+export MONGODB_DATABASE='pickleball_vision'
+export PICKLEBALL_VISION_ARTIFACT_BACKEND='vercel_blob'
+export BLOB_READ_WRITE_TOKEN='<server-side-token>'
+```
+
+Do not expose either credential to a browser. MongoDB stores compact structured
+records and artifact references; videos, frames, audio waveforms, model weights,
+large detections, and debug media remain in an artifact store.
 
 ## Prerequisites
 

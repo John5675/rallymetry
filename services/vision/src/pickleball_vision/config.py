@@ -39,6 +39,13 @@ class AudioAnalysisChannelMode(StrEnum):
     PER_CHANNEL = "per_channel"
 
 
+class ArtifactBackend(StrEnum):
+    """Configured artifact provider selected at an application boundary."""
+
+    LOCAL = "local"
+    VERCEL_BLOB = "vercel_blob"
+
+
 @dataclass(frozen=True, slots=True)
 class MediaSettings:
     """Canonical media-timeline settings shared by future A/V fusion stages."""
@@ -1740,6 +1747,83 @@ class MatchAnalyticsSettings:
 
 
 @dataclass(frozen=True, slots=True)
+class PersistenceSettings:
+    """Hosted-adapter configuration whose public form never contains secrets."""
+
+    mongodb_url: str | None = field(default=None, repr=False)
+    mongodb_database: str = "pickleball_vision"
+    artifact_backend: ArtifactBackend = ArtifactBackend.LOCAL
+    local_artifact_root: Path = Path("output/artifacts")
+    vercel_blob_token: str | None = field(default=None, repr=False)
+
+    @classmethod
+    def from_env(
+        cls,
+        environ: Mapping[str, str] | None = None,
+    ) -> PersistenceSettings:
+        """Load exact provider variables while allowing a credential-free local default."""
+
+        source = os.environ if environ is None else environ
+        mongodb_url_raw = source.get("MONGODB_URL", "").strip()
+        mongodb_url = mongodb_url_raw or None
+        if mongodb_url is not None and not mongodb_url.startswith(("mongodb://", "mongodb+srv://")):
+            raise ConfigurationError(
+                "MONGODB_URL must use the mongodb:// or mongodb+srv:// scheme",
+                setting="MONGODB_URL",
+            )
+        mongodb_database = source.get("MONGODB_DATABASE", cls().mongodb_database).strip()
+        if re.fullmatch(r"[A-Za-z0-9_-]{1,63}", mongodb_database) is None:
+            raise ConfigurationError(
+                "MONGODB_DATABASE must contain 1-63 letters, numbers, underscores, or hyphens",
+                setting="MONGODB_DATABASE",
+            )
+        backend_raw = source.get(
+            f"{ENV_PREFIX}ARTIFACT_BACKEND",
+            ArtifactBackend.LOCAL.value,
+        ).strip()
+        try:
+            backend = ArtifactBackend(backend_raw.lower())
+        except ValueError as error:
+            setting = f"{ENV_PREFIX}ARTIFACT_BACKEND"
+            raise ConfigurationError(
+                f"{setting} must be local or vercel_blob",
+                setting=setting,
+            ) from error
+        root_raw = source.get(
+            f"{ENV_PREFIX}LOCAL_ARTIFACT_ROOT",
+            str(cls().local_artifact_root),
+        ).strip()
+        if not root_raw:
+            setting = f"{ENV_PREFIX}LOCAL_ARTIFACT_ROOT"
+            raise ConfigurationError(f"{setting} must not be empty", setting=setting)
+        token_raw = source.get("BLOB_READ_WRITE_TOKEN", "").strip()
+        token = token_raw or None
+        if backend is ArtifactBackend.VERCEL_BLOB and token is None:
+            raise ConfigurationError(
+                "BLOB_READ_WRITE_TOKEN is required when the Vercel Blob backend is selected",
+                setting="BLOB_READ_WRITE_TOKEN",
+            )
+        return cls(
+            mongodb_url=mongodb_url,
+            mongodb_database=mongodb_database,
+            artifact_backend=backend,
+            local_artifact_root=Path(root_raw).expanduser(),
+            vercel_blob_token=token,
+        )
+
+    def public_values(self) -> dict[str, object]:
+        """Return adapter readiness without returning either credential."""
+
+        return {
+            "mongodbConfigured": self.mongodb_url is not None,
+            "mongodbDatabase": self.mongodb_database,
+            "artifactBackend": self.artifact_backend.value,
+            "localArtifactRoot": str(self.local_artifact_root),
+            "vercelBlobConfigured": self.vercel_blob_token is not None,
+        }
+
+
+@dataclass(frozen=True, slots=True)
 class Settings:
     """Validated settings loaded once at an executable boundary."""
 
@@ -1764,6 +1848,7 @@ class Settings:
         default_factory=ShotClassificationSettings
     )
     match_analytics: MatchAnalyticsSettings = field(default_factory=MatchAnalyticsSettings)
+    persistence: PersistenceSettings = field(default_factory=PersistenceSettings)
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> Settings:
@@ -1821,6 +1906,7 @@ class Settings:
             hitter_identification=HitterIdentificationSettings.from_env(source),
             shot_classification=ShotClassificationSettings.from_env(source),
             match_analytics=MatchAnalyticsSettings.from_env(source),
+            persistence=PersistenceSettings.from_env(source),
         )
 
     def public_values(self) -> dict[str, object]:
@@ -1844,4 +1930,5 @@ class Settings:
             "hitter_identification": self.hitter_identification.as_dict(),
             "shot_classification": self.shot_classification.as_dict(),
             "match_analytics": self.match_analytics.as_dict(),
+            "persistence": self.persistence.public_values(),
         }
