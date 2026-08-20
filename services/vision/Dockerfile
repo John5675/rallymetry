@@ -12,10 +12,11 @@ ENV PATH="/opt/pickleball-vision/.venv/bin:${PATH}" \
 
 WORKDIR /opt/pickleball-vision
 
-COPY requirements-api.txt ./
+COPY requirements-api.txt pyproject.toml README.md ./
 RUN uv venv .venv && uv pip install --python .venv/bin/python --requirement requirements-api.txt
 
 COPY src ./src
+RUN uv pip install --python .venv/bin/python --no-deps .
 
 RUN addgroup --system api \
     && adduser --system --ingroup api --home /nonexistent --no-create-home api \
