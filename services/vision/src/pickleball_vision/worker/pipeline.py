@@ -215,6 +215,10 @@ def _load_artifact_result_plans(value: object) -> tuple[ArtifactResultPlan, ...]
             )
         except ValueError as error:
             raise WorkerConfigurationError(f"artifacts[{index}] has an invalid policy") from error
+        if access is ArtifactAccess.PUBLIC and category is not ArtifactCategory.VIEWABLE_MEDIA:
+            raise WorkerConfigurationError(
+                f"artifacts[{index}] may use PUBLIC access only with VIEWABLE_MEDIA"
+            )
         required = item.get("required", True)
         if not isinstance(required, bool):
             raise WorkerConfigurationError(f"artifacts[{index}].required must be boolean")

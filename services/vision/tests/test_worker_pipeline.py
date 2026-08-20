@@ -42,6 +42,7 @@ def _write_plan(path: Path, *, command: str = "detect-people") -> None:
                         "path": "review/annotated.mp4",
                         "artifactType": "annotated_video",
                         "category": "VIEWABLE_MEDIA",
+                        "access": "PUBLIC",
                     }
                 ],
             }
@@ -91,6 +92,8 @@ def test_planned_runner_loads_structured_results_and_artifacts(tmp_path: Path) -
     assert rally.record_id == "rally-1"
     assert rally.timestamp_seconds == 1.25
     assert result.artifacts[0].source_path.name == "annotated.mp4"
+    assert result.artifacts[0].access is not None
+    assert result.artifacts[0].access.value == "PUBLIC"
 
 
 def test_pipeline_plan_rejects_arbitrary_commands(tmp_path: Path) -> None:
@@ -98,4 +101,15 @@ def test_pipeline_plan_rejects_arbitrary_commands(tmp_path: Path) -> None:
     _write_plan(plan_path, command="bash")
 
     with pytest.raises(WorkerConfigurationError):
+        load_pipeline_plan(plan_path)
+
+
+def test_pipeline_plan_rejects_public_internal_artifact(tmp_path: Path) -> None:
+    plan_path = tmp_path / "plan.json"
+    _write_plan(plan_path)
+    payload = json.loads(plan_path.read_text(encoding="utf-8"))
+    payload["artifacts"][0]["category"] = "INTERNAL_ARTIFACT"
+    plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(WorkerConfigurationError, match="PUBLIC access"):
         load_pipeline_plan(plan_path)

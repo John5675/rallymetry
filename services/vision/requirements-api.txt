@@ -1,0 +1,7 @@
+# Keep these direct pins synchronized with uv.lock. Transitive dependencies are
+# resolved inside the immutable container build.
+dnspython==2.8.0
+fastapi==0.141.1
+pymongo==4.17.0
+uvicorn==0.52.4
+vercel==0.10.0

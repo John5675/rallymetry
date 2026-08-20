@@ -21,14 +21,15 @@ algorithms do not import provider SDKs.
 | `MONGODB_DATABASE` | No | `pickleball_vision` | Database name |
 | `PICKLEBALL_VISION_ARTIFACT_BACKEND` | No | `local` | `local` or `vercel_blob` |
 | `PICKLEBALL_VISION_LOCAL_ARTIFACT_ROOT` | No | `output/artifacts` | Local artifact root |
-| `BLOB_READ_WRITE_TOKEN` | Only for Vercel Blob | unset | Server-side Blob credential |
+| `BLOB_READ_WRITE_TOKEN` | Only for Vercel Blob | unset | Private-store server credential |
+| `PUBLIC_BLOB_READ_WRITE_TOKEN` | Only for public viewable delivery | unset | Separate public-store server credential |
 
 The local backend needs no cloud service, credentials, or network. Diagnostic
 configuration reports only whether credentials are configured; it never returns
 their values. `.env.example` contains empty placeholders only. Application and
 worker deployments must inject real secrets through their environment.
 
-### Provision a private Vercel Blob store
+### Provision Vercel Blob stores
 
 Link the repository to a dedicated Vercel project without deploying it, create a
 private store in the region nearest the analysis worker, and pull the development
@@ -62,10 +63,12 @@ uv run pickleball-vision worker \
   --pipeline-plan ../../docs/examples/worker-pipeline-plan.json
 ```
 
-The default worker publication plan requests private access for viewable and
-internal outputs, so it is compatible with this private store. A future public
-delivery path must use an explicitly configured public store; a Blob store's access
-mode cannot be changed after creation.
+Friend-viewable deployment uses a second public Blob store whose token is injected
+as `PUBLIC_BLOB_READ_WRITE_TOKEN`. Blob access is store-wide and cannot be changed
+per object, so the routed adapter sends explicit public `VIEWABLE_MEDIA` only to
+that store. Private viewable drafts, `SOURCE_MEDIA`, and `INTERNAL_ARTIFACT` remain
+on the private store. Connect the public store with the `PUBLIC_BLOB_` environment
+prefix; see [`deployment.md`](deployment.md#2-vercel-blob-stores).
 
 ## MongoDB collections
 
@@ -121,8 +124,8 @@ not treated as access control.
 | `INTERNAL_ARTIFACT` | `PRIVATE` | No | detections, tracks, audio observations, evaluation reports |
 
 The local provider records `LOCAL` access and copies atomically under its configured
-root. The Vercel provider streams uploads and downloads, keeps its token inside the
-adapter, and never writes the token to artifact metadata. Callers should first store
+root. The Vercel provider streams uploads and downloads, keeps both tokens inside a
+routed adapter, and never writes either token to artifact metadata. Callers should first store
 the file, then save the returned artifact manifest in MongoDB and reference its
 `artifactId` from compact match or result records.
 

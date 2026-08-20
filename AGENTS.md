@@ -76,6 +76,10 @@ and the relevant design document before changing code.
 - Keep hosted integrations behind interfaces and adapters rather than embedding
   them throughout CV or audio code.
 - Never expose MongoDB credentials or Vercel Blob credentials to the browser.
+- Public Vercel Blob delivery requires an explicit `PUBLIC` `VIEWABLE_MEDIA`
+  artifact and a separate public-store credential; source media and internal
+  artifacts must remain in the private store.
+- Keep FastAPI CORS origins environment-driven and exact for deployed frontends.
 - Do not require user authentication until the dedicated web-access milestone.
 - Prefer the simplest solution suitable for approximately six users.
 - Videos, private YouTube URLs, secrets, large datasets, and trained model weights

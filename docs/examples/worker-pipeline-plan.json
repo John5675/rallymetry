@@ -236,42 +236,78 @@
     {
       "path": "player-tracking/annotated.mp4",
       "artifactType": "player_tracking_video",
-      "category": "VIEWABLE_MEDIA"
+      "category": "VIEWABLE_MEDIA",
+      "access": "PUBLIC"
     },
     {
       "path": "player-analysis/topdown.mp4",
       "artifactType": "player_topdown_video",
-      "category": "VIEWABLE_MEDIA"
+      "category": "VIEWABLE_MEDIA",
+      "access": "PUBLIC"
+    },
+    {
+      "path": "player-analysis/heatmap-me.png",
+      "artifactType": "heatmap_me",
+      "category": "VIEWABLE_MEDIA",
+      "access": "PUBLIC",
+      "required": false
+    },
+    {
+      "path": "player-analysis/heatmap-partner.png",
+      "artifactType": "heatmap_partner",
+      "category": "VIEWABLE_MEDIA",
+      "access": "PUBLIC",
+      "required": false
+    },
+    {
+      "path": "player-analysis/heatmap-opponent-1.png",
+      "artifactType": "heatmap_opponent_1",
+      "category": "VIEWABLE_MEDIA",
+      "access": "PUBLIC",
+      "required": false
+    },
+    {
+      "path": "player-analysis/heatmap-opponent-2.png",
+      "artifactType": "heatmap_opponent_2",
+      "category": "VIEWABLE_MEDIA",
+      "access": "PUBLIC",
+      "required": false
     },
     {
       "path": "ball-tracking/ball-debug.mp4",
       "artifactType": "ball_tracking_video",
-      "category": "VIEWABLE_MEDIA"
+      "category": "VIEWABLE_MEDIA",
+      "access": "PUBLIC"
     },
     {
       "path": "rallies/rally-debug.mp4",
       "artifactType": "rally_debug_video",
-      "category": "VIEWABLE_MEDIA"
+      "category": "VIEWABLE_MEDIA",
+      "access": "PUBLIC"
     },
     {
       "path": "shots/shot-debug.mp4",
       "artifactType": "shot_debug_video",
-      "category": "VIEWABLE_MEDIA"
+      "category": "VIEWABLE_MEDIA",
+      "access": "PUBLIC"
     },
     {
       "path": "ball-tracking/ball_tracks.json",
       "artifactType": "ball_tracks",
-      "category": "INTERNAL_ARTIFACT"
+      "category": "INTERNAL_ARTIFACT",
+      "access": "PRIVATE"
     },
     {
       "path": "audio-analysis/audio-events.json",
       "artifactType": "audio_events",
-      "category": "INTERNAL_ARTIFACT"
+      "category": "INTERNAL_ARTIFACT",
+      "access": "PRIVATE"
     },
     {
       "path": "analytics/match-analytics.json",
       "artifactType": "match_analytics",
-      "category": "INTERNAL_ARTIFACT"
+      "category": "INTERNAL_ARTIFACT",
+      "access": "PRIVATE"
     }
   ]
 }

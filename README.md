@@ -5,8 +5,8 @@ doubles pickleball matches into inspectable, structured match data. The long-ter
 goal includes court and player tracking, ball trajectories, rally and shot events,
 match analytics, and AI-assisted coaching.
 
-The latest completed milestone is **React/Vite match dashboard**.
-Milestones 0–22 are complete. The local
+The latest completed milestone is **Vercel deployment + hosted media delivery**.
+Milestones 0–23 are complete. The local
 CLI can inspect video plus optional synchronized audio, extract lossless analysis
 audio, calibrate the court, detect people broadly, derive court-aware candidates,
 manually assign the four logical match roles, and track those identities separately
@@ -66,13 +66,14 @@ MongoDB Atlas for hosted structured data and the initial small-scale job queue,
 Vercel Blob for hosted media/artifacts, and a separate Python analysis worker that
 invokes the existing pipeline. Heavy analysis will not run in Vercel Functions or
 inside FastAPI HTTP requests. The persistence adapters, FastAPI control plane,
-analysis worker, and browser dashboard are implemented; hosted deployment remains
-deferred to Milestone 23. See
+analysis worker, and browser dashboard are implemented. Milestone 23 adds the Vercel
+SPA build contract, a vendor-neutral persistent FastAPI container, exact
+environment-driven CORS, and separate private/public Blob routing. See
 the
 [architecture contract](docs/architecture.md) and
 [hosted persistence contract](docs/persistence.md), plus the
 [API contract](docs/api.md), [worker contract](docs/worker.md), and
-[web dashboard guide](docs/web.md).
+[web dashboard guide](docs/web.md), and [deployment guide](docs/deployment.md).
 
 ## Optional hosted persistence
 
@@ -84,16 +85,17 @@ store only when a future API or worker uses the hosted adapters:
 export MONGODB_URL='mongodb+srv://<user>:<password>@<cluster>/'
 export MONGODB_DATABASE='pickleball_vision'
 export PICKLEBALL_VISION_ARTIFACT_BACKEND='vercel_blob'
-export BLOB_READ_WRITE_TOKEN='<server-side-token>'
+export BLOB_READ_WRITE_TOKEN='<private-store-server-token>'
+export PUBLIC_BLOB_READ_WRITE_TOKEN='<public-store-server-token>'
 ```
 
 Do not expose either credential to a browser. MongoDB stores compact structured
 records and artifact references; videos, frames, audio waveforms, model weights,
 large detections, and debug media remain in an artifact store.
 
-For the supported Vercel project-link, private-store creation, local environment
+For the supported Vercel project link, private/public store creation, local environment
 pull, and worker startup sequence, see the
-[hosted persistence setup](docs/persistence.md#provision-a-private-vercel-blob-store).
+[hosted persistence setup](docs/persistence.md#provision-vercel-blob-stores).
 
 Run the API from `services/vision` after configuring MongoDB:
 

@@ -13,8 +13,9 @@ engine, media downloader, worker, persistence adapter, or credential boundary.
 | `/matches/:matchId` | Overview, video/timeline, players, rallies, shots, and court maps |
 | `/matches/:matchId/analysis` | Deterministic player, position, tactical, provenance, and landing analysis |
 
-Vite owns the local development fallback for these client routes. Production SPA
-rewrites and Vercel deployment are intentionally deferred to Milestone 23.
+Vite owns the local development fallback for these client routes. The repository
+root `vercel.json` provides the equivalent production SPA rewrite and monorepo build
+contract; see [`deployment.md`](deployment.md).
 
 ## API contract
 
@@ -86,3 +87,12 @@ npm run build
 
 The tests use mocked HTTP responses and require no MongoDB, Vercel, private video,
 or internet access.
+
+## Vercel production
+
+Vercel builds from the repository root with `npm --prefix apps/web run build` and
+serves `apps/web/dist`. Configure `VITE_API_BASE_URL` to the public HTTPS FastAPI
+origin in the Vercel build environment. Only that origin is browser configuration;
+MongoDB and both Blob write tokens remain on the API/worker hosts. Direct navigation
+to all routes uses the committed SPA fallback. Full setup and smoke-test commands
+are in [`deployment.md`](deployment.md).

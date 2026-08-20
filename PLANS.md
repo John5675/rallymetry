@@ -792,9 +792,41 @@ Exit criteria:
 - No deployment, hosted-media upload UI, authentication, human correction, or AI
   coaching is implemented.
 
+## 23. Vercel deployment + hosted media — complete
+
+Make the React/Vite dashboard deployable to Vercel for a small friend group while
+keeping FastAPI and the outbound-only analysis worker on persistent Python hosts.
+Publish only deliberately friend-viewable generated media through a separate public
+Vercel Blob store; source recordings and internal artifacts remain private.
+
+Exit criteria:
+
+- The existing monorepo has an explicit Vercel build/install/output contract for
+  `apps/web`, a production `VITE_API_BASE_URL`, and an SPA fallback for direct
+  navigation to match and analysis routes.
+- FastAPI remains outside Vercel Functions and has a vendor-neutral production
+  Dockerfile, documented startup command, environment contract, and `/health`
+  health check suitable for a small persistent Python host.
+- `CORS_ORIGINS` supports exact localhost, Vercel production, and optional custom
+  frontend origins without exposing database or Blob credentials to the browser.
+- Hosted artifact storage routes private source/internal media to a private Blob
+  store and explicitly public `VIEWABLE_MEDIA` to a separate public Blob store;
+  randomized pathnames remain mandatory.
+- Worker publication policy makes friend-viewable generated videos and images
+  explicit while structured internal outputs remain private.
+- Existing unlisted YouTube IDs remain the normal source for browser playback and
+  are not copied to Blob solely for viewing.
+- Root, FastAPI/worker, and frontend `.env.example` files list required variable
+  names and safe examples without secrets.
+- `docs/deployment.md` covers MongoDB Atlas, both Blob access classes, FastAPI,
+  Vercel, worker startup, variables, and an end-to-end smoke test.
+- Python tests, Ruff checks/formatting, mypy, the CLI doctor, frontend lint/type
+  checks/tests/build, and deployment-config validation pass.
+- No authentication, correction workflow, AI coaching, or FastAPI-on-Vercel
+  implementation is introduced.
+
 ## Future milestones — not current
 
-23. Vercel deployment + hosted media
 24. Human correction workflow
 25. AI coaching
 26. Final architecture / quality audit

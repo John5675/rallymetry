@@ -3,6 +3,7 @@
 from pickleball_vision.persistence.artifacts import (
     ArtifactStore,
     LocalArtifactStore,
+    RoutedVercelBlobArtifactStore,
     VercelBlobArtifactStore,
     create_artifact_store,
 )
@@ -38,6 +39,7 @@ __all__ = [
     "PlayerRecord",
     "ProcessingJobRecord",
     "ProcessingJobStatus",
+    "RoutedVercelBlobArtifactStore",
     "StructuredCollection",
     "StructuredDomainRecord",
     "VercelBlobArtifactStore",

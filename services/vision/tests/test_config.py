@@ -112,6 +112,7 @@ def test_settings_load_prefixed_environment_values() -> None:
             "PICKLEBALL_VISION_ARTIFACT_BACKEND": "vercel_blob",
             "PICKLEBALL_VISION_LOCAL_ARTIFACT_ROOT": "~/pickleball-artifacts",
             "BLOB_READ_WRITE_TOKEN": "blob-secret",
+            "PUBLIC_BLOB_READ_WRITE_TOKEN": "public-blob-secret",
         }
     )
 
@@ -200,6 +201,7 @@ def test_settings_load_prefixed_environment_values() -> None:
         artifact_backend=ArtifactBackend.VERCEL_BLOB,
         local_artifact_root=Path("~/pickleball-artifacts").expanduser(),
         vercel_blob_token="blob-secret",
+        vercel_blob_public_token="public-blob-secret",
     )
     public = settings.public_values()["persistence"]
     assert isinstance(public, dict)
@@ -209,6 +211,7 @@ def test_settings_load_prefixed_environment_values() -> None:
         "artifactBackend": "vercel_blob",
         "localArtifactRoot": str(Path("~/pickleball-artifacts").expanduser()),
         "vercelBlobConfigured": True,
+        "vercelBlobPublicConfigured": True,
     }
     assert "secret" not in repr(public)
 

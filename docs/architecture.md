@@ -65,7 +65,9 @@ adds the FastAPI control plane under the vision service; see [`api.md`](api.md).
 Milestone 21 adds the separate leased analysis process without moving analysis into
 HTTP; see [`worker.md`](worker.md).
 Milestone 22 adds the strict TypeScript dashboard under `apps/web`; see
-[`web.md`](web.md). Deployment and hosted routing remain Milestone 23 work.
+[`web.md`](web.md). Milestone 23 adds the Vercel SPA deployment contract, persistent
+FastAPI container boundary, and dual-access Blob delivery; see
+[`deployment.md`](deployment.md).
 
 ## Runtime responsibilities
 
@@ -120,11 +122,12 @@ MongoDB stores their metadata, provenance, status, and blob references.
 
 ### Vercel Blob
 
-Vercel Blob stores hosted source video and binary/generated artifacts, including
-review media, visualizations, and large structured artifacts when appropriate. Only
-FastAPI and the analysis worker access Blob through project-owned interfaces and
-adapters. Storage provider details and credentials cannot become CV/audio domain
-dependencies or browser configuration.
+Vercel Blob stores hosted source video and binary/generated artifacts. A private
+store owns source/internal objects; a separate public store owns only deliberately
+public `VIEWABLE_MEDIA` such as friend-viewable review videos and heatmaps. Only
+FastAPI and the analysis worker receive either write credential through
+project-owned adapters. The browser receives public object URLs, never provider
+credentials. Storage details cannot become CV/audio domain dependencies.
 
 ### Local pipeline
 
@@ -338,14 +341,15 @@ the domain model.
 
 ## Deployment boundary
 
-The React/Vite frontend will eventually deploy to Vercel. FastAPI and the Python
-analysis worker require independent Python-capable runtime boundaries; heavy analysis
-cannot execute in Vercel Functions or in the API request process. Their exact hosting
-provider is intentionally deferred.
+The React/Vite frontend deploys to Vercel. FastAPI runs in the vendor-neutral
+container under `services/vision` on a persistent Python-capable host. The analysis
+worker remains an independent outbound-only process and can run on the developer PC.
+Heavy analysis cannot execute in Vercel Functions or in the API request process.
 
 MongoDB Atlas and Vercel Blob remain optional hosted adapters, not prerequisites for
 local pipeline use. Milestone 20 provides the FastAPI control plane and creates
 durable queued-job records. Milestone 21 provides the separate single-concurrency
 worker, atomic MongoDB claims, heartbeats, bounded stale-lease recovery, source
-staging, and pipeline publication. No web application, deployment, authentication,
-upload flow, or correction workflow is implemented yet.
+staging, and pipeline publication. Milestone 22 provides the browser, and Milestone
+23 provides hosted delivery. Authentication, upload UI, and corrections remain
+later work.

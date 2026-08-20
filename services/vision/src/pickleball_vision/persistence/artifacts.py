@@ -264,13 +264,17 @@ class VercelBlobArtifactStore:
         self,
         token: str,
         *,
+        store_access: ArtifactAccess = ArtifactAccess.PRIVATE,
         client: _AsyncBlobClient | None = None,
         token_factory: Callable[[], str] = _random_token,
     ) -> None:
         if not token.strip():
             raise PersistenceValidationError("Vercel Blob token must not be empty")
+        if store_access is ArtifactAccess.LOCAL:
+            raise PersistenceValidationError("Vercel Blob store access cannot be LOCAL")
         self._client = client or cast(_AsyncBlobClient, AsyncBlobClient(token=token))
         self._token_factory = token_factory
+        self._store_access = store_access
 
     async def put(self, request: ArtifactPutRequest) -> ArtifactRecord:
         source = _validate_source(request.source_path)
@@ -364,8 +368,7 @@ class VercelBlobArtifactStore:
             ) from error
         return True
 
-    @staticmethod
-    def _access(request: ArtifactPutRequest) -> ArtifactAccess:
+    def _access(self, request: ArtifactPutRequest) -> ArtifactAccess:
         access = request.access or ArtifactAccess.PRIVATE
         if access is ArtifactAccess.LOCAL:
             raise PersistenceValidationError("Vercel Blob access must be PRIVATE or PUBLIC")
@@ -374,16 +377,71 @@ class VercelBlobArtifactStore:
             and access is ArtifactAccess.PUBLIC
         ):
             raise PersistenceValidationError("only VIEWABLE_MEDIA may be intentionally public")
+        if access is not self._store_access:
+            raise PersistenceValidationError(
+                f"artifact requests {access.value} access but this Blob store is "
+                f"{self._store_access.value}"
+            )
         return access
 
-    @staticmethod
-    def _require_provider(artifact: ArtifactRecord) -> None:
+    def _require_provider(self, artifact: ArtifactRecord) -> None:
         if artifact.provider is not ArtifactProvider.VERCEL_BLOB:
             raise ArtifactStorageError(
                 "provider_check",
                 reason="artifact belongs to a different provider",
                 pathname=artifact.pathname,
             )
+        if artifact.access is not self._store_access:
+            raise ArtifactStorageError(
+                "provider_check",
+                reason="artifact belongs to a Blob store with different access",
+                pathname=artifact.pathname,
+            )
+
+
+class RoutedVercelBlobArtifactStore:
+    """Route public viewable media to a distinct public Blob store."""
+
+    def __init__(
+        self,
+        private_store: VercelBlobArtifactStore,
+        public_store: VercelBlobArtifactStore | None = None,
+    ) -> None:
+        self._private_store = private_store
+        self._public_store = public_store
+
+    async def put(self, request: ArtifactPutRequest) -> ArtifactRecord:
+        return await self._store_for_request(request).put(request)
+
+    async def get(self, artifact: ArtifactRecord, destination: Path) -> Path:
+        return await self._store_for_artifact(artifact).get(artifact, destination)
+
+    async def delete(self, artifact: ArtifactRecord) -> None:
+        await self._store_for_artifact(artifact).delete(artifact)
+
+    async def exists(self, artifact: ArtifactRecord) -> bool:
+        return await self._store_for_artifact(artifact).exists(artifact)
+
+    def _store_for_request(self, request: ArtifactPutRequest) -> VercelBlobArtifactStore:
+        access = request.access or ArtifactAccess.PRIVATE
+        if access is not ArtifactAccess.PUBLIC:
+            return self._private_store
+        if request.category is not ArtifactCategory.VIEWABLE_MEDIA:
+            raise PersistenceValidationError("only VIEWABLE_MEDIA may be intentionally public")
+        if self._public_store is None:
+            raise PersistenceValidationError(
+                "public VIEWABLE_MEDIA requires PUBLIC_BLOB_READ_WRITE_TOKEN"
+            )
+        return self._public_store
+
+    def _store_for_artifact(self, artifact: ArtifactRecord) -> VercelBlobArtifactStore:
+        if artifact.access is not ArtifactAccess.PUBLIC:
+            return self._private_store
+        if self._public_store is None:
+            raise PersistenceValidationError(
+                "public Vercel Blob access requires PUBLIC_BLOB_READ_WRITE_TOKEN"
+            )
+        return self._public_store
 
 
 def create_artifact_store(settings: PersistenceSettings) -> ArtifactStore:
@@ -394,4 +452,15 @@ def create_artifact_store(settings: PersistenceSettings) -> ArtifactStore:
     token = settings.vercel_blob_token
     if token is None:  # Defensive: PersistenceSettings.from_env already enforces this.
         raise PersistenceValidationError("Vercel Blob backend requires a configured token")
-    return VercelBlobArtifactStore(token)
+    public_store = (
+        VercelBlobArtifactStore(
+            settings.vercel_blob_public_token,
+            store_access=ArtifactAccess.PUBLIC,
+        )
+        if settings.vercel_blob_public_token is not None
+        else None
+    )
+    return RoutedVercelBlobArtifactStore(
+        private_store=VercelBlobArtifactStore(token),
+        public_store=public_store,
+    )

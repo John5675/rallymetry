@@ -1755,6 +1755,7 @@ class PersistenceSettings:
     artifact_backend: ArtifactBackend = ArtifactBackend.LOCAL
     local_artifact_root: Path = Path("output/artifacts")
     vercel_blob_token: str | None = field(default=None, repr=False)
+    vercel_blob_public_token: str | None = field(default=None, repr=False)
 
     @classmethod
     def from_env(
@@ -1798,6 +1799,8 @@ class PersistenceSettings:
             raise ConfigurationError(f"{setting} must not be empty", setting=setting)
         token_raw = source.get("BLOB_READ_WRITE_TOKEN", "").strip()
         token = token_raw or None
+        public_token_raw = source.get("PUBLIC_BLOB_READ_WRITE_TOKEN", "").strip()
+        public_token = public_token_raw or None
         if backend is ArtifactBackend.VERCEL_BLOB and token is None:
             raise ConfigurationError(
                 "BLOB_READ_WRITE_TOKEN is required when the Vercel Blob backend is selected",
@@ -1809,6 +1812,7 @@ class PersistenceSettings:
             artifact_backend=backend,
             local_artifact_root=Path(root_raw).expanduser(),
             vercel_blob_token=token,
+            vercel_blob_public_token=public_token,
         )
 
     def public_values(self) -> dict[str, object]:
@@ -1820,6 +1824,7 @@ class PersistenceSettings:
             "artifactBackend": self.artifact_backend.value,
             "localArtifactRoot": str(self.local_artifact_root),
             "vercelBlobConfigured": self.vercel_blob_token is not None,
+            "vercelBlobPublicConfigured": self.vercel_blob_public_token is not None,
         }
 
 

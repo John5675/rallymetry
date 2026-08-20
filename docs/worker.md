@@ -64,6 +64,12 @@ deterministic record. `artifacts` lists selected files and their explicit
 `VIEWABLE_MEDIA` or `INTERNAL_ARTIFACT` policy. Raw detections and frame-level data
 remain artifacts rather than large MongoDB documents.
 
+The checked-in friend-view publication policy marks review videos and optional
+heatmaps `PUBLIC` `VIEWABLE_MEDIA`. It marks ball tracks, raw audio observations,
+and analytics artifacts `PRIVATE` `INTERNAL_ARTIFACT`. Public publication requires
+the separate `PUBLIC_BLOB_READ_WRITE_TOKEN`; it never falls back to weakening the
+private store.
+
 The checked-in [example plan](examples/worker-pipeline-plan.json) shows the complete
 stage chain. Its `/opt/pickleball-vision/...` calibration, assignment, configuration,
 and weights paths are deliberate placeholders: operators must provide reviewed
@@ -78,6 +84,7 @@ export MONGODB_URL='mongodb+srv://<user>:<password>@<cluster>/'
 export MONGODB_DATABASE='pickleball_vision'
 export PICKLEBALL_VISION_ARTIFACT_BACKEND='vercel_blob'
 export BLOB_READ_WRITE_TOKEN='<server-side-token>'
+export PUBLIC_BLOB_READ_WRITE_TOKEN='<separate-public-store-server-token>'
 export PICKLEBALL_VISION_WORKER_PIPELINE_PLAN="$PWD/../../docs/examples/worker-pipeline-plan.json"
 ```
 

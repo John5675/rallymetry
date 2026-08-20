@@ -15,6 +15,7 @@ def test_api_settings_load_cors_mongodb_and_storage_environment() -> None:
             "MONGODB_DATABASE": "rallymetry_test",
             "PICKLEBALL_VISION_ARTIFACT_BACKEND": "vercel_blob",
             "BLOB_READ_WRITE_TOKEN": "server-secret",
+            "PUBLIC_BLOB_READ_WRITE_TOKEN": "public-server-secret",
         }
     )
 
@@ -25,7 +26,24 @@ def test_api_settings_load_cors_mongodb_and_storage_environment() -> None:
     assert settings.persistence.artifact_backend is ArtifactBackend.VERCEL_BLOB
     public = settings.public_values()
     assert "server-secret" not in repr(public)
+    assert "public-server-secret" not in repr(public)
     assert "user:secret" not in repr(public)
+
+
+def test_api_settings_accept_local_vercel_and_custom_frontend_origins() -> None:
+    settings = ApiSettings.from_env(
+        {
+            "CORS_ORIGINS": (
+                "http://localhost:5173,https://rallymetry.vercel.app,https://matches.example.com"
+            )
+        }
+    )
+
+    assert settings.cors_origins == (
+        "http://localhost:5173",
+        "https://rallymetry.vercel.app",
+        "https://matches.example.com",
+    )
 
 
 @pytest.mark.parametrize(
