@@ -75,4 +75,16 @@ describe("dashboard domain projections", () => {
     expect(findPrimaryVideo([artifact({ access: "PRIVATE" })])).toBeNull();
     expect(findPrimaryVideo([artifact({ access: "PUBLIC" })])?.url).toContain("blob.example");
   });
+
+  it("does not mistake court-map media for the primary match video", () => {
+    expect(
+      findPrimaryVideo([
+        artifact({
+          artifactType: "player_topdown_video",
+          pathname: "random/topdown.mp4",
+          url: "https://blob.example/topdown.mp4",
+        }),
+      ]),
+    ).toBeNull();
+  });
 });

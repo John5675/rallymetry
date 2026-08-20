@@ -156,7 +156,7 @@ export function findPrimaryVideo(artifacts: Artifact[]): Artifact | null {
       return artifact;
     }
   }
-  return findPublicArtifact(artifacts, (artifact) => artifact.contentType.startsWith("video/"));
+  return null;
 }
 
 function recordTimestamp(record: DomainRecord, ...payloadKeys: string[]): number | null {
