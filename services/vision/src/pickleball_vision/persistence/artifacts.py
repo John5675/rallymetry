@@ -9,7 +9,7 @@ import os
 import re
 import shutil
 import uuid
-from collections.abc import AsyncIterator, Callable
+from collections.abc import Callable
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import Protocol, cast
@@ -54,20 +54,15 @@ class _BlobPutResult(Protocol):
     content_type: str
 
 
-class _BlobGetResult(Protocol):
-    status_code: int
-    stream: AsyncIterator[bytes] | None
-
-
 class _BlobHeadResult(Protocol):
     pathname: str
 
 
 class _AsyncBlobClient(Protocol):
-    async def put(
+    async def upload_file(
         self,
+        local_path: str | Path,
         path: str,
-        body: object,
         *,
         access: str,
         content_type: str | None,
@@ -76,7 +71,15 @@ class _AsyncBlobClient(Protocol):
         multipart: bool,
     ) -> _BlobPutResult: ...
 
-    async def get(self, url_or_path: str, *, access: str) -> _BlobGetResult | None: ...
+    async def download_file(
+        self,
+        url_or_path: str,
+        local_path: str | Path,
+        *,
+        access: str,
+        overwrite: bool,
+        create_parents: bool,
+    ) -> str: ...
 
     async def delete(self, url_or_path: str) -> None: ...
 
@@ -138,15 +141,6 @@ def _sha256(path: Path) -> str:
 
 def _artifact_id(token: str) -> str:
     return f"artifact_{token}"
-
-
-async def _file_chunks(path: Path) -> AsyncIterator[bytes]:
-    with path.open("rb") as source:
-        while True:
-            chunk = await asyncio.to_thread(source.read, _CHUNK_SIZE)
-            if not chunk:
-                break
-            yield chunk
 
 
 def _temporary_destination(destination: Path, token: str) -> Path:
@@ -285,15 +279,16 @@ class VercelBlobArtifactStore:
         access = self._access(request)
         size_bytes = source.stat().st_size
         content_type = _content_type(request)
+        multipart = size_bytes >= _MULTIPART_THRESHOLD_BYTES
         try:
-            result = await self._client.put(
+            result = await self._client.upload_file(
+                source,
                 pathname,
-                _file_chunks(source),
                 access=access.value.lower(),
                 content_type=content_type,
                 add_random_suffix=True,
                 overwrite=False,
-                multipart=size_bytes >= _MULTIPART_THRESHOLD_BYTES,
+                multipart=multipart,
             )
             checksum = await asyncio.to_thread(_sha256, source)
         except (BlobError, OSError) as error:
@@ -321,27 +316,17 @@ class VercelBlobArtifactStore:
     async def get(self, artifact: ArtifactRecord, destination: Path) -> Path:
         self._require_provider(artifact)
         target = artifact.url or artifact.pathname
-        try:
-            result = await self._client.get(target, access=artifact.access.value.lower())
-        except BlobError as error:
-            raise ArtifactStorageError(
-                "get",
-                reason=str(error),
-                pathname=artifact.pathname,
-            ) from error
-        if result is None or result.status_code != 200 or result.stream is None:
-            raise ArtifactStorageError(
-                "get",
-                reason="artifact does not exist or returned no content",
-                pathname=artifact.pathname,
-            )
         resolved_destination = destination.expanduser().resolve()
         resolved_destination.parent.mkdir(parents=True, exist_ok=True)
         temporary = _temporary_destination(resolved_destination, self._token_factory())
         try:
-            with temporary.open("wb") as output:
-                async for chunk in result.stream:
-                    output.write(chunk)
+            await self._client.download_file(
+                target,
+                temporary,
+                access=artifact.access.value.lower(),
+                overwrite=True,
+                create_parents=True,
+            )
             await asyncio.to_thread(os.replace, temporary, resolved_destination)
         except (OSError, BlobError) as error:
             temporary.unlink(missing_ok=True)

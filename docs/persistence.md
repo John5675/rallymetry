@@ -28,6 +28,45 @@ configuration reports only whether credentials are configured; it never returns
 their values. `.env.example` contains empty placeholders only. Application and
 worker deployments must inject real secrets through their environment.
 
+### Provision a private Vercel Blob store
+
+Link the repository to a dedicated Vercel project without deploying it, create a
+private store in the region nearest the analysis worker, and pull the development
+environment into the ignored `.env.local` file:
+
+```bash
+npx --yes vercel@latest login
+npx --yes vercel@latest link
+npx --yes vercel@latest blob create-store pickleball-vision-private \
+  --access private \
+  --region sfo1 \
+  --yes
+npx --yes vercel@latest env add PICKLEBALL_VISION_ARTIFACT_BACKEND \
+  production,preview,development \
+  --value vercel_blob \
+  --yes \
+  --no-sensitive
+npx --yes vercel@latest env pull .env.local --yes
+```
+
+Vercel creates and connects `BLOB_READ_WRITE_TOKEN`; never copy its value into a
+tracked file. The Python settings layer intentionally does not load dotenv files,
+so a local worker must export the pulled values before it starts:
+
+```bash
+cd services/vision
+set -a
+source ../../.env.local
+set +a
+uv run pickleball-vision worker \
+  --pipeline-plan ../../docs/examples/worker-pipeline-plan.json
+```
+
+The default worker publication plan requests private access for viewable and
+internal outputs, so it is compatible with this private store. A future public
+delivery path must use an explicitly configured public store; a Blob store's access
+mode cannot be changed after creation.
+
 ## MongoDB collections
 
 Each record is match-scoped where applicable. Repeating records remain separate so
@@ -42,12 +81,16 @@ a match does not become one unbounded document.
 | `bounces` | Structured bounce records | unique match/record; match/time |
 | `shots` | Structured shot records | unique match/record; match/time |
 | `analytics` | Deterministic metrics, calculation version, input references | unique match/analytics ID |
-| `processing_jobs` | Job status and progress records | match/create time; status/update time |
+| `processing_jobs` | Leased job state, progress, attempts, errors, source/result references | match/create time; status/update time; status/heartbeat/attempt/create claim index |
 | `corrections` | Versionable correction records for the later workflow | match/target |
 | `artifacts` | Provider-neutral artifact manifests | unique pathname; match/time; match/category |
 
-The processing-job record is persistence only. Atomic claiming, retries, leases,
-and worker execution belong to Milestone 21.
+The Milestone 21 [analysis worker](worker.md) owns job execution. It atomically
+claims one eligible document, writes ownership-checked heartbeats and stage updates,
+reclaims stale leases up to a bounded attempt count, and marks exhausted or explicit
+failures terminal. Job documents retain only coordination metadata and artifact
+references; pipeline outputs continue to use their separate collections or artifact
+storage.
 
 Before a write, the adapter validates BSON-safe values, rejects byte arrays and
 known inline binary fields, rejects unsafe MongoDB keys, rejects non-finite numbers,

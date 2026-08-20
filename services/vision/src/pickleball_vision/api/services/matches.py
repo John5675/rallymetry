@@ -27,9 +27,12 @@ from pickleball_vision.api.schemas.records import (
 )
 from pickleball_vision.api.services.persistence import ApplicationPersistence
 from pickleball_vision.persistence.models import (
+    ArtifactCategory,
+    ArtifactProvider,
     Document,
     MatchRecord,
     ProcessingJobRecord,
+    SourceMediaType,
 )
 
 ResponseModel = TypeVar("ResponseModel", bound=BaseModel)
@@ -144,12 +147,39 @@ class MatchApplicationService:
         return ArtifactListResponse(items=items, total=len(items))
 
     async def queue_processing(self, match_id: str) -> JobResponse:
-        await self._require_match(match_id)
+        match = await self._require_match(match_id)
+        source_artifact_id = match.get("sourceArtifactId")
+        if not isinstance(source_artifact_id, str) or not source_artifact_id:
+            raise ApiError(
+                status_code=409,
+                code="source_media_required",
+                message="The match requires a SOURCE_MEDIA artifact before processing",
+            )
+        artifact = await self._persistence.get_artifact(source_artifact_id)
+        if artifact is None or artifact.get("category") != ArtifactCategory.SOURCE_MEDIA.value:
+            raise ApiError(
+                status_code=409,
+                code="source_media_unavailable",
+                message="The match source-media artifact is unavailable",
+            )
+        provider = artifact.get("provider")
+        if provider == ArtifactProvider.LOCAL.value:
+            source_type = SourceMediaType.LOCAL_PATH
+        elif provider == ArtifactProvider.VERCEL_BLOB.value:
+            source_type = SourceMediaType.BLOB
+        else:
+            raise ApiError(
+                status_code=409,
+                code="source_media_unavailable",
+                message="The match source-media provider is unsupported",
+            )
         now = datetime.now(UTC)
         record = ProcessingJobRecord(
             job_id=f"job_{uuid.uuid4().hex}",
             match_id=match_id,
             job_type="analyze_match",
+            source_type=source_type,
+            source_artifact_id=source_artifact_id,
             created_at=now,
             updated_at=now,
         )

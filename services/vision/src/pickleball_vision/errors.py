@@ -51,6 +51,10 @@ class ErrorCode(StrEnum):
     RALLY_SEGMENTATION_INPUT = "rally_segmentation_input_error"
     VIDEO_NOT_FOUND = "video_not_found"
     VIDEO_UNREADABLE = "video_unreadable"
+    WORKER_CONFIGURATION = "worker_configuration_error"
+    WORKER_LEASE = "worker_lease_error"
+    WORKER_PIPELINE = "worker_pipeline_error"
+    WORKER_SOURCE = "worker_source_error"
 
 
 class PickleballVisionError(Exception):
@@ -112,6 +116,64 @@ class ArtifactStorageError(PickleballVisionError):
             f"Artifact storage operation {operation} failed: {reason}",
             code=ErrorCode.ARTIFACT_STORAGE,
             details=details,
+        )
+
+
+class WorkerError(PickleballVisionError):
+    """Expected failure recorded on a leased background-processing job."""
+
+    def __init__(
+        self,
+        message: str,
+        *,
+        code: ErrorCode,
+        job_error_code: str,
+        details: Mapping[str, object] | None = None,
+    ) -> None:
+        super().__init__(message, code=code, details=details)
+        self.job_error_code = job_error_code
+
+
+class WorkerConfigurationError(WorkerError):
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Invalid worker configuration: {reason}",
+            code=ErrorCode.WORKER_CONFIGURATION,
+            job_error_code="WORKER_CONFIGURATION",
+            details={"reason": reason},
+        )
+
+
+class WorkerSourceError(WorkerError):
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Unable to stage source media: {reason}",
+            code=ErrorCode.WORKER_SOURCE,
+            job_error_code="WORKER_SOURCE",
+            details={"reason": reason},
+        )
+
+
+class WorkerPipelineError(WorkerError):
+    def __init__(self, reason: str, *, stage: str | None = None) -> None:
+        details: dict[str, object] = {"reason": reason}
+        if stage is not None:
+            details["stage"] = stage
+        super().__init__(
+            f"Analysis pipeline failed: {reason}",
+            code=ErrorCode.WORKER_PIPELINE,
+            job_error_code="WORKER_PIPELINE",
+            details=details,
+        )
+
+
+class WorkerLeaseLostError(WorkerError):
+    def __init__(self, job_id: str) -> None:
+        super().__init__(
+            f"Worker no longer owns job {job_id}",
+            code=ErrorCode.WORKER_LEASE,
+            job_error_code="WORKER_LEASE_LOST",
+            details={"jobId": job_id},
         )
 
 

@@ -61,6 +61,8 @@ class ApplicationPersistence(Protocol):
 
     async def get_processing_job(self, job_id: str) -> Document | None: ...
 
+    async def get_artifact(self, artifact_id: str) -> Document | None: ...
+
 
 def copy_documents(documents: Sequence[Document]) -> tuple[Document, ...]:
     """Copy injected-test documents so API serialization cannot mutate storage."""

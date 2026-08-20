@@ -5,8 +5,8 @@ doubles pickleball matches into inspectable, structured match data. The long-ter
 goal includes court and player tracking, ball trajectories, rally and shot events,
 match analytics, and AI-assisted coaching.
 
-The latest completed milestone is **FastAPI application API**.
-Milestones 0–20 are complete. The local
+The latest completed milestone is **MongoDB job queue + separate analysis worker**.
+Milestones 0–21 are complete. The local
 CLI can inspect video plus optional synchronized audio, extract lossless analysis
 audio, calibrate the court, detect people broadly, derive court-aware candidates,
 manually assign the four logical match roles, and track those identities separately
@@ -41,6 +41,10 @@ through the official PyMongo Async API and large artifacts through interchangeab
 local-filesystem or Vercel Blob adapters without making cloud access a CLI
 prerequisite. A separate FastAPI control plane now exposes JSON match/result records
 and queues durable processing-job status without running analysis in HTTP requests.
+A separate outbound-only worker now atomically claims those MongoDB jobs, maintains
+bounded leases and heartbeats, stages local or Blob media, invokes an explicit
+operator-controlled plan of existing CLI stages, persists compact structured
+results, and publishes selected artifacts through the configured store.
 
 ## Repository map
 
@@ -57,12 +61,12 @@ The locked product stack is a React/Vite/TypeScript frontend, a FastAPI product 
 MongoDB Atlas for hosted structured data and the initial small-scale job queue,
 Vercel Blob for hosted media/artifacts, and a separate Python analysis worker that
 invokes the existing pipeline. Heavy analysis will not run in Vercel Functions or
-inside FastAPI HTTP requests. The persistence adapters and FastAPI control plane are
-now implemented; the worker and browser applications remain deferred to their
-milestones. See the
+inside FastAPI HTTP requests. The persistence adapters, FastAPI control plane, and
+analysis worker are now implemented; the browser application remains deferred. See
+the
 [architecture contract](docs/architecture.md) and
 [hosted persistence contract](docs/persistence.md), plus the
-[API contract](docs/api.md).
+[API contract](docs/api.md) and [worker contract](docs/worker.md).
 
 ## Optional hosted persistence
 
@@ -81,6 +85,10 @@ Do not expose either credential to a browser. MongoDB stores compact structured
 records and artifact references; videos, frames, audio waveforms, model weights,
 large detections, and debug media remain in an artifact store.
 
+For the supported Vercel project-link, private-store creation, local environment
+pull, and worker startup sequence, see the
+[hosted persistence setup](docs/persistence.md#provision-a-private-vercel-blob-store).
+
 Run the API from `services/vision` after configuring MongoDB:
 
 ```bash
@@ -88,8 +96,18 @@ export CORS_ORIGINS='http://localhost:5173'
 uv run uvicorn pickleball_vision.api.main:app --host 127.0.0.1 --port 8000
 ```
 
-`POST /api/matches/{matchId}/process` returns `202 Accepted` with a queued job ID.
-The separate analysis worker that will claim and execute that job is Milestone 21.
+`POST /api/matches/{matchId}/process` returns `202 Accepted` with a queued job ID
+after verifying the match has a `SOURCE_MEDIA` artifact. Run a single local claim
+with the trusted example plan (after replacing its match/model path placeholders):
+
+```bash
+uv run pickleball-vision worker \
+  --pipeline-plan ../../docs/examples/worker-pipeline-plan.json \
+  --once
+```
+
+Omit `--once` for continuous single-concurrency polling. The worker only needs
+outbound MongoDB Atlas and Vercel Blob access; it opens no inbound server.
 
 ## Prerequisites
 

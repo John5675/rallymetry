@@ -159,6 +159,9 @@ def test_mongodb_adapter_initializes_indexes_and_separate_collections() -> None:
         index["name"] == "ix_jobs_status_updated" for index in database["processing_jobs"].indexes
     )
     assert any(
+        index["name"] == "ix_jobs_claim_lease" for index in database["processing_jobs"].indexes
+    )
+    assert any(
         index["name"] == "uq_artifacts_pathname" and index["unique"] is True
         for index in database["artifacts"].indexes
     )
@@ -245,6 +248,7 @@ def test_mongodb_adapter_persists_compact_records_without_one_huge_match_documen
         "timestamp": 1.0,
     }
     assert asyncio.run(persistence.get_processing_job("job-1")) is not None
+    assert asyncio.run(persistence.get_artifact("artifact-source")) is not None
     artifacts = asyncio.run(persistence.list_match_artifacts("match-1"))
     assert [record["artifactId"] for record in artifacts] == ["artifact-source"]
 

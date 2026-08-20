@@ -1,0 +1,277 @@
+{
+  "planVersion": "1",
+  "pipelineVersion": "release-0.1-worker-v1",
+  "stages": [
+    {
+      "stage": "PLAYER_PROCESSING",
+      "progress": 0.05,
+      "argv": [
+        "detect-people",
+        "{source}",
+        "--calibration",
+        "/opt/pickleball-vision/matches/{matchId}/calibration.json",
+        "--output-dir",
+        "{workspace}/person-detection"
+      ]
+    },
+    {
+      "stage": "PLAYER_PROCESSING",
+      "progress": 0.12,
+      "argv": [
+        "track-players",
+        "{source}",
+        "--calibration",
+        "/opt/pickleball-vision/matches/{matchId}/calibration.json",
+        "--detections",
+        "{workspace}/person-detection/detections.json",
+        "--assignments",
+        "/opt/pickleball-vision/matches/{matchId}/player-assignments.json",
+        "--output-dir",
+        "{workspace}/player-tracking"
+      ]
+    },
+    {
+      "stage": "PLAYER_PROCESSING",
+      "progress": 0.18,
+      "argv": [
+        "analyze-players",
+        "{source}",
+        "--calibration",
+        "/opt/pickleball-vision/matches/{matchId}/calibration.json",
+        "--tracks",
+        "{workspace}/player-tracking/tracks.json",
+        "--output-dir",
+        "{workspace}/player-analysis"
+      ]
+    },
+    {
+      "stage": "BALL_PROCESSING",
+      "progress": 0.28,
+      "argv": [
+        "ball",
+        "detect",
+        "{source}",
+        "--config",
+        "/opt/pickleball-vision/models/ball/experiment.json",
+        "--weights",
+        "/opt/pickleball-vision/models/ball/best.pt",
+        "--strategy",
+        "court-roi-1920",
+        "--calibration",
+        "/opt/pickleball-vision/matches/{matchId}/calibration.json",
+        "--output-dir",
+        "{workspace}/ball-detection"
+      ]
+    },
+    {
+      "stage": "BALL_PROCESSING",
+      "progress": 0.38,
+      "argv": [
+        "track-ball",
+        "{source}",
+        "--detections",
+        "{workspace}/ball-detection/detections.json",
+        "--calibration",
+        "/opt/pickleball-vision/matches/{matchId}/calibration.json",
+        "--output-dir",
+        "{workspace}/ball-tracking"
+      ]
+    },
+    {
+      "stage": "AUDIO_PROCESSING",
+      "progress": 0.44,
+      "argv": [
+        "analyze-audio",
+        "{source}",
+        "--output-dir",
+        "{workspace}/audio-analysis"
+      ]
+    },
+    {
+      "stage": "RALLY_PROCESSING",
+      "progress": 0.52,
+      "argv": [
+        "segment-rallies",
+        "{source}",
+        "--ball-tracks",
+        "{workspace}/ball-tracking/ball_tracks.json",
+        "--player-tracks",
+        "{workspace}/player-tracking/tracks.json",
+        "--audio-events",
+        "{workspace}/audio-analysis/audio-events.json",
+        "--output-dir",
+        "{workspace}/rallies"
+      ]
+    },
+    {
+      "stage": "EVENT_PROCESSING",
+      "progress": 0.60,
+      "argv": [
+        "detect-bounces",
+        "{source}",
+        "--ball-tracks",
+        "{workspace}/ball-tracking/ball_tracks.json",
+        "--calibration",
+        "/opt/pickleball-vision/matches/{matchId}/calibration.json",
+        "--rallies",
+        "{workspace}/rallies/rallies.json",
+        "--audio-events",
+        "{workspace}/audio-analysis/audio-events.json",
+        "--output-dir",
+        "{workspace}/bounces"
+      ]
+    },
+    {
+      "stage": "EVENT_PROCESSING",
+      "progress": 0.67,
+      "argv": [
+        "detect-contacts",
+        "{source}",
+        "--ball-tracks",
+        "{workspace}/ball-tracking/ball_tracks.json",
+        "--player-tracks",
+        "{workspace}/player-tracking/tracks.json",
+        "--rallies",
+        "{workspace}/rallies/rallies.json",
+        "--bounces",
+        "{workspace}/bounces/bounces.json",
+        "--audio-events",
+        "{workspace}/audio-analysis/audio-events.json",
+        "--output-dir",
+        "{workspace}/contacts"
+      ]
+    },
+    {
+      "stage": "EVENT_PROCESSING",
+      "progress": 0.72,
+      "argv": [
+        "identify-hitters",
+        "{source}",
+        "--contacts",
+        "{workspace}/contacts/contacts.json",
+        "--player-tracks",
+        "{workspace}/player-tracking/tracks.json",
+        "--output-dir",
+        "{workspace}/hitters"
+      ]
+    },
+    {
+      "stage": "SHOT_PROCESSING",
+      "progress": 0.80,
+      "argv": [
+        "reconstruct-shots",
+        "{source}",
+        "--ball-tracks",
+        "{workspace}/ball-tracking/ball_tracks.json",
+        "--rallies",
+        "{workspace}/rallies/rallies.json",
+        "--contacts",
+        "{workspace}/contacts/contacts.json",
+        "--bounces",
+        "{workspace}/bounces/bounces.json",
+        "--hitters",
+        "{workspace}/hitters/hitters.json",
+        "--player-tracks",
+        "{workspace}/player-tracking/tracks.json",
+        "--output-dir",
+        "{workspace}/shots"
+      ]
+    },
+    {
+      "stage": "ANALYTICS",
+      "progress": 0.88,
+      "argv": [
+        "analyze-match",
+        "{source}",
+        "--rallies",
+        "{workspace}/rallies/rallies.json",
+        "--shots",
+        "{workspace}/shots/shots.json",
+        "--player-positions",
+        "{workspace}/player-analysis/player_positions.json",
+        "--output",
+        "{workspace}/analytics/match-analytics.json"
+      ]
+    }
+  ],
+  "structuredResults": [
+    {
+      "collection": "rallies",
+      "path": "rallies/rallies.json",
+      "recordsKey": "rallies",
+      "idField": "rallyId",
+      "timestampField": "startTimestamp",
+      "confidenceField": "confidence"
+    },
+    {
+      "collection": "bounces",
+      "path": "bounces/bounces.json",
+      "recordsKey": "bounceCandidates",
+      "idField": "bounceId",
+      "timestampField": "timestamp",
+      "confidenceField": "fusedConfidence"
+    },
+    {
+      "collection": "contacts",
+      "path": "contacts/contacts.json",
+      "recordsKey": "contactCandidates",
+      "idField": "contactId",
+      "timestampField": "timestamp",
+      "confidenceField": "fusedConfidence"
+    },
+    {
+      "collection": "shots",
+      "path": "shots/shots.json",
+      "recordsKey": "shots",
+      "idField": "shotId",
+      "timestampField": "contactTimestamp",
+      "confidenceField": "confidence"
+    },
+    {
+      "collection": "analytics",
+      "path": "analytics/match-analytics.json"
+    }
+  ],
+  "artifacts": [
+    {
+      "path": "player-tracking/annotated.mp4",
+      "artifactType": "player_tracking_video",
+      "category": "VIEWABLE_MEDIA"
+    },
+    {
+      "path": "player-analysis/topdown.mp4",
+      "artifactType": "player_topdown_video",
+      "category": "VIEWABLE_MEDIA"
+    },
+    {
+      "path": "ball-tracking/ball-debug.mp4",
+      "artifactType": "ball_tracking_video",
+      "category": "VIEWABLE_MEDIA"
+    },
+    {
+      "path": "rallies/rally-debug.mp4",
+      "artifactType": "rally_debug_video",
+      "category": "VIEWABLE_MEDIA"
+    },
+    {
+      "path": "shots/shot-debug.mp4",
+      "artifactType": "shot_debug_video",
+      "category": "VIEWABLE_MEDIA"
+    },
+    {
+      "path": "ball-tracking/ball_tracks.json",
+      "artifactType": "ball_tracks",
+      "category": "INTERNAL_ARTIFACT"
+    },
+    {
+      "path": "audio-analysis/audio-events.json",
+      "artifactType": "audio_events",
+      "category": "INTERNAL_ARTIFACT"
+    },
+    {
+      "path": "analytics/match-analytics.json",
+      "artifactType": "match_analytics",
+      "category": "INTERNAL_ARTIFACT"
+    }
+  ]
+}

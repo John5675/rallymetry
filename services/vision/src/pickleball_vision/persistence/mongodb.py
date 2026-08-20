@@ -13,6 +13,7 @@ from pymongo.errors import PyMongoError
 
 from pickleball_vision.config import PersistenceSettings
 from pickleball_vision.errors import PersistenceOperationError, PersistenceValidationError
+from pickleball_vision.persistence.job_queue import JobCollection, MongoJobQueue
 from pickleball_vision.persistence.models import (
     AnalyticsRecord,
     ArtifactRecord,
@@ -246,6 +247,17 @@ class MongoPersistence:
                     False,
                     "ix_jobs_status_updated",
                 ),
+                (
+                    (
+                        ("status", ASCENDING),
+                        ("heartbeatAt", ASCENDING),
+                        ("attemptCount", ASCENDING),
+                        ("createdAt", ASCENDING),
+                    ),
+                    False,
+                    False,
+                    "ix_jobs_claim_lease",
+                ),
             ),
             "corrections": (
                 (
@@ -451,6 +463,19 @@ class MongoPersistence:
             {"_id": job_id},
             "get_processing_job",
         )
+
+    async def get_artifact(self, artifact_id: str) -> Document | None:
+        return await self._find_one(
+            "artifacts",
+            {"_id": artifact_id},
+            "get_artifact",
+        )
+
+    def job_queue(self) -> MongoJobQueue:
+        """Return the project-owned lease adapter over this database connection."""
+
+        collection = cast(JobCollection, self._database["processing_jobs"])
+        return MongoJobQueue(collection)
 
     async def list_match_artifacts(self, match_id: str) -> tuple[Document, ...]:
         documents, _ = await self._list_documents(

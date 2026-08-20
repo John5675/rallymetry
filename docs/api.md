@@ -82,14 +82,20 @@ of the response contract.
   "matchId": "match_<id>",
   "jobType": "analyze_match",
   "status": "QUEUED",
-  "progress": 0.0
+  "progress": 0.0,
+  "attemptCount": 0,
+  "sourceType": "BLOB",
+  "sourceArtifactId": "artifact_<id>",
+  "resultArtifactIds": []
 }
 ```
 
-The response is `202 Accepted` and includes a `Location` header pointing to
-`/api/jobs/{jobId}`. No background task is attached to the response. Atomic job
-claiming, leases, retries, worker execution, and pipeline result persistence belong
-to Milestone 21.
+The match must reference an existing `SOURCE_MEDIA` artifact; a missing or invalid
+source returns `409`. The response is `202 Accepted` and includes a `Location`
+header pointing to `/api/jobs/{jobId}`. No background task is attached to the
+response. The separate Milestone 21 worker owns atomic claiming, leases, pipeline
+execution, result persistence, and artifact publication. `GET /api/jobs/{jobId}`
+also exposes its safe stage/timestamp/attempt/error fields as they become available.
 
 ## Errors and request logging
 

@@ -73,13 +73,27 @@ class ArtifactProvider(StrEnum):
 
 
 class ProcessingJobStatus(StrEnum):
-    """Persisted status only; queue claiming is deferred to Milestone 21."""
+    """Durable queue and pipeline states for the single-match worker."""
 
     QUEUED = "QUEUED"
-    RUNNING = "RUNNING"
-    SUCCEEDED = "SUCCEEDED"
+    CLAIMED = "CLAIMED"
+    PLAYER_PROCESSING = "PLAYER_PROCESSING"
+    BALL_PROCESSING = "BALL_PROCESSING"
+    AUDIO_PROCESSING = "AUDIO_PROCESSING"
+    RALLY_PROCESSING = "RALLY_PROCESSING"
+    EVENT_PROCESSING = "EVENT_PROCESSING"
+    SHOT_PROCESSING = "SHOT_PROCESSING"
+    ANALYTICS = "ANALYTICS"
+    PUBLISHING = "PUBLISHING"
+    COMPLETE = "COMPLETE"
     FAILED = "FAILED"
-    CANCELLED = "CANCELLED"
+
+
+class SourceMediaType(StrEnum):
+    """Supported worker source-media locations; YouTube is intentionally absent."""
+
+    LOCAL_PATH = "LOCAL_PATH"
+    BLOB = "BLOB"
 
 
 class StructuredCollection(StrEnum):
@@ -316,7 +330,7 @@ class AnalyticsRecord:
 
 @dataclass(frozen=True, slots=True)
 class ProcessingJobRecord:
-    """Small processing-status record; queue leases/claims are not implemented here."""
+    """Small leased-job record stored independently from analysis results."""
 
     job_id: str
     match_id: str
@@ -324,7 +338,19 @@ class ProcessingJobRecord:
     status: ProcessingJobStatus = ProcessingJobStatus.QUEUED
     progress: float = 0.0
     stage: str | None = None
-    error: Mapping[str, object] | None = None
+    claimed_at: datetime | None = None
+    started_at: datetime | None = None
+    heartbeat_at: datetime | None = None
+    completed_at: datetime | None = None
+    worker_id: str | None = None
+    attempt_count: int = 0
+    error_code: str | None = None
+    error_message: str | None = None
+    pipeline_version: str | None = None
+    source_type: SourceMediaType | None = None
+    source_path: str | None = None
+    source_artifact_id: str | None = None
+    result_artifact_ids: tuple[str, ...] = ()
     created_at: datetime = field(default_factory=utc_now)
     updated_at: datetime = field(default_factory=utc_now)
 
@@ -335,10 +361,58 @@ class ProcessingJobRecord:
         if not 0.0 <= self.progress <= 1.0:
             raise PersistenceValidationError("progress must be between 0 and 1")
         object.__setattr__(self, "stage", _optional_text(self.stage, "stage"))
-        if self.error is not None:
-            object.__setattr__(self, "error", _copy_mapping(self.error, "error"))
+        for field_name in ("claimed_at", "started_at", "heartbeat_at", "completed_at"):
+            value = getattr(self, field_name)
+            if value is not None:
+                object.__setattr__(self, field_name, _utc_datetime(value, field_name))
+        object.__setattr__(self, "worker_id", _optional_text(self.worker_id, "worker_id"))
+        if self.attempt_count < 0:
+            raise PersistenceValidationError("attempt_count must be nonnegative")
+        object.__setattr__(self, "error_code", _optional_text(self.error_code, "error_code"))
+        object.__setattr__(
+            self,
+            "error_message",
+            _optional_text(self.error_message, "error_message"),
+        )
+        object.__setattr__(
+            self,
+            "pipeline_version",
+            _optional_text(self.pipeline_version, "pipeline_version"),
+        )
+        object.__setattr__(self, "source_path", _optional_text(self.source_path, "source_path"))
+        object.__setattr__(
+            self,
+            "source_artifact_id",
+            _optional_text(self.source_artifact_id, "source_artifact_id"),
+        )
+        object.__setattr__(
+            self,
+            "result_artifact_ids",
+            tuple(
+                _required_text(value, "result_artifact_ids item")
+                for value in self.result_artifact_ids
+            ),
+        )
         object.__setattr__(self, "created_at", _utc_datetime(self.created_at, "created_at"))
         object.__setattr__(self, "updated_at", _utc_datetime(self.updated_at, "updated_at"))
+        if self.updated_at < self.created_at:
+            raise PersistenceValidationError("updated_at must not precede created_at")
+        if self.source_type is SourceMediaType.LOCAL_PATH:
+            if self.source_path is None and self.source_artifact_id is None:
+                raise PersistenceValidationError(
+                    "LOCAL_PATH jobs require source_path or source_artifact_id"
+                )
+        elif self.source_type is SourceMediaType.BLOB and self.source_artifact_id is None:
+            raise PersistenceValidationError("BLOB jobs require source_artifact_id")
+        if self.source_path is not None and self.source_type is not SourceMediaType.LOCAL_PATH:
+            raise PersistenceValidationError("source_path is only valid for LOCAL_PATH jobs")
+        if self.status is ProcessingJobStatus.COMPLETE and self.progress != 1.0:
+            raise PersistenceValidationError("COMPLETE jobs must have progress 1.0")
+        if (
+            self.status in {ProcessingJobStatus.COMPLETE, ProcessingJobStatus.FAILED}
+            and self.completed_at is None
+        ):
+            raise PersistenceValidationError("terminal jobs require completed_at")
 
     def to_document(self) -> Document:
         document: Document = {
@@ -348,13 +422,26 @@ class ProcessingJobRecord:
             "jobType": self.job_type,
             "status": self.status.value,
             "progress": self.progress,
+            "attemptCount": self.attempt_count,
+            "resultArtifactIds": list(self.result_artifact_ids),
             "createdAt": self.created_at,
             "updatedAt": self.updated_at,
         }
-        if self.stage is not None:
-            document["stage"] = self.stage
-        if self.error is not None:
-            document["error"] = dict(self.error)
+        optional: dict[str, object | None] = {
+            "stage": self.stage,
+            "claimedAt": self.claimed_at,
+            "startedAt": self.started_at,
+            "heartbeatAt": self.heartbeat_at,
+            "completedAt": self.completed_at,
+            "workerId": self.worker_id,
+            "errorCode": self.error_code,
+            "errorMessage": self.error_message,
+            "pipelineVersion": self.pipeline_version,
+            "sourceType": self.source_type.value if self.source_type is not None else None,
+            "sourcePath": self.source_path,
+            "sourceArtifactId": self.source_artifact_id,
+        }
+        document.update({key: value for key, value in optional.items() if value is not None})
         return document
 
 
@@ -536,3 +623,132 @@ class ArtifactPutRequest:
             raise PersistenceValidationError(
                 "SOURCE_MEDIA and INTERNAL_ARTIFACT cannot request public access"
             )
+
+
+def _document_datetime(
+    document: Mapping[str, object],
+    key: str,
+    *,
+    required: bool = False,
+) -> datetime | None:
+    value = document.get(key)
+    if value is None and not required:
+        return None
+    if not isinstance(value, datetime):
+        raise PersistenceValidationError(f"persisted {key} must be a datetime")
+    return value
+
+
+def _document_string(
+    document: Mapping[str, object],
+    key: str,
+    *,
+    required: bool = False,
+) -> str | None:
+    value = document.get(key)
+    if value is None and not required:
+        return None
+    if not isinstance(value, str):
+        raise PersistenceValidationError(f"persisted {key} must be a string")
+    return value
+
+
+def processing_job_from_document(document: Mapping[str, object]) -> ProcessingJobRecord:
+    """Parse a MongoDB job document without leaking BSON-specific structures."""
+
+    job_id = _document_string(document, "jobId", required=True)
+    match_id = _document_string(document, "matchId", required=True)
+    job_type = _document_string(document, "jobType", required=True)
+    status_raw = _document_string(document, "status", required=True)
+    assert job_id is not None and match_id is not None and job_type is not None
+    assert status_raw is not None
+    try:
+        status = ProcessingJobStatus(status_raw)
+    except ValueError as error:
+        raise PersistenceValidationError(
+            f"persisted job status is invalid: {status_raw}"
+        ) from error
+    source_type_raw = _document_string(document, "sourceType")
+    try:
+        source_type = SourceMediaType(source_type_raw) if source_type_raw is not None else None
+    except ValueError as error:
+        raise PersistenceValidationError(
+            f"persisted source type is invalid: {source_type_raw}"
+        ) from error
+    result_ids_raw = document.get("resultArtifactIds", [])
+    if not isinstance(result_ids_raw, list) or not all(
+        isinstance(value, str) for value in result_ids_raw
+    ):
+        raise PersistenceValidationError("persisted resultArtifactIds must be a string array")
+    progress = document.get("progress", 0.0)
+    attempt_count = document.get("attemptCount", 0)
+    if not isinstance(progress, (int, float)) or isinstance(progress, bool):
+        raise PersistenceValidationError("persisted progress must be numeric")
+    if not isinstance(attempt_count, int) or isinstance(attempt_count, bool):
+        raise PersistenceValidationError("persisted attemptCount must be an integer")
+    created_at = _document_datetime(document, "createdAt", required=True)
+    updated_at = _document_datetime(document, "updatedAt", required=True)
+    assert created_at is not None and updated_at is not None
+    return ProcessingJobRecord(
+        job_id=job_id,
+        match_id=match_id,
+        job_type=job_type,
+        status=status,
+        progress=float(progress),
+        stage=_document_string(document, "stage"),
+        claimed_at=_document_datetime(document, "claimedAt"),
+        started_at=_document_datetime(document, "startedAt"),
+        heartbeat_at=_document_datetime(document, "heartbeatAt"),
+        completed_at=_document_datetime(document, "completedAt"),
+        worker_id=_document_string(document, "workerId"),
+        attempt_count=attempt_count,
+        error_code=_document_string(document, "errorCode"),
+        error_message=_document_string(document, "errorMessage"),
+        pipeline_version=_document_string(document, "pipelineVersion"),
+        source_type=source_type,
+        source_path=_document_string(document, "sourcePath"),
+        source_artifact_id=_document_string(document, "sourceArtifactId"),
+        result_artifact_ids=tuple(result_ids_raw),
+        created_at=created_at,
+        updated_at=updated_at,
+    )
+
+
+def artifact_record_from_document(document: Mapping[str, object]) -> ArtifactRecord:
+    """Parse provider-neutral artifact metadata loaded from MongoDB."""
+
+    required_strings = {
+        key: _document_string(document, key, required=True)
+        for key in (
+            "artifactId",
+            "artifactType",
+            "category",
+            "pathname",
+            "provider",
+            "access",
+            "contentType",
+        )
+    }
+    size = document.get("size")
+    if not isinstance(size, int) or isinstance(size, bool):
+        raise PersistenceValidationError("persisted artifact size must be an integer")
+    created_at = _document_datetime(document, "createdAt", required=True)
+    assert created_at is not None
+    try:
+        return ArtifactRecord(
+            artifact_id=required_strings["artifactId"] or "",
+            match_id=_document_string(document, "matchId"),
+            artifact_type=required_strings["artifactType"] or "",
+            category=ArtifactCategory(required_strings["category"] or ""),
+            pathname=required_strings["pathname"] or "",
+            provider=ArtifactProvider(required_strings["provider"] or ""),
+            access=ArtifactAccess(required_strings["access"] or ""),
+            content_type=required_strings["contentType"] or "",
+            size_bytes=size,
+            created_at=created_at,
+            pipeline_version=_document_string(document, "pipelineVersion"),
+            url=_document_string(document, "url"),
+            checksum_sha256=_document_string(document, "checksumSha256"),
+        )
+    except ValueError as error:
+        raise PersistenceValidationError("persisted artifact enum value is invalid") from error

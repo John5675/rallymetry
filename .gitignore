@@ -22,6 +22,7 @@ build/
 .env
 .env.*
 !.env.example
+.vercel/
 *.pem
 *.key
 secrets/

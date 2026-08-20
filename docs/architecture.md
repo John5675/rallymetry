@@ -61,8 +61,9 @@ Application areas are introduced only as their milestones become current:
 
 Milestone 19 implements the provider-neutral persistence records and optional
 MongoDB/Vercel Blob adapters; see [`persistence.md`](persistence.md). Milestone 20
-adds the FastAPI control plane under the vision service without adding a worker or
-browser application; see [`api.md`](api.md).
+adds the FastAPI control plane under the vision service; see [`api.md`](api.md).
+Milestone 21 adds the separate leased analysis process without moving analysis into
+HTTP; see [`worker.md`](worker.md).
 
 ## Runtime responsibilities
 
@@ -340,6 +341,8 @@ cannot execute in Vercel Functions or in the API request process. Their exact ho
 provider is intentionally deferred.
 
 MongoDB Atlas and Vercel Blob remain optional hosted adapters, not prerequisites for
-local pipeline use. Milestone 20 provides the FastAPI control plane and creates only
-durable queued-job records. No worker execution or leases, web application,
-deployment, authentication, upload flow, or correction workflow is implemented yet.
+local pipeline use. Milestone 20 provides the FastAPI control plane and creates
+durable queued-job records. Milestone 21 provides the separate single-concurrency
+worker, atomic MongoDB claims, heartbeats, bounded stale-lease recovery, source
+staging, and pipeline publication. No web application, deployment, authentication,
+upload flow, or correction workflow is implemented yet.

@@ -1,16 +1,16 @@
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator, Callable
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import cast
 
 import pytest
 from vercel.blob.errors import BlobNotFoundError
 
 from pickleball_vision.config import PersistenceSettings
 from pickleball_vision.errors import PersistenceValidationError
+from pickleball_vision.persistence import artifacts as artifacts_module
 from pickleball_vision.persistence.artifacts import (
     LocalArtifactStore,
     VercelBlobArtifactStore,
@@ -36,12 +36,6 @@ class FakePutResult:
 
 
 @dataclass
-class FakeGetResult:
-    status_code: int
-    stream: AsyncIterator[bytes] | None
-
-
-@dataclass
 class FakeHeadResult:
     pathname: str
 
@@ -52,10 +46,10 @@ class FakeBlobClient:
         self.urls: dict[str, str] = {}
         self.put_options: dict[str, object] = {}
 
-    async def put(
+    async def upload_file(
         self,
+        local_path: str | Path,
         path: str,
-        body: object,
         *,
         access: str,
         content_type: str | None,
@@ -63,12 +57,10 @@ class FakeBlobClient:
         overwrite: bool,
         multipart: bool,
     ) -> FakePutResult:
-        data = bytearray()
-        async for chunk in cast(AsyncIterator[bytes], body):
-            data.extend(chunk)
+        data = Path(local_path).read_bytes()
         returned_path = f"{path}-provider-suffix" if add_random_suffix else path
         url = f"https://store.{access}.blob.vercel-storage.com/{returned_path}"
-        self.objects[returned_path] = bytes(data)
+        self.objects[returned_path] = data
         self.urls[url] = returned_path
         self.put_options = {
             "access": access,
@@ -79,17 +71,27 @@ class FakeBlobClient:
         }
         return FakePutResult(returned_path, url, content_type or "application/octet-stream")
 
-    async def get(self, url_or_path: str, *, access: str) -> FakeGetResult | None:
+    async def download_file(
+        self,
+        url_or_path: str,
+        local_path: str | Path,
+        *,
+        access: str,
+        overwrite: bool,
+        create_parents: bool,
+    ) -> str:
         del access
         pathname = self.urls.get(url_or_path, url_or_path)
         data = self.objects.get(pathname)
         if data is None:
-            return None
-
-        async def chunks() -> AsyncIterator[bytes]:
-            yield data
-
-        return FakeGetResult(200, chunks())
+            raise BlobNotFoundError()
+        destination = Path(local_path)
+        if create_parents:
+            destination.parent.mkdir(parents=True, exist_ok=True)
+        if destination.exists() and not overwrite:
+            raise FileExistsError(destination)
+        destination.write_bytes(data)
+        return str(destination)
 
     async def delete(self, url_or_path: str) -> None:
         pathname = self.urls.get(url_or_path, url_or_path)
@@ -135,7 +137,7 @@ def test_local_artifact_store_round_trip_is_atomic_and_randomized(tmp_path: Path
     assert not list((tmp_path / "artifacts").rglob("*.partial"))
 
 
-def test_vercel_blob_adapter_uses_streams_and_explicit_public_viewable_access(
+def test_vercel_blob_adapter_uses_file_api_and_explicit_public_viewable_access(
     tmp_path: Path,
 ) -> None:
     source = tmp_path / "annotated.mp4"
@@ -175,6 +177,33 @@ def test_vercel_blob_adapter_uses_streams_and_explicit_public_viewable_access(
     assert destination.read_bytes() == b"viewable-media"
     asyncio.run(store.delete(artifact))
     assert asyncio.run(store.exists(artifact)) is False
+
+
+def test_vercel_blob_adapter_uses_multipart_for_large_uploads(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(artifacts_module, "_MULTIPART_THRESHOLD_BYTES", 4)
+    source = tmp_path / "large.bin"
+    source.write_bytes(b"large")
+    client = FakeBlobClient()
+    store = VercelBlobArtifactStore(
+        "server-only-secret",
+        client=client,
+        token_factory=token_factory("put-token"),
+    )
+
+    asyncio.run(
+        store.put(
+            ArtifactPutRequest(
+                source_path=source,
+                artifact_type="large_internal",
+                category=ArtifactCategory.INTERNAL_ARTIFACT,
+            )
+        )
+    )
+
+    assert client.put_options["multipart"] is True
 
 
 def test_source_and_internal_artifacts_cannot_be_public(tmp_path: Path) -> None:

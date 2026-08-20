@@ -113,6 +113,12 @@ class InMemoryApplicationPersistence:
         document = self.jobs.get(job_id)
         return dict(document) if document is not None else None
 
+    async def get_artifact(self, artifact_id: str) -> Document | None:
+        for document in self.artifacts:
+            if document.get("artifactId") == artifact_id:
+                return dict(document)
+        return None
+
     @staticmethod
     def _page(
         documents: list[Document],
@@ -131,6 +137,7 @@ def seed_persistence() -> InMemoryApplicationPersistence:
         match_id="match_seed",
         title="Seed match",
         youtube_video_id="abc123XYZ_9",
+        source_artifact_id="artifact_source",
         summary={"rallyCount": 1},
         created_at=NOW,
         updated_at=NOW,
@@ -180,12 +187,26 @@ def seed_persistence() -> InMemoryApplicationPersistence:
         created_at=NOW,
         url="https://private.example.test/annotated.mp4",
     )
+    source_artifact = ArtifactRecord(
+        artifact_id="artifact_source",
+        match_id="match_seed",
+        artifact_type="source_video",
+        category=ArtifactCategory.SOURCE_MEDIA,
+        pathname="source_media/match_seed/random/source.mp4",
+        provider=ArtifactProvider.VERCEL_BLOB,
+        access=ArtifactAccess.PRIVATE,
+        content_type="video/mp4",
+        size_bytes=456,
+        created_at=NOW,
+        url="https://private.example.test/source.mp4",
+    )
     persistence.matches[match.match_id] = match.to_document()
     persistence.players.append(player.to_document())
     persistence.rallies.append(rally.to_document())
     persistence.shots.append(shot.to_document())
     persistence.analytics.append(analytics.to_document())
     persistence.artifacts.append(artifact.to_document())
+    persistence.artifacts.append(source_artifact.to_document())
     return persistence
 
 
@@ -296,9 +317,25 @@ def test_process_endpoint_only_persists_queued_job_and_returns_202() -> None:
     assert queued.headers["Location"] == f"/api/jobs/{payload['jobId']}"
     assert payload["status"] == "QUEUED"
     assert payload["progress"] == 0.0
+    assert payload["sourceType"] == "BLOB"
+    assert payload["sourceArtifactId"] == "artifact_source"
     assert len(persistence.jobs) == 1
     assert fetched.status_code == 200
     assert fetched.json() == payload
+
+
+def test_process_endpoint_requires_available_source_media() -> None:
+    persistence = seed_persistence()
+    match = persistence.matches["match_seed"]
+    match.pop("sourceArtifactId")
+    app = create_app(settings=ApiSettings(), persistence=persistence)
+
+    with TestClient(app) as client:
+        response = client.post("/api/matches/match_seed/process")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "source_media_required"
+    assert not persistence.jobs
 
 
 def test_api_starts_degraded_without_mongodb_and_data_routes_return_503() -> None:

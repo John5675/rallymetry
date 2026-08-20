@@ -717,9 +717,49 @@ Exit criteria:
 - No CV/ML/audio execution, worker claim/lease behavior, upload endpoint, frontend,
   deployment, authentication, or human-correction workflow is implemented.
 
+## 21. Background analysis worker + MongoDB job queue — complete
+
+Run the existing local analysis pipeline from a standalone, outbound-only Python
+worker. MongoDB coordinates one match at a time per worker through atomic claims,
+heartbeats, bounded leases, and explicit stage/progress records; no queue service is
+added.
+
+Exit criteria:
+
+- `processing_jobs` retains queued/claimed/stage/complete/failed state, timestamps,
+  owner, progress, attempt count, bounded retry policy, error details, pipeline
+  version, and source/result references without embedding media or large artifacts.
+- Official PyMongo Async operations atomically claim one eligible queued or stale
+  leased job so two workers cannot own the same attempt.
+- Ownership-checked heartbeat, stage/progress, completion, and failure updates cannot
+  be written by a different worker or stale lease holder.
+- Expired `CLAIMED` or processing-stage leases are recoverable until the configured
+  maximum attempts; exhausted jobs become `FAILED` rather than retrying indefinitely.
+- A standalone `pickleball-vision worker` command polls outbound-only, processes one
+  match at a time, handles shutdown cleanly, and supports a one-job mode for local
+  operation and tests.
+- Source staging supports `LOCAL_PATH` and `BLOB` without modifying original media
+  or adding a YouTube downloader.
+- A production pipeline-runner adapter invokes configured existing
+  `pickleball-vision` stage commands outside HTTP requests, requires an explicit
+  inspectable pipeline plan, and records stage outputs rather than inventing missing
+  manual/model inputs.
+- Structured rallies, contacts, bounces, shots, players, and analytics are persisted
+  through the existing collection boundaries; selected artifact files are published
+  through `ArtifactStore` using explicit access categories.
+- Failures retain stage, safe error type/message, attempt, and timestamps. Temporary
+  worker directories are isolated and source artifacts remain untouched.
+- Tests cover claiming, double-claim prevention, stale lease recovery, ownership,
+  successful processing/publication, and bounded failed processing without MongoDB,
+  Vercel, private media, or model execution.
+- Existing FastAPI and CLI behavior remain compatible, and no Redis, Celery, HTTP
+  analysis execution, frontend, deployment, authentication, or YouTube downloader is
+  introduced.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+
 ## Future milestones — not current
 
-21. Background analysis worker + MongoDB job queue
 22. React/Vite match dashboard
 23. Vercel deployment + hosted media
 24. Human correction workflow
