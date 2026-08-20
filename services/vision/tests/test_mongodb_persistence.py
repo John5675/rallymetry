@@ -45,6 +45,14 @@ class FakeCursor:
         self.documents.sort(key=sort_value, reverse=direction < 0)
         return self
 
+    def skip(self, count: int) -> FakeCursor:
+        self.documents = self.documents[count:]
+        return self
+
+    def limit(self, count: int) -> FakeCursor:
+        self.documents = self.documents[:count]
+        return self
+
     def __aiter__(self) -> FakeCursor:
         return self
 
@@ -90,6 +98,34 @@ class FakeCollection:
         if not isinstance(identifier, str):
             return None
         return self.documents.get(identifier)
+
+    async def find_one_and_update(
+        self,
+        filter: Mapping[str, object],
+        update: Mapping[str, object],
+        *,
+        return_document: object,
+    ) -> Document | None:
+        del return_document
+        identifier = filter.get("_id")
+        if not isinstance(identifier, str) or identifier not in self.documents:
+            return None
+        document = self.documents[identifier]
+        set_values = update.get("$set", {})
+        unset_values = update.get("$unset", {})
+        assert isinstance(set_values, Mapping)
+        assert isinstance(unset_values, Mapping)
+        document.update(set_values)
+        for key in unset_values:
+            assert isinstance(key, str)
+            document.pop(key, None)
+        return document.copy()
+
+    async def count_documents(self, filter: Mapping[str, object]) -> int:
+        return sum(
+            all(document.get(key) == value for key, value in filter.items())
+            for document in self.documents.values()
+        )
 
     def find(self, filter: Mapping[str, object]) -> FakeCursor:
         documents = [
@@ -246,3 +282,77 @@ def test_duplicate_batch_ids_are_rejected_before_writing() -> None:
 def test_mongodb_connection_requires_environment_backed_url() -> None:
     with pytest.raises(PersistenceValidationError):
         asyncio.run(MongoPersistence.connect_from_settings(PersistenceSettings()))
+
+
+def test_mongodb_adapter_lists_and_patches_api_records() -> None:
+    database = FakeDatabase()
+    persistence = MongoPersistence(database)
+    first = MatchRecord(
+        match_id="match-1",
+        title="First",
+        youtube_video_id="youtube-1",
+        created_at=NOW,
+        updated_at=NOW,
+    )
+    second_time = datetime(2026, 8, 19, 13, 0, tzinfo=UTC)
+    second = MatchRecord(
+        match_id="match-2",
+        title="Second",
+        created_at=second_time,
+        updated_at=second_time,
+    )
+    player = PlayerRecord(match_id="match-1", player_id="JOHN", created_at=NOW, updated_at=NOW)
+    rally = StructuredDomainRecord(
+        match_id="match-1",
+        record_id="rally-1",
+        payload={"startFrame": 10},
+        timestamp_seconds=1.0,
+        created_at=NOW,
+    )
+    shot = StructuredDomainRecord(
+        match_id="match-1",
+        record_id="shot-1",
+        payload={"shotType": "SERVE"},
+        timestamp_seconds=1.2,
+        created_at=NOW,
+    )
+    analytics = AnalyticsRecord(
+        match_id="match-1",
+        analytics_id="analytics-1",
+        calculation_version="v1",
+        metrics={"rallyCount": {"value": 1}},
+        created_at=NOW,
+    )
+
+    asyncio.run(persistence.save_match(first))
+    asyncio.run(persistence.save_match(second))
+    asyncio.run(persistence.save_players([player]))
+    asyncio.run(persistence.save_rallies([rally]))
+    asyncio.run(persistence.save_shots([shot]))
+    asyncio.run(persistence.save_analytics(analytics))
+
+    matches, total = asyncio.run(persistence.list_matches(limit=1, offset=0))
+    patched = asyncio.run(
+        persistence.patch_match(
+            "match-1",
+            {"title": "Updated", "youtubeVideoId": None},
+            updated_at=second_time,
+        )
+    )
+    players = asyncio.run(persistence.list_match_players("match-1"))
+    rallies, rally_total = asyncio.run(
+        persistence.list_match_rallies("match-1", limit=50, offset=0)
+    )
+    shots, shot_total = asyncio.run(persistence.list_match_shots("match-1", limit=50, offset=0))
+    latest_analytics = asyncio.run(persistence.get_latest_match_analytics("match-1"))
+
+    assert total == 2
+    assert matches[0]["matchId"] == "match-2"
+    assert patched is not None
+    assert patched["title"] == "Updated"
+    assert "youtubeVideoId" not in patched
+    assert len(players) == 1
+    assert rally_total == 1 and rallies[0]["recordId"] == "rally-1"
+    assert shot_total == 1 and shots[0]["recordId"] == "shot-1"
+    assert latest_analytics is not None
+    assert latest_analytics["analyticsId"] == "analytics-1"

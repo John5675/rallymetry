@@ -8,7 +8,7 @@ from datetime import datetime
 from typing import Protocol, cast
 
 from bson import BSON
-from pymongo import ASCENDING, AsyncMongoClient
+from pymongo import ASCENDING, DESCENDING, AsyncMongoClient, ReturnDocument
 from pymongo.errors import PyMongoError
 
 from pickleball_vision.config import PersistenceSettings
@@ -49,10 +49,15 @@ _PROHIBITED_BINARY_FIELDS = {
     "rawvideoframes",
     "videobytes",
 }
+_MATCH_PATCH_FIELDS = frozenset({"sourceArtifactId", "title", "youtubeVideoId"})
 
 
 class _AsyncCursor(Protocol):
     def sort(self, key: str, direction: int) -> _AsyncCursor: ...
+
+    def skip(self, count: int) -> _AsyncCursor: ...
+
+    def limit(self, count: int) -> _AsyncCursor: ...
 
     def __aiter__(self) -> AsyncIterator[Document]: ...
 
@@ -76,6 +81,16 @@ class _AsyncCollection(Protocol):
     ) -> object: ...
 
     async def find_one(self, filter: Mapping[str, object]) -> Document | None: ...
+
+    async def find_one_and_update(
+        self,
+        filter: Mapping[str, object],
+        update: Mapping[str, object],
+        *,
+        return_document: object,
+    ) -> Document | None: ...
+
+    async def count_documents(self, filter: Mapping[str, object]) -> int: ...
 
     def find(self, filter: Mapping[str, object]) -> _AsyncCursor: ...
 
@@ -328,6 +343,108 @@ class MongoPersistence:
     async def get_match(self, match_id: str) -> Document | None:
         return await self._find_one("matches", {"_id": match_id}, "get_match")
 
+    async def list_matches(
+        self,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[tuple[Document, ...], int]:
+        return await self._list_documents(
+            "matches",
+            {},
+            sort_key="updatedAt",
+            direction=DESCENDING,
+            limit=limit,
+            offset=offset,
+            operation="list_matches",
+        )
+
+    async def patch_match(
+        self,
+        match_id: str,
+        fields: Mapping[str, object],
+        *,
+        updated_at: datetime,
+    ) -> Document | None:
+        """Atomically update the API-editable compact match fields."""
+
+        unsupported = set(fields).difference(_MATCH_PATCH_FIELDS)
+        if unsupported:
+            names = ", ".join(sorted(unsupported))
+            raise PersistenceValidationError(f"match patch contains unsupported fields: {names}")
+        if not fields:
+            raise PersistenceValidationError("match patch must contain at least one field")
+        validate_compact_document(dict(fields))
+        set_values: Document = {key: value for key, value in fields.items() if value is not None}
+        set_values["updatedAt"] = updated_at
+        unset_values: Document = {key: "" for key, value in fields.items() if value is None}
+        update: Document = {"$set": set_values}
+        if unset_values:
+            update["$unset"] = unset_values
+        try:
+            return await self._database["matches"].find_one_and_update(
+                {"_id": match_id},
+                update,
+                return_document=ReturnDocument.AFTER,
+            )
+        except PyMongoError as error:
+            raise PersistenceOperationError(
+                "patch_match",
+                reason=_driver_reason(error),
+            ) from error
+
+    async def list_match_players(self, match_id: str) -> tuple[Document, ...]:
+        documents, _ = await self._list_documents(
+            "players",
+            {"matchId": match_id},
+            sort_key="playerId",
+            direction=ASCENDING,
+            limit=100,
+            offset=0,
+            operation="list_match_players",
+        )
+        return documents
+
+    async def list_match_rallies(
+        self,
+        match_id: str,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[tuple[Document, ...], int]:
+        return await self._list_match_domain_records(
+            StructuredCollection.RALLIES,
+            match_id,
+            limit=limit,
+            offset=offset,
+        )
+
+    async def list_match_shots(
+        self,
+        match_id: str,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[tuple[Document, ...], int]:
+        return await self._list_match_domain_records(
+            StructuredCollection.SHOTS,
+            match_id,
+            limit=limit,
+            offset=offset,
+        )
+
+    async def get_latest_match_analytics(self, match_id: str) -> Document | None:
+        documents, _ = await self._list_documents(
+            "analytics",
+            {"matchId": match_id},
+            sort_key="createdAt",
+            direction=DESCENDING,
+            limit=1,
+            offset=0,
+            operation="get_latest_match_analytics",
+        )
+        return documents[0] if documents else None
+
     async def get_processing_job(self, job_id: str) -> Document | None:
         return await self._find_one(
             "processing_jobs",
@@ -336,18 +453,16 @@ class MongoPersistence:
         )
 
     async def list_match_artifacts(self, match_id: str) -> tuple[Document, ...]:
-        try:
-            cursor = self._database["artifacts"].find({"matchId": match_id})
-            cursor = cursor.sort("createdAt", ASCENDING)
-            documents: list[Document] = []
-            async for document in cursor:
-                documents.append(document)
-            return tuple(documents)
-        except PyMongoError as error:
-            raise PersistenceOperationError(
-                "list_match_artifacts",
-                reason=_driver_reason(error),
-            ) from error
+        documents, _ = await self._list_documents(
+            "artifacts",
+            {"matchId": match_id},
+            sort_key="createdAt",
+            direction=ASCENDING,
+            limit=100,
+            offset=0,
+            operation="list_match_artifacts",
+        )
+        return documents
 
     async def _save_structured(
         self,
@@ -355,6 +470,51 @@ class MongoPersistence:
         records: Sequence[StructuredDomainRecord],
     ) -> None:
         await self._replace_many(collection.value, records, f"save_{collection.value}")
+
+    async def _list_match_domain_records(
+        self,
+        collection: StructuredCollection,
+        match_id: str,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[tuple[Document, ...], int]:
+        return await self._list_documents(
+            collection.value,
+            {"matchId": match_id},
+            sort_key="timestampSeconds",
+            direction=ASCENDING,
+            limit=limit,
+            offset=offset,
+            operation=f"list_match_{collection.value}",
+        )
+
+    async def _list_documents(
+        self,
+        collection: str,
+        filter: Mapping[str, object],
+        *,
+        sort_key: str,
+        direction: int,
+        limit: int,
+        offset: int,
+        operation: str,
+    ) -> tuple[tuple[Document, ...], int]:
+        if not 1 <= limit <= 100:
+            raise PersistenceValidationError("list limit must be between 1 and 100")
+        if offset < 0:
+            raise PersistenceValidationError("list offset must be nonnegative")
+        try:
+            collection_handle = self._database[collection]
+            total = await collection_handle.count_documents(filter)
+            cursor = collection_handle.find(filter)
+            cursor = cursor.sort(sort_key, direction).skip(offset).limit(limit)
+            documents: list[Document] = []
+            async for document in cursor:
+                documents.append(document)
+            return tuple(documents), total
+        except PyMongoError as error:
+            raise PersistenceOperationError(operation, reason=_driver_reason(error)) from error
 
     async def _replace_many(
         self,

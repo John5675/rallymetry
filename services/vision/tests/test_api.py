@@ -1,0 +1,315 @@
+from __future__ import annotations
+
+import logging
+from collections.abc import Mapping
+from datetime import UTC, datetime
+
+import pytest
+from fastapi.testclient import TestClient
+
+from pickleball_vision.api.main import create_app
+from pickleball_vision.api.settings import ApiSettings
+from pickleball_vision.config import PersistenceSettings
+from pickleball_vision.persistence.models import (
+    AnalyticsRecord,
+    ArtifactAccess,
+    ArtifactCategory,
+    ArtifactProvider,
+    ArtifactRecord,
+    Document,
+    MatchRecord,
+    PlayerRecord,
+    ProcessingJobRecord,
+    StructuredDomainRecord,
+)
+
+NOW = datetime(2026, 8, 20, 12, 0, tzinfo=UTC)
+
+
+class InMemoryApplicationPersistence:
+    def __init__(self) -> None:
+        self.matches: dict[str, Document] = {}
+        self.players: list[Document] = []
+        self.rallies: list[Document] = []
+        self.shots: list[Document] = []
+        self.analytics: list[Document] = []
+        self.artifacts: list[Document] = []
+        self.jobs: dict[str, Document] = {}
+
+    async def save_match(self, record: MatchRecord) -> None:
+        self.matches[record.match_id] = record.to_document()
+
+    async def get_match(self, match_id: str) -> Document | None:
+        document = self.matches.get(match_id)
+        return dict(document) if document is not None else None
+
+    async def list_matches(
+        self,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[tuple[Document, ...], int]:
+        documents = sorted(
+            self.matches.values(),
+            key=lambda document: str(document["updatedAt"]),
+            reverse=True,
+        )
+        return tuple(dict(item) for item in documents[offset : offset + limit]), len(documents)
+
+    async def patch_match(
+        self,
+        match_id: str,
+        fields: Mapping[str, object],
+        *,
+        updated_at: datetime,
+    ) -> Document | None:
+        document = self.matches.get(match_id)
+        if document is None:
+            return None
+        for key, value in fields.items():
+            if value is None:
+                document.pop(key, None)
+            else:
+                document[key] = value
+        document["updatedAt"] = updated_at
+        return dict(document)
+
+    async def list_match_players(self, match_id: str) -> tuple[Document, ...]:
+        return tuple(dict(document) for document in self.players if document["matchId"] == match_id)
+
+    async def list_match_rallies(
+        self,
+        match_id: str,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[tuple[Document, ...], int]:
+        return self._page(self.rallies, match_id, limit=limit, offset=offset)
+
+    async def list_match_shots(
+        self,
+        match_id: str,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[tuple[Document, ...], int]:
+        return self._page(self.shots, match_id, limit=limit, offset=offset)
+
+    async def get_latest_match_analytics(self, match_id: str) -> Document | None:
+        matches = [item for item in self.analytics if item["matchId"] == match_id]
+        if not matches:
+            return None
+        return dict(matches[-1])
+
+    async def list_match_artifacts(self, match_id: str) -> tuple[Document, ...]:
+        return tuple(
+            dict(document) for document in self.artifacts if document.get("matchId") == match_id
+        )
+
+    async def save_processing_job(self, record: ProcessingJobRecord) -> None:
+        self.jobs[record.job_id] = record.to_document()
+
+    async def get_processing_job(self, job_id: str) -> Document | None:
+        document = self.jobs.get(job_id)
+        return dict(document) if document is not None else None
+
+    @staticmethod
+    def _page(
+        documents: list[Document],
+        match_id: str,
+        *,
+        limit: int,
+        offset: int,
+    ) -> tuple[tuple[Document, ...], int]:
+        matches = [item for item in documents if item["matchId"] == match_id]
+        return tuple(dict(item) for item in matches[offset : offset + limit]), len(matches)
+
+
+def seed_persistence() -> InMemoryApplicationPersistence:
+    persistence = InMemoryApplicationPersistence()
+    match = MatchRecord(
+        match_id="match_seed",
+        title="Seed match",
+        youtube_video_id="abc123XYZ_9",
+        summary={"rallyCount": 1},
+        created_at=NOW,
+        updated_at=NOW,
+    )
+    player = PlayerRecord(
+        match_id="match_seed",
+        player_id="JOHN",
+        display_name="John",
+        logical_identity="ME",
+        team="NEAR",
+        created_at=NOW,
+        updated_at=NOW,
+    )
+    rally = StructuredDomainRecord(
+        match_id="match_seed",
+        record_id="rally_1",
+        payload={"startFrame": 10, "endFrame": 100},
+        confidence=0.8,
+        timestamp_seconds=1.0,
+        created_at=NOW,
+    )
+    shot = StructuredDomainRecord(
+        match_id="match_seed",
+        record_id="shot_1",
+        payload={"shotType": "SERVE", "hitterId": "JOHN"},
+        confidence=0.75,
+        timestamp_seconds=1.2,
+        created_at=NOW,
+    )
+    analytics = AnalyticsRecord(
+        match_id="match_seed",
+        analytics_id="analytics_v1",
+        calculation_version="match-analytics-v1",
+        metrics={"rallyCount": {"value": 1}},
+        created_at=NOW,
+    )
+    artifact = ArtifactRecord(
+        artifact_id="artifact_review",
+        match_id="match_seed",
+        artifact_type="annotated_video",
+        category=ArtifactCategory.VIEWABLE_MEDIA,
+        pathname="viewable_media/match_seed/random/annotated.mp4",
+        provider=ArtifactProvider.VERCEL_BLOB,
+        access=ArtifactAccess.PRIVATE,
+        content_type="video/mp4",
+        size_bytes=123,
+        created_at=NOW,
+        url="https://private.example.test/annotated.mp4",
+    )
+    persistence.matches[match.match_id] = match.to_document()
+    persistence.players.append(player.to_document())
+    persistence.rallies.append(rally.to_document())
+    persistence.shots.append(shot.to_document())
+    persistence.analytics.append(analytics.to_document())
+    persistence.artifacts.append(artifact.to_document())
+    return persistence
+
+
+def test_health_request_logging_request_id_and_cors(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    persistence = seed_persistence()
+    settings = ApiSettings(
+        cors_origins=("https://friends.example.com",),
+        persistence=PersistenceSettings(mongodb_url="mongodb://test.invalid"),
+    )
+    app = create_app(settings=settings, persistence=persistence)
+
+    with (
+        caplog.at_level(logging.INFO, logger="pickleball_vision.api"),
+        TestClient(app) as client,
+    ):
+        response = client.get("/health", headers={"X-Request-ID": "request-123"})
+        preflight = client.options(
+            "/api/matches",
+            headers={
+                "Origin": "https://friends.example.com",
+                "Access-Control-Request-Method": "POST",
+            },
+        )
+
+    assert response.status_code == 200
+    assert response.json() == {
+        "status": "ok",
+        "service": "pickleball-vision-api",
+        "version": "0.1.0",
+        "databaseConfigured": True,
+        "databaseReady": True,
+        "artifactBackend": "local",
+    }
+    assert response.headers["X-Request-ID"] == "request-123"
+    assert preflight.status_code == 200
+    assert preflight.headers["access-control-allow-origin"] == "https://friends.example.com"
+    assert any(record.message == "api_request_completed" for record in caplog.records)
+
+
+def test_match_crud_uses_json_ids_and_consistent_validation_errors() -> None:
+    persistence = seed_persistence()
+    app = create_app(settings=ApiSettings(), persistence=persistence)
+
+    with TestClient(app) as client:
+        created = client.post(
+            "/api/matches",
+            json={"title": "New match", "youtubeVideoId": "newVideo_12"},
+        )
+        match_id = created.json()["matchId"]
+        listed = client.get("/api/matches?limit=1&offset=0")
+        fetched = client.get(f"/api/matches/{match_id}")
+        patched = client.patch(f"/api/matches/{match_id}", json={"title": "Updated match"})
+        invalid = client.patch(
+            f"/api/matches/{match_id}",
+            headers={"X-Request-ID": "validation-1"},
+            json={"unsupported": True},
+        )
+        missing = client.get("/api/matches/match_missing")
+
+    assert created.status_code == 201
+    assert created.json()["youtubeVideoId"] == "newVideo_12"
+    assert "_id" not in created.json()
+    assert listed.status_code == 200
+    assert listed.json()["total"] == 2
+    assert len(listed.json()["items"]) == 1
+    assert fetched.json()["matchId"] == match_id
+    assert patched.json()["title"] == "Updated match"
+    assert invalid.status_code == 422
+    assert invalid.json()["error"]["code"] == "validation_error"
+    assert invalid.json()["error"]["requestId"] == "validation-1"
+    assert missing.status_code == 404
+    assert missing.json()["error"]["code"] == "resource_not_found"
+
+
+def test_match_scoped_structured_endpoints_do_not_expose_mongo_ids() -> None:
+    persistence = seed_persistence()
+    app = create_app(settings=ApiSettings(), persistence=persistence)
+
+    with TestClient(app) as client:
+        players = client.get("/api/matches/match_seed/players")
+        rallies = client.get("/api/matches/match_seed/rallies")
+        shots = client.get("/api/matches/match_seed/shots")
+        analytics = client.get("/api/matches/match_seed/analytics")
+        artifacts = client.get("/api/matches/match_seed/artifacts")
+
+    assert players.json()["items"][0]["logicalIdentity"] == "ME"
+    assert rallies.json()["items"][0]["payload"]["startFrame"] == 10
+    assert shots.json()["items"][0]["payload"]["shotType"] == "SERVE"
+    assert analytics.json()["metrics"]["rallyCount"]["value"] == 1
+    assert artifacts.json()["items"][0]["access"] == "PRIVATE"
+    for response in (players, rallies, shots, analytics, artifacts):
+        assert response.status_code == 200
+        assert "_id" not in response.text
+
+
+def test_process_endpoint_only_persists_queued_job_and_returns_202() -> None:
+    persistence = seed_persistence()
+    app = create_app(settings=ApiSettings(), persistence=persistence)
+
+    with TestClient(app) as client:
+        queued = client.post("/api/matches/match_seed/process")
+        payload = queued.json()
+        fetched = client.get(f"/api/jobs/{payload['jobId']}")
+
+    assert queued.status_code == 202
+    assert queued.headers["Location"] == f"/api/jobs/{payload['jobId']}"
+    assert payload["status"] == "QUEUED"
+    assert payload["progress"] == 0.0
+    assert len(persistence.jobs) == 1
+    assert fetched.status_code == 200
+    assert fetched.json() == payload
+
+
+def test_api_starts_degraded_without_mongodb_and_data_routes_return_503() -> None:
+    app = create_app(settings=ApiSettings())
+
+    with TestClient(app) as client:
+        health = client.get("/health")
+        matches = client.get("/api/matches")
+
+    assert health.status_code == 200
+    assert health.json()["status"] == "degraded"
+    assert health.json()["databaseReady"] is False
+    assert matches.status_code == 503
+    assert matches.json()["error"]["code"] == "persistence_unavailable"

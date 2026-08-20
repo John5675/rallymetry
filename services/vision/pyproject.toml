@@ -13,17 +13,20 @@ authors = [{ name = "Pickleball Vision contributors" }]
 dependencies = [
   "av>=18,<19",
   "dnspython>=2.7,<3",
+  "fastapi>=0.121,<1",
   "imageio-ffmpeg>=0.6,<1",
   "lap>=0.5.12,<1",
   "numpy>=2,<2.5",
   "opencv-python>=4.10,<5",
   "pymongo>=4.15,<5",
   "ultralytics>=8.4,<9",
+  "uvicorn>=0.35,<1",
   "vercel>=0.5,<1",
 ]
 
 [project.optional-dependencies]
 dev = [
+  "httpx2>=2.9,<3",
   "mypy>=1.15,<2",
   "pytest>=8.3,<10",
   "ruff>=0.11,<1",

@@ -3,8 +3,9 @@
 ## Scope
 
 Milestone 19 adds optional storage adapters without changing the existing local
-analysis pipeline. It does not add an HTTP API, execute analysis jobs, claim queue
-leases, download YouTube media, or expose cloud credentials to a browser.
+analysis pipeline. That milestone itself does not execute analysis jobs, claim queue
+leases, download YouTube media, or expose cloud credentials to a browser. Milestone
+20 consumes this boundary through the separate [FastAPI application API](api.md).
 
 Hosted structured records use MongoDB Atlas through the official PyMongo Async API.
 Binary and large generated artifacts use the project-owned `ArtifactStore` contract,

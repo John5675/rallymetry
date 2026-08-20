@@ -50,20 +50,19 @@ Python worker owns long-running pipeline execution.
 | `sample-data` | Local, uncommitted test media | Private URLs or committed video |
 | `output` | Local, generated results | Source-of-truth code or labels |
 
-Planned application areas are documented now but must not be created before their
-milestones become current:
+Application areas are introduced only as their milestones become current:
 
-| Planned area | Responsibility | Must not own |
+| Area | Responsibility | Must not own |
 | --- | --- | --- |
 | React/Vite web application | Browser presentation and later human workflows | Hosted credentials, CV execution, domain truth |
-| FastAPI product API | HTTP contracts, validation, compact records, artifact coordination, job submission/status | Heavy analysis inside requests |
+| `services/vision/src/pickleball_vision/api` | FastAPI HTTP contracts, validation, compact records, artifact manifests, job submission/status | Heavy analysis inside requests |
 | Python analysis worker | Claim jobs, stage media, invoke existing pipeline, persist results | Browser presentation or synchronous request handling |
 | Hosted persistence adapters | PyMongo Async and Vercel Blob integration behind project interfaces | CV/audio domain algorithms |
 
-Exact application directories and deployment configuration belong to the
-corresponding product milestones. Milestone 19 implements only the provider-neutral
-persistence records and optional MongoDB/Vercel Blob adapters; see
-[`persistence.md`](persistence.md).
+Milestone 19 implements the provider-neutral persistence records and optional
+MongoDB/Vercel Blob adapters; see [`persistence.md`](persistence.md). Milestone 20
+adds the FastAPI control plane under the vision service without adding a worker or
+browser application; see [`api.md`](api.md).
 
 ## Runtime responsibilities
 
@@ -341,6 +340,6 @@ cannot execute in Vercel Functions or in the API request process. Their exact ho
 provider is intentionally deferred.
 
 MongoDB Atlas and Vercel Blob remain optional hosted adapters, not prerequisites for
-local use. Milestone 19 provides their persistence boundary, compact record schemas,
-and local/test implementations. No application service, worker execution, web
-application, deployment, authentication, or correction workflow is implemented yet.
+local pipeline use. Milestone 20 provides the FastAPI control plane and creates only
+durable queued-job records. No worker execution or leases, web application,
+deployment, authentication, upload flow, or correction workflow is implemented yet.

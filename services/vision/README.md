@@ -10,7 +10,16 @@ versioned custom pickleball training, raw spatial inference, fixed-split detecto
 evaluation, a local resumable annotation UI, derived rally/bounce/contact/hitter/shot
 records, and deterministic match analytics. Optional MongoDB Atlas and Vercel Blob
 persistence now lives behind project-owned adapters; local CLI execution still needs
-neither provider. See [`docs/persistence.md`](../../docs/persistence.md).
+neither provider. A FastAPI control plane exposes the compact hosted records and can
+queue processing status without running the pipeline in a request. See
+[`docs/persistence.md`](../../docs/persistence.md) and
+[`docs/api.md`](../../docs/api.md).
+
+Run the API after setting `MONGODB_URL`, `MONGODB_DATABASE`, and `CORS_ORIGINS`:
+
+```bash
+uv run uvicorn pickleball_vision.api.main:app --host 127.0.0.1 --port 8000
+```
 
 ```bash
 uv sync --locked --extra dev

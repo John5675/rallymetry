@@ -686,9 +686,39 @@ Exit criteria:
 - No FastAPI routes, worker execution/leases, browser application, deployment,
   authentication, or human-correction workflow is implemented.
 
+## 20. FastAPI application API — complete
+
+Add an asynchronous HTTP control plane over the Milestone 19 persistence contracts.
+The API exposes compact JSON application records and may create queued job status;
+it never executes CV, audio, ML, or analytics work inside a request.
+
+Exit criteria:
+
+- A `pickleball_vision.api` package separates application creation, routes, JSON
+  schemas, services, dependencies, settings, middleware, and error translation.
+- Match endpoints create, list, retrieve, and patch compact match metadata without
+  exposing MongoDB `_id`, BSON, driver, or credential details.
+- Match-scoped players, rallies, shots, analytics, and artifact manifests are
+  available through read-only JSON endpoints backed by the persistence layer.
+- `POST /api/matches/{matchId}/process` verifies the match, persists a `QUEUED`
+  processing-job record, and returns `202 Accepted` plus its job ID without invoking
+  any local pipeline function.
+- `GET /api/jobs/{jobId}` returns durable status independently from request-local
+  execution.
+- `GET /health`, validated `MONGODB_URL`/`MONGODB_DATABASE`/`CORS_ORIGINS` and
+  storage settings, CORS middleware, request IDs/logging, and consistent JSON errors
+  are implemented at the application boundary.
+- The production lifespan opens and closes official PyMongo Async persistence;
+  integration tests inject an isolated asynchronous persistence implementation and
+  require no MongoDB or Vercel credentials.
+- Existing CLI and local pipeline behavior remain unchanged and cloud-independent.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- No CV/ML/audio execution, worker claim/lease behavior, upload endpoint, frontend,
+  deployment, authentication, or human-correction workflow is implemented.
+
 ## Future milestones — not current
 
-20. FastAPI application API
 21. Background analysis worker + MongoDB job queue
 22. React/Vite match dashboard
 23. Vercel deployment + hosted media
