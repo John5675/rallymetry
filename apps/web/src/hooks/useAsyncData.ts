@@ -1,13 +1,20 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 interface AsyncData<T> {
   data: T | null;
   error: Error | null;
   loading: boolean;
+  reload: () => void;
 }
 
 export function useAsyncData<T>(loader: (signal: AbortSignal) => Promise<T>): AsyncData<T> {
-  const [state, setState] = useState<AsyncData<T>>({ data: null, error: null, loading: true });
+  const [state, setState] = useState<Omit<AsyncData<T>, "reload">>({
+    data: null,
+    error: null,
+    loading: true,
+  });
+  const [revision, setRevision] = useState(0);
+  const reload = useCallback(() => setRevision((value) => value + 1), []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -30,7 +37,7 @@ export function useAsyncData<T>(loader: (signal: AbortSignal) => Promise<T>): As
         }
       });
     return () => controller.abort();
-  }, [loader]);
+  }, [loader, revision]);
 
-  return state;
+  return { ...state, reload };
 }

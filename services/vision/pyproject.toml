@@ -23,6 +23,7 @@ dependencies = [
   "ultralytics>=8.4,<9",
   "uvicorn>=0.35,<1",
   "vercel>=0.5,<1",
+  "yt-dlp[default]>=2026.6.9,<2027",
 ]
 
 [project.optional-dependencies]

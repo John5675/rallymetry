@@ -15,6 +15,8 @@ from pickleball_vision.api.schemas.matches import (
     MatchListResponse,
     MatchPatchRequest,
     MatchResponse,
+    YouTubeMatchSubmitRequest,
+    YouTubeMatchSubmitResponse,
 )
 from pickleball_vision.api.schemas.records import (
     AnalyticsResponse,
@@ -27,7 +29,9 @@ from pickleball_vision.api.schemas.records import (
 )
 from pickleball_vision.api.services.persistence import ApplicationPersistence
 from pickleball_vision.api.services.render_workflows import AnalysisWorkflowClient
+from pickleball_vision.api.youtube import parse_youtube_video_id
 from pickleball_vision.persistence.models import (
+    ArtifactAccess,
     ArtifactCategory,
     ArtifactProvider,
     Document,
@@ -35,6 +39,7 @@ from pickleball_vision.persistence.models import (
     ProcessingJobRecord,
     ProcessingJobStatus,
     SourceMediaType,
+    artifact_record_from_document,
 )
 
 ResponseModel = TypeVar("ResponseModel", bound=BaseModel)
@@ -68,9 +73,11 @@ class MatchApplicationService:
         persistence: ApplicationPersistence,
         *,
         workflow_client: AnalysisWorkflowClient | None = None,
+        default_analysis_profile_match_id: str | None = None,
     ) -> None:
         self._persistence = persistence
         self._workflow_client = workflow_client
+        self._default_analysis_profile_match_id = default_analysis_profile_match_id
 
     async def create_match(self, request: MatchCreateRequest) -> MatchResponse:
         now = datetime.now(UTC)
@@ -85,6 +92,58 @@ class MatchApplicationService:
         )
         await self._persistence.save_match(record)
         return _record(MatchResponse, record.to_document())
+
+    async def submit_youtube_match(
+        self,
+        request: YouTubeMatchSubmitRequest,
+    ) -> YouTubeMatchSubmitResponse:
+        """Create and queue one authorized YouTube recording without downloading in HTTP."""
+
+        youtube_video_id = parse_youtube_video_id(request.youtube_url)
+        existing = await self._persistence.get_match_by_youtube_video_id(youtube_video_id)
+        if existing is not None:
+            match_id = existing.get("matchId")
+            raise ApiError(
+                status_code=409,
+                code="youtube_match_exists",
+                message="This YouTube recording already exists in Rallymetry",
+                details={"matchId": match_id if isinstance(match_id, str) else ""},
+            )
+        profile_match_id = self._default_analysis_profile_match_id
+        if profile_match_id is None:
+            raise ApiError(
+                status_code=503,
+                code="analysis_profile_unavailable",
+                message="One-click analysis has no configured court and model profile",
+            )
+        profile = await self._persistence.get_match(profile_match_id)
+        if profile is None:
+            raise ApiError(
+                status_code=503,
+                code="analysis_profile_unavailable",
+                message="The configured court and model profile is unavailable",
+            )
+        match_id = f"match_{uuid.uuid4().hex}"
+        now = datetime.now(UTC)
+        setup = await self._shared_analysis_setup(
+            profile=profile,
+        )
+        record = MatchRecord(
+            match_id=match_id,
+            title=request.title or f"YouTube match {youtube_video_id}",
+            youtube_video_id=youtube_video_id,
+            analysis_profile_match_id=profile_match_id,
+            analysis_setup=setup,
+            summary={"status": ProcessingJobStatus.CREATED.value},
+            created_at=now,
+            updated_at=now,
+        )
+        await self._persistence.save_match(record)
+        job = await self.queue_processing(match_id)
+        return YouTubeMatchSubmitResponse(
+            match=_record(MatchResponse, record.to_document()),
+            job=job,
+        )
 
     async def list_matches(self, *, limit: int, offset: int) -> MatchListResponse:
         documents, total = await self._persistence.list_matches(limit=limit, offset=offset)
@@ -189,27 +248,33 @@ class MatchApplicationService:
     async def queue_processing(self, match_id: str) -> JobResponse:
         match = await self._require_match(match_id)
         source_artifact_id = match.get("sourceArtifactId")
-        if not isinstance(source_artifact_id, str) or not source_artifact_id:
-            raise ApiError(
-                status_code=409,
-                code="source_media_required",
-                message="The match requires a SOURCE_MEDIA artifact before processing",
-            )
-        artifact = await self._persistence.get_artifact(source_artifact_id)
-        if artifact is None or artifact.get("category") != ArtifactCategory.SOURCE_MEDIA.value:
-            raise ApiError(
-                status_code=409,
-                code="source_media_unavailable",
-                message="The match source-media artifact is unavailable",
-            )
-        provider = artifact.get("provider")
-        if provider == ArtifactProvider.VERCEL_BLOB.value:
-            source_type = SourceMediaType.BLOB
+        raw_youtube_video_id = match.get("youtubeVideoId")
+        youtube_video_id = raw_youtube_video_id if isinstance(raw_youtube_video_id, str) else None
+        if isinstance(source_artifact_id, str) and source_artifact_id:
+            artifact = await self._persistence.get_artifact(source_artifact_id)
+            if artifact is None or artifact.get("category") != ArtifactCategory.SOURCE_MEDIA.value:
+                raise ApiError(
+                    status_code=409,
+                    code="source_media_unavailable",
+                    message="The match source-media artifact is unavailable",
+                )
+            provider = artifact.get("provider")
+            if provider == ArtifactProvider.VERCEL_BLOB.value:
+                source_type = SourceMediaType.BLOB
+            else:
+                raise ApiError(
+                    status_code=409,
+                    code="source_media_unavailable",
+                    message="On-demand analysis requires a hosted source-media artifact",
+                )
+        elif youtube_video_id:
+            source_type = SourceMediaType.YOUTUBE
+            source_artifact_id = None
         else:
             raise ApiError(
                 status_code=409,
-                code="source_media_unavailable",
-                message="On-demand analysis requires a Vercel Blob SOURCE_MEDIA artifact",
+                code="source_media_required",
+                message="The match requires source media or a YouTube video ID before processing",
             )
         setup = match.get("analysisSetup")
         if not isinstance(setup, dict):
@@ -232,9 +297,13 @@ class MatchApplicationService:
                     details={"field": name},
                 )
             setup_artifact = await self._persistence.get_artifact(setup_artifact_id)
+            profile_match_id = match.get("analysisProfileMatchId")
+            allowed_owners = {match_id}
+            if isinstance(profile_match_id, str) and profile_match_id:
+                allowed_owners.add(profile_match_id)
             if (
                 setup_artifact is None
-                or setup_artifact.get("matchId") != match_id
+                or setup_artifact.get("matchId") not in allowed_owners
                 or setup_artifact.get("category") != ArtifactCategory.INTERNAL_ARTIFACT.value
                 or setup_artifact.get("provider") != ArtifactProvider.VERCEL_BLOB.value
             ):
@@ -261,6 +330,7 @@ class MatchApplicationService:
             processing_run_id=processing_run_id,
             source_type=source_type,
             source_artifact_id=source_artifact_id,
+            youtube_video_id=(youtube_video_id if source_type is SourceMediaType.YOUTUBE else None),
             created_at=now,
             updated_at=now,
         )
@@ -317,6 +387,59 @@ class MatchApplicationService:
         if document is None:
             raise ResourceNotFoundError("processing job", job_id)
         return _record(JobResponse, document)
+
+    async def get_latest_match_job(self, match_id: str) -> JobResponse:
+        await self._require_match(match_id)
+        document = await self._persistence.get_latest_processing_job_for_match(match_id)
+        if document is None:
+            raise ResourceNotFoundError("processing job", match_id)
+        return _record(JobResponse, document)
+
+    async def _shared_analysis_setup(
+        self,
+        *,
+        profile: Document,
+    ) -> dict[str, str]:
+        raw_setup = profile.get("analysisSetup")
+        if not isinstance(raw_setup, dict):
+            raw_setup = {}
+        missing = sorted(REQUIRED_ANALYSIS_SETUP.difference(raw_setup))
+        if missing:
+            raise ApiError(
+                status_code=503,
+                code="analysis_profile_invalid",
+                message="The configured analysis profile is incomplete",
+                details={"missing": missing},
+            )
+        shared: dict[str, str] = {}
+        for field in sorted(REQUIRED_ANALYSIS_SETUP):
+            artifact_id = raw_setup.get(field)
+            document = (
+                await self._persistence.get_artifact(artifact_id)
+                if isinstance(artifact_id, str)
+                else None
+            )
+            if document is None:
+                raise ApiError(
+                    status_code=503,
+                    code="analysis_profile_invalid",
+                    message="A configured analysis profile artifact is unavailable",
+                    details={"field": field},
+                )
+            source = artifact_record_from_document(document)
+            if (
+                source.category is not ArtifactCategory.INTERNAL_ARTIFACT
+                or source.provider is not ArtifactProvider.VERCEL_BLOB
+                or source.access is not ArtifactAccess.PRIVATE
+            ):
+                raise ApiError(
+                    status_code=503,
+                    code="analysis_profile_invalid",
+                    message="A configured analysis profile artifact is not private hosted setup",
+                    details={"field": field},
+                )
+            shared[field] = source.artifact_id
+        return shared
 
     async def _require_match(self, match_id: str) -> Document:
         document = await self._persistence.get_match(match_id)

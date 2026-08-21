@@ -25,6 +25,10 @@ POST /api/matches/{matchId}/process
 The task never commits output, modifies the React application, or triggers a Vercel
 deployment. The existing website reads new MongoDB/Blob references through FastAPI.
 
+For the friend-facing path, `POST /api/matches/import-youtube` validates one video
+URL, creates a match using the configured analysis profile, creates the job, and
+starts the same task in a single short request. FastAPI never downloads the media.
+
 ## Code boundaries
 
 - `pickleball_vision.api.services.render_workflows` wraps the official async Render
@@ -50,10 +54,12 @@ rallymetry-analysis/analyze_match
 {"job_id": "job_...", "match_id": "match_..."}
 ```
 
-## Match prerequisites
+## Match prerequisites and one-click profile
 
-The match must reference a private Vercel Blob `SOURCE_MEDIA` artifact and this
-`analysisSetup` object:
+An existing match can reference a private Vercel Blob `SOURCE_MEDIA` artifact. A
+one-click submission instead persists a canonical `youtubeVideoId`; Render downloads
+that one accessible recording only after the asynchronous task starts. Both paths
+require this `analysisSetup` object:
 
 ```json
 {
@@ -65,9 +71,18 @@ The match must reference a private Vercel Blob `SOURCE_MEDIA` artifact and this
 ```
 
 Every setup reference must belong to the same match and be a private hosted
-`INTERNAL_ARTIFACT`. The workflow downloads these files into the current job's
-temporary `input` directory. The source recording remains unchanged. A YouTube ID is
-preserved for website playback but is never used as an analysis download mechanism.
+`INTERNAL_ARTIFACT`. `DEFAULT_ANALYSIS_PROFILE_MATCH_ID` selects an explicitly
+configured existing match. The import endpoint creates new match-scoped artifact
+references plus an explicit `analysisProfileMatchId` owner reference to the same
+immutable private setup objects; it never duplicates or modifies the profile match.
+This is appropriate only for recordings compatible with that court, camera,
+player-role, and model profile.
+
+The workflow downloads setup plus either the private Blob source or the YouTube
+source into the current job's temporary `input` directory. It preserves audio,
+limits YouTube duration/size with `YOUTUBE_MAX_DURATION_SECONDS` and
+`YOUTUBE_MAX_BYTES`, never accepts playlists/channels, and removes the downloaded
+copy during normal job cleanup. The original recording remains unchanged.
 
 ## Job state and duplicate protection
 
@@ -144,6 +159,7 @@ MONGODB_DATABASE
 RENDER_API_KEY
 RENDER_WORKFLOW_TASK
 CORS_ORIGINS
+DEFAULT_ANALYSIS_PROFILE_MATCH_ID
 ```
 
 The workflow service requires:
@@ -159,6 +175,8 @@ MODEL_DEVICE=cpu
 WORKFLOW_TEMP_DIR=/tmp/rallymetry
 RENDER_WORKFLOW_PLAN=pro
 RENDER_WORKFLOW_TIMEOUT_SECONDS=21600
+YOUTUBE_MAX_DURATION_SECONDS=7200
+YOUTUBE_MAX_BYTES=4000000000
 ```
 
 `RENDER_API_KEY` is a FastAPI trigger credential. The task does not need it unless a
@@ -222,8 +240,10 @@ in Render logs.
 ## Smoke test
 
 1. Confirm `/health` reports MongoDB ready.
-2. Confirm the match and all five required private artifacts exist.
-3. Call `POST /api/matches/{matchId}/process` and verify an immediate `202` response.
+2. Confirm the profile match and its four required private setup artifacts exist.
+3. Call `POST /api/matches/import-youtube` with `youtubeUrl` (and optional `title`),
+   or call `/api/matches/{matchId}/process` for a preconfigured match; verify an
+   immediate `202` response.
 4. Verify the response/job includes `status=QUEUED`, `processingRunId`, and
    `renderTaskRunId`.
 5. Refresh `GET /api/jobs/{jobId}` and observe meaningful stage changes.

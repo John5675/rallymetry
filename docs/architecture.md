@@ -93,7 +93,7 @@ task, stores the returned task-run ID, and exposes status/results as the task up
 ### On-demand analysis workflow
 
 `analyze_match` is a Render Workflow task and separate execution unit. It retrieves
-private source/setup artifacts, runs the existing CV/audio pipeline, uploads an
+private source/setup artifacts or one explicitly submitted YouTube recording, runs the existing CV/audio pipeline, uploads an
 explicit allow-list of generated media, writes compact status/results, and cleans its
 job-scoped `/tmp/rallymetry/<job-id>` directory. It preserves raw-observation/
 derived-event boundaries and never turns infrastructure state into match evidence.
@@ -349,5 +349,5 @@ local pipeline use. Milestone 20 provides the FastAPI control plane and creates
 durable job records. Milestone 21 provides async Render triggering, duplicate-submit
 protection, private source/setup staging, idempotent publication, progress updates,
 and cleanup. Milestone 22 provides the browser, and Milestone
-23 provides hosted delivery. Authentication, upload UI, and corrections remain
-later work.
+23 provides hosted delivery. Milestone 23A adds the bounded YouTube-link submission
+UI while keeping retrieval in Render. Authentication and corrections remain later work.

@@ -9,6 +9,7 @@ from pickleball_vision.analysis_runtime.pipeline import (
     load_pipeline_plan,
 )
 from pickleball_vision.analysis_runtime.source import SourceMediaStager
+from pickleball_vision.analysis_runtime.youtube import YtDlpYouTubeDownloader
 from pickleball_vision.config import ArtifactBackend, PersistenceSettings
 from pickleball_vision.errors import AnalysisConfigurationError
 from pickleball_vision.persistence.artifacts import create_artifact_store
@@ -52,7 +53,14 @@ async def run_configured_analysis(*, job_id: str, match_id: str) -> dict[str, st
         orchestrator = OnDemandAnalysisOrchestrator(
             persistence=persistence,
             artifact_store=artifact_store,
-            source_stager=SourceMediaStager(persistence, artifact_store),
+            source_stager=SourceMediaStager(
+                persistence,
+                artifact_store,
+                youtube_downloader=YtDlpYouTubeDownloader(
+                    max_duration_seconds=workflow_settings.youtube_max_duration_seconds,
+                    max_bytes=workflow_settings.youtube_max_bytes,
+                ),
+            ),
             setup_stager=MatchSetupStager(persistence, artifact_store),
             pipeline_runner=PlannedCliPipelineRunner(
                 plan,

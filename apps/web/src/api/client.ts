@@ -7,6 +7,8 @@ import type {
   MatchDashboardData,
   Page,
   Player,
+  ProcessingJob,
+  YouTubeMatchSubmission,
 } from "./types";
 
 const PAGE_SIZE = 100;
@@ -15,13 +17,21 @@ export class ApiClientError extends Error {
   readonly status: number;
   readonly code: string;
   readonly requestId: string | null;
+  readonly details: ApiErrorEnvelope["error"]["details"];
 
-  constructor(message: string, status: number, code: string, requestId: string | null = null) {
+  constructor(
+    message: string,
+    status: number,
+    code: string,
+    requestId: string | null = null,
+    details: ApiErrorEnvelope["error"]["details"] = null,
+  ) {
     super(message);
     this.name = "ApiClientError";
     this.status = status;
     this.code = code;
     this.requestId = requestId;
+    this.details = details;
   }
 }
 
@@ -59,6 +69,7 @@ async function parseResponse<T>(response: Response): Promise<T> {
         response.status,
         body.error.code,
         body.error.requestId ?? null,
+        body.error.details ?? null,
       );
     }
     throw new ApiClientError(
@@ -77,9 +88,18 @@ export class ApiClient {
     this.baseUrl = normalizeBaseUrl(baseUrl);
   }
 
-  private async request<T>(path: string, signal?: AbortSignal): Promise<T> {
+  private async request<T>(
+    path: string,
+    signal?: AbortSignal,
+    init: RequestInit = {},
+  ): Promise<T> {
+    const headers: Record<string, string> = { Accept: "application/json" };
+    if (init.body !== undefined && init.body !== null) {
+      headers["Content-Type"] = "application/json";
+    }
     const response = await fetch(`${this.baseUrl}${path}`, {
-      headers: { Accept: "application/json" },
+      ...init,
+      headers,
       signal,
     });
     return parseResponse<T>(response);
@@ -112,6 +132,36 @@ export class ApiClient {
 
   getMatch(matchId: string, signal?: AbortSignal): Promise<Match> {
     return this.request<Match>(`/api/matches/${encodeURIComponent(matchId)}`, signal);
+  }
+
+  submitYouTubeMatch(
+    youtubeUrl: string,
+    title: string | null,
+    signal?: AbortSignal,
+  ): Promise<YouTubeMatchSubmission> {
+    return this.request<YouTubeMatchSubmission>("/api/matches/import-youtube", signal, {
+      method: "POST",
+      body: JSON.stringify({ youtubeUrl, ...(title === null ? {} : { title }) }),
+    });
+  }
+
+  async getLatestProcessingJob(
+    matchId: string,
+    signal?: AbortSignal,
+  ): Promise<ProcessingJob | null> {
+    try {
+      return await this.request<ProcessingJob>(
+        `/api/matches/${encodeURIComponent(matchId)}/processing-job`,
+        signal,
+      );
+    } catch (error) {
+      if (error instanceof ApiClientError && error.status === 404) return null;
+      throw error;
+    }
+  }
+
+  getProcessingJob(jobId: string, signal?: AbortSignal): Promise<ProcessingJob> {
+    return this.request<ProcessingJob>(`/api/jobs/${encodeURIComponent(jobId)}`, signal);
   }
 
   getPlayers(matchId: string, signal?: AbortSignal): Promise<Player[]> {

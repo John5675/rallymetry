@@ -13,6 +13,7 @@ from pickleball_vision.errors import PersistenceValidationError
 
 Document = dict[str, object]
 _SHA256_PATTERN = re.compile(r"^[0-9a-f]{64}$")
+_YOUTUBE_VIDEO_ID_PATTERN = re.compile(r"^[A-Za-z0-9_-]{11}$")
 
 
 def utc_now() -> datetime:
@@ -110,10 +111,11 @@ ACTIVE_PROCESSING_JOB_STATUSES = frozenset(
 
 
 class SourceMediaType(StrEnum):
-    """Supported analysis source locations; YouTube is intentionally absent."""
+    """Supported analysis source locations."""
 
     LOCAL_PATH = "LOCAL_PATH"
     BLOB = "BLOB"
+    YOUTUBE = "YOUTUBE"
 
 
 class StructuredCollection(StrEnum):
@@ -133,6 +135,7 @@ class MatchRecord:
     title: str | None = None
     youtube_video_id: str | None = None
     source_artifact_id: str | None = None
+    analysis_profile_match_id: str | None = None
     analysis_setup: Mapping[str, str] = field(default_factory=dict)
     pipeline_version: str | None = None
     model_versions: Mapping[str, str] = field(default_factory=dict)
@@ -153,6 +156,11 @@ class MatchRecord:
             self,
             "source_artifact_id",
             _optional_text(self.source_artifact_id, "source_artifact_id"),
+        )
+        object.__setattr__(
+            self,
+            "analysis_profile_match_id",
+            _optional_text(self.analysis_profile_match_id, "analysis_profile_match_id"),
         )
         setup = dict(self.analysis_setup)
         for name, artifact_id in setup.items():
@@ -195,6 +203,7 @@ class MatchRecord:
             "title": self.title,
             "youtubeVideoId": self.youtube_video_id,
             "sourceArtifactId": self.source_artifact_id,
+            "analysisProfileMatchId": self.analysis_profile_match_id,
             "pipelineVersion": self.pipeline_version,
         }
         document.update({key: value for key, value in optional.items() if value is not None})
@@ -394,6 +403,7 @@ class ProcessingJobRecord:
     source_type: SourceMediaType | None = None
     source_path: str | None = None
     source_artifact_id: str | None = None
+    youtube_video_id: str | None = None
     result_artifact_ids: tuple[str, ...] = ()
     result_summary: Mapping[str, object] = field(default_factory=dict)
     created_at: datetime = field(default_factory=utc_now)
@@ -451,6 +461,11 @@ class ProcessingJobRecord:
         )
         object.__setattr__(
             self,
+            "youtube_video_id",
+            _optional_text(self.youtube_video_id, "youtube_video_id"),
+        )
+        object.__setattr__(
+            self,
             "result_artifact_ids",
             tuple(
                 _required_text(value, "result_artifact_ids item")
@@ -473,8 +488,15 @@ class ProcessingJobRecord:
                 )
         elif self.source_type is SourceMediaType.BLOB and self.source_artifact_id is None:
             raise PersistenceValidationError("BLOB jobs require source_artifact_id")
+        elif self.source_type is SourceMediaType.YOUTUBE and (
+            self.youtube_video_id is None
+            or _YOUTUBE_VIDEO_ID_PATTERN.fullmatch(self.youtube_video_id) is None
+        ):
+            raise PersistenceValidationError("YOUTUBE jobs require a valid youtube_video_id")
         if self.source_path is not None and self.source_type is not SourceMediaType.LOCAL_PATH:
             raise PersistenceValidationError("source_path is only valid for LOCAL_PATH jobs")
+        if self.youtube_video_id is not None and self.source_type is not SourceMediaType.YOUTUBE:
+            raise PersistenceValidationError("youtube_video_id is only valid for YOUTUBE jobs")
         if self.status is ProcessingJobStatus.COMPLETE and self.progress != 1.0:
             raise PersistenceValidationError("COMPLETE jobs must have progress 1.0")
         if self.status is ProcessingJobStatus.COMPLETE and self.completed_at is None:
@@ -512,6 +534,7 @@ class ProcessingJobRecord:
             "sourceType": self.source_type.value if self.source_type is not None else None,
             "sourcePath": self.source_path,
             "sourceArtifactId": self.source_artifact_id,
+            "youtubeVideoId": self.youtube_video_id,
         }
         document.update({key: value for key, value in optional.items() if value is not None})
         return document
@@ -801,6 +824,7 @@ def processing_job_from_document(document: Mapping[str, object]) -> ProcessingJo
         source_type=source_type,
         source_path=_document_string(document, "sourcePath"),
         source_artifact_id=_document_string(document, "sourceArtifactId"),
+        youtube_video_id=_document_string(document, "youtubeVideoId"),
         result_artifact_ids=tuple(result_ids_raw),
         result_summary=result_summary,
         created_at=created_at,

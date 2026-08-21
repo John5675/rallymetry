@@ -10,6 +10,7 @@ from pickleball_vision.api.errors import PersistenceUnavailableError
 from pickleball_vision.api.services.matches import MatchApplicationService
 from pickleball_vision.api.services.persistence import ApplicationPersistence
 from pickleball_vision.api.services.render_workflows import AnalysisWorkflowClient
+from pickleball_vision.api.settings import ApiSettings
 
 
 def get_persistence(request: Request) -> ApplicationPersistence:
@@ -30,7 +31,12 @@ def get_match_service(
         AnalysisWorkflowClient | None,
         getattr(request.app.state, "workflow_client", None),
     )
-    return MatchApplicationService(persistence, workflow_client=workflow_client)
+    settings = cast(ApiSettings, request.app.state.api_settings)
+    return MatchApplicationService(
+        persistence,
+        workflow_client=workflow_client,
+        default_analysis_profile_match_id=settings.default_analysis_profile_match_id,
+    )
 
 
 MatchServiceDependency = Annotated[MatchApplicationService, Depends(get_match_service)]

@@ -89,6 +89,7 @@ export BLOB_READ_WRITE_TOKEN='<private-store-server-token>'
 export PUBLIC_BLOB_READ_WRITE_TOKEN='<public-store-server-token>'
 export RENDER_API_KEY='<server-side-render-api-key>'
 export RENDER_WORKFLOW_TASK='rallymetry-analysis/analyze_match'
+export DEFAULT_ANALYSIS_PROFILE_MATCH_ID='match_<configured-profile>'
 ```
 
 Do not expose either credential to a browser. MongoDB stores compact structured
@@ -106,10 +107,12 @@ export CORS_ORIGINS='http://localhost:5173'
 uv run uvicorn pickleball_vision.api.main:app --host 127.0.0.1 --port 8000
 ```
 
-`POST /api/matches/{matchId}/process` returns `202 Accepted` after verifying the match
-has a private Blob `SOURCE_MEDIA` artifact and four private setup artifacts. It creates
-one durable MongoDB job, starts the configured Render task, stores its task-run ID,
-and returns without waiting for analysis. For local task registration and execution:
+`POST /api/matches/import-youtube` accepts a validated `youtubeUrl` plus optional
+`title`, creates a match from the configured analysis profile, and returns `202
+Accepted` after starting the on-demand workflow. Existing preconfigured matches may
+still use `POST /api/matches/{matchId}/process`. Both paths create
+one durable MongoDB job, start the configured Render task, store its task-run ID,
+and return without waiting for analysis. For local task registration and execution:
 
 ```bash
 render workflows dev -- uv run python -m pickleball_vision.workflows.app

@@ -8,10 +8,11 @@ import {
   Trophy,
   UsersRound,
 } from "lucide-react";
-import { useCallback, useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { useApi } from "../api/context";
+import type { ProcessingJob } from "../api/types";
 import { AsyncState } from "../components/AsyncState";
 import { CourtMap } from "../components/CourtMap";
 import { EventTimeline } from "../components/EventTimeline";
@@ -40,6 +41,8 @@ export function MatchPage() {
   const { matchId } = useParams();
   const api = useApi();
   const mediaRef = useRef<SeekableMediaHandle>(null);
+  const lastJobStatusRef = useRef<string | null>(null);
+  const [job, setJob] = useState<ProcessingJob | null>(null);
   const loadMatch = useCallback(
     (signal: AbortSignal) => {
       if (matchId === undefined) return Promise.reject(new Error("A match ID is required."));
@@ -47,7 +50,35 @@ export function MatchPage() {
     },
     [api, matchId],
   );
-  const { data, loading, error } = useAsyncData(loadMatch);
+  const { data, loading, error, reload } = useAsyncData(loadMatch);
+
+  useEffect(() => {
+    if (matchId === undefined) return;
+    const controller = new AbortController();
+    let timer: number | undefined;
+    const poll = async () => {
+      try {
+        const nextJob = await api.getLatestProcessingJob(matchId, controller.signal);
+        if (controller.signal.aborted) return;
+        setJob(nextJob);
+        const status = nextJob?.status ?? null;
+        if (status === "COMPLETE" && lastJobStatusRef.current !== "COMPLETE") {
+          reload();
+        }
+        lastJobStatusRef.current = status;
+        if (status !== null && !["COMPLETE", "FAILED", "CANCELED"].includes(status)) {
+          timer = window.setTimeout(poll, 5_000);
+        }
+      } catch {
+        if (!controller.signal.aborted) timer = window.setTimeout(poll, 10_000);
+      }
+    };
+    void poll();
+    return () => {
+      controller.abort();
+      if (timer !== undefined) window.clearTimeout(timer);
+    };
+  }, [api, matchId, reload]);
   const events = useMemo(
     () =>
       data === null
@@ -76,12 +107,26 @@ export function MatchPage() {
                 </p>
               </div>
               <div className="match-header-actions">
-                <StatusBadge status={matchStatus(data.match)} />
+                <StatusBadge status={job?.status ?? matchStatus(data.match)} />
                 <Link to={`/matches/${data.match.matchId}/analysis`} className="button button--primary">
                   <BarChart3 aria-hidden="true" /> Full analysis
                 </Link>
               </div>
             </header>
+
+            {job !== null && job.status !== "COMPLETE" ? (
+              <section className={`processing-banner processing-banner--${job.status === "FAILED" ? "failed" : "active"}`} aria-live="polite">
+                <div>
+                  <strong>{job.stage?.replaceAll("_", " ") ?? job.status}</strong>
+                  <span>
+                    {job.status === "FAILED"
+                      ? job.errorMessage ?? "Analysis stopped before completion."
+                      : "Analysis is running in the background. You can safely leave this page."}
+                  </span>
+                </div>
+                <span>{Math.round(job.progress * 100)}%</span>
+              </section>
+            ) : null}
 
             <nav className="section-nav" aria-label="Match sections">
               <a href="#overview"><Trophy aria-hidden="true" /> Overview</a>

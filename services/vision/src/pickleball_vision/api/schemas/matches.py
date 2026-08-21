@@ -14,6 +14,7 @@ from pickleball_vision.api.schemas.common import (
     JsonObject,
     ShortText,
 )
+from pickleball_vision.api.schemas.jobs import JobResponse
 
 YouTubeVideoId = Annotated[
     str,
@@ -31,6 +32,14 @@ class MatchCreateRequest(ApiInputModel):
     youtube_video_id: YouTubeVideoId | None = None
     source_artifact_id: Identifier | None = None
     analysis_setup: dict[str, Identifier] = Field(default_factory=dict)
+
+
+class YouTubeMatchSubmitRequest(ApiInputModel):
+    youtube_url: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=2048),
+    ]
+    title: ShortText | None = None
 
 
 class MatchPatchRequest(ApiInputModel):
@@ -51,6 +60,7 @@ class MatchResponse(ApiOutputModel):
     title: str | None = None
     youtube_video_id: str | None = None
     source_artifact_id: str | None = None
+    analysis_profile_match_id: str | None = None
     analysis_setup: dict[str, str] = Field(default_factory=dict)
     pipeline_version: str | None = None
     model_versions: dict[str, str] = Field(default_factory=dict)
@@ -65,3 +75,8 @@ class MatchListResponse(ApiOutputModel):
     total: int
     limit: int
     offset: int
+
+
+class YouTubeMatchSubmitResponse(ApiOutputModel):
+    match: MatchResponse
+    job: JobResponse

@@ -53,6 +53,7 @@ class ApiSettings:
     persistence: PersistenceSettings = field(default_factory=PersistenceSettings)
     render_api_key: str | None = None
     render_workflow_task: str | None = None
+    default_analysis_profile_match_id: str | None = None
 
     @classmethod
     def from_env(cls, environ: Mapping[str, str] | None = None) -> ApiSettings:
@@ -60,6 +61,7 @@ class ApiSettings:
         raw_origins = source.get("CORS_ORIGINS", ",".join(DEFAULT_CORS_ORIGINS))
         api_key = source.get("RENDER_API_KEY", "").strip() or None
         workflow_task = source.get("RENDER_WORKFLOW_TASK", "").strip() or None
+        profile_match_id = source.get("DEFAULT_ANALYSIS_PROFILE_MATCH_ID", "").strip() or None
         if (api_key is None) != (workflow_task is None):
             missing = "RENDER_WORKFLOW_TASK" if workflow_task is None else "RENDER_API_KEY"
             raise ConfigurationError(
@@ -78,6 +80,7 @@ class ApiSettings:
             persistence=PersistenceSettings.from_env(source),
             render_api_key=api_key,
             render_workflow_task=workflow_task,
+            default_analysis_profile_match_id=profile_match_id,
         )
 
     def public_values(self) -> dict[str, object]:
@@ -85,4 +88,5 @@ class ApiSettings:
             "corsOrigins": list(self.cors_origins),
             "persistence": self.persistence.public_values(),
             "renderWorkflowConfigured": self.render_api_key is not None,
+            "defaultAnalysisProfileConfigured": self.default_analysis_profile_match_id is not None,
         }

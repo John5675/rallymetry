@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Protocol
 
+from pickleball_vision.analysis_runtime.youtube import YouTubeDownloader
 from pickleball_vision.errors import AnalysisSourceError, ArtifactStorageError
 from pickleball_vision.persistence.artifacts import ArtifactStore
 from pickleball_vision.persistence.models import (
@@ -24,13 +25,27 @@ class ArtifactLookup(Protocol):
 class SourceMediaStager:
     """Resolve direct local paths or materialize configured artifact references."""
 
-    def __init__(self, persistence: ArtifactLookup, artifact_store: ArtifactStore) -> None:
+    def __init__(
+        self,
+        persistence: ArtifactLookup,
+        artifact_store: ArtifactStore,
+        *,
+        youtube_downloader: YouTubeDownloader | None = None,
+    ) -> None:
         self._persistence = persistence
         self._artifact_store = artifact_store
+        self._youtube_downloader = youtube_downloader
 
     async def stage(self, job: ProcessingJobRecord, *, workspace: Path) -> Path:
         if job.source_type is SourceMediaType.LOCAL_PATH and job.source_path is not None:
             return self._validate_local_path(Path(job.source_path))
+        if job.source_type is SourceMediaType.YOUTUBE:
+            if self._youtube_downloader is None or job.youtube_video_id is None:
+                raise AnalysisSourceError("YouTube source download is not configured")
+            return await self._youtube_downloader.download(
+                job.youtube_video_id,
+                destination_dir=workspace / "input",
+            )
         artifact_id = job.source_artifact_id
         if artifact_id is None:
             raise AnalysisSourceError("job has no source-media reference")

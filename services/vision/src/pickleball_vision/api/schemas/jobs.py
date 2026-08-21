@@ -29,6 +29,7 @@ class JobResponse(ApiOutputModel):
     pipeline_version: str | None = None
     source_type: str | None = None
     source_artifact_id: Identifier | None = None
+    youtube_video_id: str | None = None
     result_artifact_ids: list[Identifier] = Field(default_factory=list)
     result_summary: dict[str, object] = Field(default_factory=dict)
     created_at: datetime

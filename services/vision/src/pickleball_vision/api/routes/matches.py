@@ -14,6 +14,8 @@ from pickleball_vision.api.schemas.matches import (
     MatchListResponse,
     MatchPatchRequest,
     MatchResponse,
+    YouTubeMatchSubmitRequest,
+    YouTubeMatchSubmitResponse,
 )
 from pickleball_vision.api.schemas.records import ArtifactListResponse
 
@@ -26,6 +28,21 @@ async def create_match(
     service: MatchServiceDependency,
 ) -> MatchResponse:
     return await service.create_match(request)
+
+
+@router.post(
+    "/import-youtube",
+    response_model=YouTubeMatchSubmitResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def submit_youtube_match(
+    request: YouTubeMatchSubmitRequest,
+    service: MatchServiceDependency,
+    response: Response,
+) -> YouTubeMatchSubmitResponse:
+    result = await service.submit_youtube_match(request)
+    response.headers["Location"] = f"/api/jobs/{result.job.job_id}"
+    return result
 
 
 @router.get("", response_model=MatchListResponse)
@@ -57,6 +74,14 @@ async def list_artifacts(
     service: MatchServiceDependency,
 ) -> ArtifactListResponse:
     return await service.list_artifacts(match_id)
+
+
+@router.get("/{matchId}/processing-job", response_model=JobResponse)
+async def get_latest_processing_job(
+    match_id: MatchId,
+    service: MatchServiceDependency,
+) -> JobResponse:
+    return await service.get_latest_match_job(match_id)
 
 
 @router.post(

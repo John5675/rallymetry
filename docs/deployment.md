@@ -36,6 +36,7 @@ MONGODB_DATABASE=rallymetry
 CORS_ORIGINS=http://localhost:5173,https://rallymetry.vercel.app
 RENDER_API_KEY=...
 RENDER_WORKFLOW_TASK=rallymetry-analysis/analyze_match
+DEFAULT_ANALYSIS_PROFILE_MATCH_ID=match_...
 ```
 
 FastAPI needs the Render key only to call the async task-start API. It does not need
@@ -54,6 +55,8 @@ MODEL_DEVICE=cpu
 WORKFLOW_TEMP_DIR=/tmp/rallymetry
 RENDER_WORKFLOW_PLAN=pro
 RENDER_WORKFLOW_TIMEOUT_SECONDS=21600
+YOUTUBE_MAX_DURATION_SECONDS=7200
+YOUTUBE_MAX_BYTES=4000000000
 ```
 
 The workflow does not need `RENDER_API_KEY`. Secrets belong in deployment secret
@@ -84,12 +87,13 @@ Use two stores:
 Set the private token as `BLOB_READ_WRITE_TOKEN` and public token as
 `PUBLIC_BLOB_READ_WRITE_TOKEN` on the workflow. Never put either in `VITE_*`.
 Artifact paths are randomized. Source recordings remain private. An unlisted YouTube
-ID remains the normal browser playback source when present; the workflow still
-analyzes the explicitly persisted source artifact and never downloads YouTube.
+ID remains the normal browser playback source and may also be downloaded directly by
+the on-demand Render task for one-click submissions. That copy is bounded, temporary,
+and never made public.
 
-Before analysis, each match must reference one private source artifact and four
-private setup artifacts in `analysisSetup`; see
-[`render-workflows.md`](render-workflows.md#match-prerequisites).
+Before analysis, each match must reference either one private source artifact or one
+validated YouTube video ID, plus four private setup artifacts in `analysisSetup`; see
+[`render-workflows.md`](render-workflows.md#match-prerequisites-and-one-click-profile).
 
 ## FastAPI deployment
 
@@ -149,8 +153,9 @@ retry behavior, status semantics, and debugging are in
 
 1. `GET https://<fastapi-host>/health` returns `200` with database ready.
 2. The Vercel match list loads through the configured API origin with no CORS error.
-3. The target match has its private source and required setup artifact references.
-4. `POST /api/matches/<matchId>/process` returns `202` quickly with `jobId`,
+3. `DEFAULT_ANALYSIS_PROFILE_MATCH_ID` points to a match with the required setup.
+4. Paste a YouTube link in the match library, or call
+   `POST /api/matches/import-youtube`; verify `202` quickly with `jobId`,
    `processingRunId`, and `renderTaskRunId`.
 5. A duplicate request returns that active job and creates no second Render run.
 6. Render Dashboard shows one `analyze_match` run. `GET /api/jobs/<jobId>` advances

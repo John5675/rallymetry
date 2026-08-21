@@ -46,6 +46,12 @@ class InMemoryApplicationPersistence:
         document = self.matches.get(match_id)
         return dict(document) if document is not None else None
 
+    async def get_match_by_youtube_video_id(self, youtube_video_id: str) -> Document | None:
+        for document in self.matches.values():
+            if document.get("youtubeVideoId") == youtube_video_id:
+                return dict(document)
+        return None
+
     async def list_matches(
         self,
         *,
@@ -165,11 +171,28 @@ class InMemoryApplicationPersistence:
         document = self.jobs.get(job_id)
         return dict(document) if document is not None else None
 
+    async def get_latest_processing_job_for_match(self, match_id: str) -> Document | None:
+        documents = [
+            document for document in self.jobs.values() if document.get("matchId") == match_id
+        ]
+        if not documents:
+            return None
+        return dict(max(documents, key=lambda document: str(document["createdAt"])))
+
     async def get_artifact(self, artifact_id: str) -> Document | None:
         for document in self.artifacts:
             if document.get("artifactId") == artifact_id:
                 return dict(document)
         return None
+
+    async def save_artifact(self, record: ArtifactRecord) -> None:
+        document = record.to_document()
+        self.artifacts = [
+            existing
+            for existing in self.artifacts
+            if existing.get("artifactId") != record.artifact_id
+        ]
+        self.artifacts.append(document)
 
     @staticmethod
     def _page(
@@ -479,6 +502,101 @@ def test_duplicate_process_request_returns_active_job_without_second_render_run(
     assert len(workflow.starts) == 1
 
 
+def test_youtube_submission_clones_profile_setup_and_queues_workflow() -> None:
+    persistence = seed_persistence()
+    workflow = FakeWorkflowClient()
+    app = create_app(
+        settings=ApiSettings(default_analysis_profile_match_id="match_seed"),
+        persistence=persistence,
+        workflow_client=workflow,
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/matches/import-youtube",
+            json={
+                "youtubeUrl": "https://youtu.be/_cPF1fTnk0Y?feature=shared",
+                "title": "Thursday night match",
+            },
+        )
+        payload = response.json()
+        latest = client.get(f"/api/matches/{payload['match']['matchId']}/processing-job")
+
+    assert response.status_code == 202
+    assert payload["match"]["title"] == "Thursday night match"
+    assert payload["match"]["youtubeVideoId"] == "_cPF1fTnk0Y"
+    assert payload["match"]["sourceArtifactId"] is None
+    assert payload["match"]["analysisProfileMatchId"] == "match_seed"
+    assert payload["job"]["status"] == "QUEUED"
+    assert payload["job"]["sourceType"] == "YOUTUBE"
+    assert payload["job"]["youtubeVideoId"] == "_cPF1fTnk0Y"
+    assert response.headers["Location"] == f"/api/jobs/{payload['job']['jobId']}"
+    assert latest.status_code == 200
+    assert latest.json()["jobId"] == payload["job"]["jobId"]
+    setup = payload["match"]["analysisSetup"]
+    assert set(setup) == {
+        "ballExperimentArtifactId",
+        "ballWeightsArtifactId",
+        "calibrationArtifactId",
+        "playerAssignmentsArtifactId",
+    }
+    assert set(setup.values()) == {
+        "artifact_ball_experiment",
+        "artifact_ball_weights",
+        "artifact_calibration",
+        "artifact_assignments",
+    }
+    assert len(persistence.artifacts) == 6
+
+
+def test_youtube_submission_rejects_duplicate_without_starting_paid_run() -> None:
+    persistence = seed_persistence()
+    workflow = FakeWorkflowClient()
+    app = create_app(
+        settings=ApiSettings(default_analysis_profile_match_id="match_seed"),
+        persistence=persistence,
+        workflow_client=workflow,
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/matches/import-youtube",
+            json={"youtubeUrl": "https://www.youtube.com/watch?v=abc123XYZ_9"},
+        )
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "youtube_match_exists"
+    assert response.json()["error"]["details"]["matchId"] == "match_seed"
+    assert workflow.starts == []
+
+
+@pytest.mark.parametrize(
+    "youtube_url",
+    [
+        "https://example.com/watch?v=_cPF1fTnk0Y",
+        "https://www.youtube.com/playlist?list=abc",
+        "https://www.youtube.com/watch?v=too-short",
+        "not a url",
+    ],
+)
+def test_youtube_submission_rejects_unsupported_urls(youtube_url: str) -> None:
+    persistence = seed_persistence()
+    app = create_app(
+        settings=ApiSettings(default_analysis_profile_match_id="match_seed"),
+        persistence=persistence,
+        workflow_client=FakeWorkflowClient(),
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/matches/import-youtube",
+            json={"youtubeUrl": youtube_url},
+        )
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "youtube_url_invalid"
+
+
 def test_render_trigger_failure_marks_job_failed_and_returns_safe_503() -> None:
     persistence = seed_persistence()
     app = create_app(
@@ -501,6 +619,7 @@ def test_process_endpoint_requires_available_source_media() -> None:
     persistence = seed_persistence()
     match = persistence.matches["match_seed"]
     match.pop("sourceArtifactId")
+    match.pop("youtubeVideoId")
     app = create_app(settings=ApiSettings(), persistence=persistence)
 
     with TestClient(app) as client:

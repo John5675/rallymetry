@@ -359,6 +359,13 @@ class MongoPersistence:
     async def save_match(self, record: MatchRecord) -> None:
         await self._replace("matches", record.to_document(), "save_match")
 
+    async def get_match_by_youtube_video_id(self, youtube_video_id: str) -> Document | None:
+        return await self._find_one(
+            "matches",
+            {"youtubeVideoId": youtube_video_id},
+            "get_match_by_youtube_video_id",
+        )
+
     async def save_players(self, records: Sequence[PlayerRecord]) -> None:
         await self._replace_many("players", records, "save_players")
 
@@ -620,6 +627,18 @@ class MongoPersistence:
             {"_id": job_id},
             "get_processing_job",
         )
+
+    async def get_latest_processing_job_for_match(self, match_id: str) -> Document | None:
+        documents, _ = await self._list_documents(
+            "processing_jobs",
+            {"matchId": match_id},
+            sort_key="createdAt",
+            direction=DESCENDING,
+            limit=1,
+            offset=0,
+            operation="get_latest_processing_job_for_match",
+        )
+        return documents[0] if documents else None
 
     async def get_artifact(self, artifact_id: str) -> Document | None:
         return await self._find_one(

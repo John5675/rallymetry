@@ -51,15 +51,28 @@ class DownloadOnlyBlobStore:
         return True
 
 
+class FakeYouTubeDownloader:
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, Path]] = []
+
+    async def download(self, video_id: str, *, destination_dir: Path) -> Path:
+        destination_dir.mkdir(parents=True, exist_ok=True)
+        destination = destination_dir / "source.mp4"
+        destination.write_bytes(b"youtube")
+        self.calls.append((video_id, destination_dir))
+        return destination
+
+
 def _artifact(
     artifact_id: str,
     *,
     category: ArtifactCategory,
     pathname: str,
+    match_id: str = "match_test",
 ) -> ArtifactRecord:
     return ArtifactRecord(
         artifact_id=artifact_id,
-        match_id="match_test",
+        match_id=match_id,
         artifact_type=artifact_id,
         category=category,
         pathname=pathname,
@@ -116,3 +129,62 @@ def test_workflow_stages_source_and_required_private_setup_into_job_input(tmp_pa
     assert staged_source.read_bytes() == b"artifact_source"
     assert {path.name for path in staged_setup.values()} == set(SETUP_FILENAMES.values())
     assert len(store.destinations) == 5
+
+
+def test_workflow_stages_youtube_source_only_inside_job_workspace(tmp_path: Path) -> None:
+    lookup = ArtifactLookup([])
+    store = DownloadOnlyBlobStore()
+    downloader = FakeYouTubeDownloader()
+    job = ProcessingJobRecord(
+        job_id="job_youtube",
+        match_id="match_test",
+        job_type="analyze_match",
+        source_type=SourceMediaType.YOUTUBE,
+        youtube_video_id="_cPF1fTnk0Y",
+        processing_run_id="run_test",
+        created_at=NOW,
+        updated_at=NOW,
+    )
+    workspace = tmp_path / "job_youtube"
+
+    staged = asyncio.run(
+        SourceMediaStager(
+            lookup,
+            store,
+            youtube_downloader=downloader,
+        ).stage(job, workspace=workspace)
+    )
+
+    assert staged == workspace / "input" / "source.mp4"
+    assert staged.read_bytes() == b"youtube"
+    assert downloader.calls == [("_cPF1fTnk0Y", workspace / "input")]
+    assert store.destinations == []
+
+
+def test_workflow_accepts_explicit_shared_analysis_profile_owner(tmp_path: Path) -> None:
+    setup_records = [
+        _artifact(
+            f"profile_{field}",
+            category=ArtifactCategory.INTERNAL_ARTIFACT,
+            pathname=f"internal_artifact/profile/random/{filename}",
+            match_id="match_profile",
+        )
+        for field, filename in SETUP_FILENAMES.items()
+    ]
+    lookup = ArtifactLookup(setup_records)
+    store = DownloadOnlyBlobStore()
+    match_document: Document = {
+        "analysisProfileMatchId": "match_profile",
+        "analysisSetup": {field: f"profile_{field}" for field in SETUP_FILENAMES},
+    }
+
+    staged = asyncio.run(
+        MatchSetupStager(lookup, store).stage(
+            match_id="match_new",
+            match_document=match_document,
+            workspace=tmp_path / "match_new",
+        )
+    )
+
+    assert {path.name for path in staged.values()} == set(SETUP_FILENAMES.values())
+    assert len(store.destinations) == 4

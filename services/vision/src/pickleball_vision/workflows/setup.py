@@ -50,6 +50,10 @@ class MatchSetupStager:
         if not isinstance(raw_setup, Mapping):
             raise AnalysisConfigurationError("match has no analysisSetup object")
         staged: dict[str, Path] = {}
+        profile_match_id = match_document.get("analysisProfileMatchId")
+        allowed_owners = {match_id}
+        if isinstance(profile_match_id, str) and profile_match_id:
+            allowed_owners.add(profile_match_id)
         for field, filename in SETUP_FILENAMES.items():
             artifact_id = raw_setup.get(field)
             if not isinstance(artifact_id, str) or not artifact_id:
@@ -58,7 +62,7 @@ class MatchSetupStager:
             if document is None:
                 raise AnalysisConfigurationError(f"analysis setup artifact {field} does not exist")
             artifact = artifact_record_from_document(document)
-            if artifact.match_id != match_id:
+            if artifact.match_id not in allowed_owners:
                 raise AnalysisConfigurationError(f"analysis setup artifact {field} has wrong match")
             if artifact.category is not ArtifactCategory.INTERNAL_ARTIFACT:
                 raise AnalysisConfigurationError(f"analysis setup artifact {field} is not internal")

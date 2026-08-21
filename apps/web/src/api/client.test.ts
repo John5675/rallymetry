@@ -66,4 +66,23 @@ describe("ApiClient", () => {
 
     await expect(client.getAnalytics("match-1")).resolves.toBeNull();
   });
+
+  it("submits one YouTube link as JSON to the asynchronous import endpoint", async () => {
+    const payload = { match: { matchId: "match-1" }, job: { jobId: "job-1" } };
+    const fetchMock = vi.fn().mockResolvedValue(jsonResponse(payload, 202));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ApiClient("https://api.example.test");
+
+    await expect(
+      client.submitYouTubeMatch("https://youtu.be/_cPF1fTnk0Y", null),
+    ).resolves.toEqual(payload);
+    expect(fetchMock).toHaveBeenCalledWith(
+      "https://api.example.test/api/matches/import-youtube",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({ youtubeUrl: "https://youtu.be/_cPF1fTnk0Y" }),
+        headers: { Accept: "application/json", "Content-Type": "application/json" },
+      }),
+    );
+  });
 });

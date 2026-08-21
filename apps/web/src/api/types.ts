@@ -13,12 +13,46 @@ export interface Match {
   title: string | null;
   youtubeVideoId: string | null;
   sourceArtifactId: string | null;
+  analysisProfileMatchId: string | null;
+  analysisSetup: Record<string, string>;
   pipelineVersion: string | null;
   modelVersions: Record<string, string>;
   summary: Record<string, JsonValue>;
   artifactIds: string[];
   createdAt: string;
   updatedAt: string;
+}
+
+export interface ProcessingJob {
+  jobId: string;
+  matchId: string;
+  jobType: string;
+  status: string;
+  progress: number;
+  stage: string | null;
+  renderTriggeredAt: string | null;
+  startedAt: string | null;
+  completedAt: string | null;
+  failedAt: string | null;
+  failedStage: string | null;
+  renderTaskRunId: string | null;
+  processingRunId: string | null;
+  attemptCount: number;
+  errorCode: string | null;
+  errorMessage: string | null;
+  pipelineVersion: string | null;
+  sourceType: string | null;
+  sourceArtifactId: string | null;
+  youtubeVideoId: string | null;
+  resultArtifactIds: string[];
+  resultSummary: Record<string, JsonValue>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface YouTubeMatchSubmission {
+  match: Match;
+  job: ProcessingJob;
 }
 
 export interface Player {

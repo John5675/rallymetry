@@ -18,6 +18,7 @@ def test_api_settings_load_cors_mongodb_and_storage_environment() -> None:
             "PUBLIC_BLOB_READ_WRITE_TOKEN": "public-server-secret",
             "RENDER_API_KEY": "render-secret",
             "RENDER_WORKFLOW_TASK": "rallymetry-analysis/analyze_match",
+            "DEFAULT_ANALYSIS_PROFILE_MATCH_ID": "match_profile",
         }
     )
 
@@ -32,6 +33,8 @@ def test_api_settings_load_cors_mongodb_and_storage_environment() -> None:
     assert "user:secret" not in repr(public)
     assert "render-secret" not in repr(public)
     assert public["renderWorkflowConfigured"] is True
+    assert public["defaultAnalysisProfileConfigured"] is True
+    assert settings.default_analysis_profile_match_id == "match_profile"
 
 
 def test_api_settings_accept_local_vercel_and_custom_frontend_origins() -> None:

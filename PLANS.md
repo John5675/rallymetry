@@ -826,6 +826,34 @@ Exit criteria:
 - No authentication, correction workflow, AI coaching, or FastAPI-on-Vercel
   implementation is introduced.
 
+## 23A. One-click YouTube match submission — complete
+
+Add a friend-facing submission path that accepts a single YouTube recording URL,
+creates a compact match record, and immediately queues the existing on-demand Render
+analysis workflow. Media download remains outside FastAPI request handling and runs
+only inside the temporary Render task workspace.
+
+Exit criteria:
+
+- The match library contains a validated YouTube-link form with an optional title and
+  one explicit `Upload & analyze` action.
+- A single FastAPI request parses only supported YouTube URL shapes, creates the match,
+  applies a configured reusable analysis profile, creates the durable processing job,
+  triggers Render, and returns `202 Accepted` without downloading media in HTTP.
+- The Render task accepts the persisted YouTube video ID as a source type, downloads at
+  most one authorized recording into its isolated temporary workspace, preserves audio,
+  enforces a configurable duration limit, and cleans the copy after processing.
+- Default calibration/player/model setup is copied by reference from an explicitly
+  configured profile match; new matches never mutate the profile match or its artifacts.
+- Duplicate submissions and unsupported/non-video URLs do not create duplicate paid
+  analysis runs.
+- The dashboard displays durable job stage/progress after submission and after reload,
+  with clear failure output and no credentials in browser responses.
+- Tests cover URL parsing, profile setup cloning, asynchronous queueing, download adapter
+  behavior, duplicate prevention, frontend submission, and job-state rendering.
+- Python and frontend tests, lint, formatting, type checks, builds, and the CLI doctor
+  pass.
+
 ## Future milestones — not current
 
 24. Human correction workflow

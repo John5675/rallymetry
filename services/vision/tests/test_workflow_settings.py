@@ -18,6 +18,8 @@ def test_workflow_settings_default_to_cpu_and_scoped_temp_root() -> None:
     assert settings.pipeline_config_path == Path("plan.json")
     assert settings.temp_root == Path("/tmp/rallymetry")
     assert settings.model_device == "cpu"
+    assert settings.youtube_max_duration_seconds == 7_200
+    assert settings.youtube_max_bytes == 4_000_000_000
     assert workflow_task_plan({}) == "pro"
     assert workflow_timeout_seconds({}) == 21_600
 

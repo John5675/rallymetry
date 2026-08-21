@@ -13,6 +13,8 @@ DEFAULT_WORKFLOW_PLAN = "pro"
 DEFAULT_WORKFLOW_TIMEOUT_SECONDS = 21_600
 DEFAULT_WORKFLOW_MAX_RETRIES = 1
 DEFAULT_WORKFLOW_RETRY_WAIT_MS = 30_000
+DEFAULT_YOUTUBE_MAX_DURATION_SECONDS = 7_200
+DEFAULT_YOUTUBE_MAX_BYTES = 4_000_000_000
 RENDER_WORKFLOW_PLANS = frozenset({"flex", "starter", "standard", "pro", "pro_plus", "pro_max"})
 
 
@@ -34,6 +36,8 @@ class WorkflowSettings:
     pipeline_config_path: Path
     temp_root: Path = Path("/tmp/rallymetry")
     model_device: str = "cpu"
+    youtube_max_duration_seconds: int = DEFAULT_YOUTUBE_MAX_DURATION_SECONDS
+    youtube_max_bytes: int = DEFAULT_YOUTUBE_MAX_BYTES
 
     def __post_init__(self) -> None:
         if not self.model_device.strip():
@@ -52,6 +56,16 @@ class WorkflowSettings:
             pipeline_config_path=Path(raw_plan).expanduser(),
             temp_root=Path(raw_root).expanduser(),
             model_device=source.get("MODEL_DEVICE", "cpu").strip().lower(),
+            youtube_max_duration_seconds=_positive_int(
+                source,
+                "YOUTUBE_MAX_DURATION_SECONDS",
+                DEFAULT_YOUTUBE_MAX_DURATION_SECONDS,
+            ),
+            youtube_max_bytes=_positive_int(
+                source,
+                "YOUTUBE_MAX_BYTES",
+                DEFAULT_YOUTUBE_MAX_BYTES,
+            ),
         )
 
 
