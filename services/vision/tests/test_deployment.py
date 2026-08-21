@@ -41,14 +41,15 @@ def test_api_container_requirements_match_locked_direct_versions() -> None:
         "dnspython": locked_versions["dnspython"],
         "fastapi": locked_versions["fastapi"],
         "pymongo": locked_versions["pymongo"],
+        "render-sdk": locked_versions["render-sdk"],
         "uvicorn": locked_versions["uvicorn"],
         "vercel": locked_versions["vercel"],
     }
 
 
-def test_worker_publication_plan_never_exposes_internal_artifacts() -> None:
+def test_workflow_publication_plan_contains_only_viewable_artifacts() -> None:
     plan = json.loads(
-        (REPOSITORY_ROOT / "docs" / "examples" / "worker-pipeline-plan.json").read_text(
+        (REPOSITORY_ROOT / "docs" / "examples" / "render-workflow-pipeline-plan.json").read_text(
             encoding="utf-8"
         )
     )
@@ -56,8 +57,4 @@ def test_worker_publication_plan_never_exposes_internal_artifacts() -> None:
     public_artifacts = [item for item in plan["artifacts"] if item.get("access") == "PUBLIC"]
     assert public_artifacts
     assert all(item["category"] == "VIEWABLE_MEDIA" for item in public_artifacts)
-    assert all(
-        item.get("access") == "PRIVATE"
-        for item in plan["artifacts"]
-        if item["category"] == "INTERNAL_ARTIFACT"
-    )
+    assert all(item["category"] == "VIEWABLE_MEDIA" for item in plan["artifacts"])

@@ -5,6 +5,7 @@ from collections.abc import Mapping, Sequence
 from datetime import UTC, datetime
 
 import pytest
+from pymongo.errors import DuplicateKeyError
 
 from pickleball_vision.config import PersistenceSettings
 from pickleball_vision.errors import ErrorCode, PersistenceValidationError
@@ -76,9 +77,31 @@ class FakeCollection:
         unique: bool = False,
         sparse: bool = False,
         name: str | None = None,
+        partialFilterExpression: Mapping[str, object] | None = None,
     ) -> str:
-        self.indexes.append({"keys": keys, "unique": unique, "sparse": sparse, "name": name})
+        self.indexes.append(
+            {
+                "keys": keys,
+                "unique": unique,
+                "sparse": sparse,
+                "name": name,
+                "partialFilterExpression": partialFilterExpression,
+            }
+        )
         return name or "unnamed"
+
+    async def insert_one(self, document: Mapping[str, object]) -> object:
+        if document.get("active") is True:
+            for existing in self.documents.values():
+                if (
+                    existing.get("matchId") == document.get("matchId")
+                    and existing.get("active") is True
+                ):
+                    raise DuplicateKeyError("one active job per match")
+        identifier = document.get("_id")
+        assert isinstance(identifier, str)
+        self.documents[identifier] = dict(document)
+        return object()
 
     async def replace_one(
         self,
@@ -94,10 +117,10 @@ class FakeCollection:
         return object()
 
     async def find_one(self, filter: Mapping[str, object]) -> Document | None:
-        identifier = filter.get("_id")
-        if not isinstance(identifier, str):
-            return None
-        return self.documents.get(identifier)
+        for document in self.documents.values():
+            if all(document.get(key) == value for key, value in filter.items()):
+                return document.copy()
+        return None
 
     async def find_one_and_update(
         self,
@@ -107,10 +130,16 @@ class FakeCollection:
         return_document: object,
     ) -> Document | None:
         del return_document
-        identifier = filter.get("_id")
-        if not isinstance(identifier, str) or identifier not in self.documents:
+        document = next(
+            (
+                item
+                for item in self.documents.values()
+                if all(item.get(key) == value for key, value in filter.items())
+            ),
+            None,
+        )
+        if document is None:
             return None
-        document = self.documents[identifier]
         set_values = update.get("$set", {})
         unset_values = update.get("$unset", {})
         assert isinstance(set_values, Mapping)
@@ -159,7 +188,10 @@ def test_mongodb_adapter_initializes_indexes_and_separate_collections() -> None:
         index["name"] == "ix_jobs_status_updated" for index in database["processing_jobs"].indexes
     )
     assert any(
-        index["name"] == "ix_jobs_claim_lease" for index in database["processing_jobs"].indexes
+        index["name"] == "uq_jobs_one_active_match"
+        and index["unique"] is True
+        and index["partialFilterExpression"] == {"active": True}
+        for index in database["processing_jobs"].indexes
     )
     assert any(
         index["name"] == "uq_artifacts_pathname" and index["unique"] is True
@@ -251,6 +283,38 @@ def test_mongodb_adapter_persists_compact_records_without_one_huge_match_documen
     assert asyncio.run(persistence.get_artifact("artifact-source")) is not None
     artifacts = asyncio.run(persistence.list_match_artifacts("match-1"))
     assert [record["artifactId"] for record in artifacts] == ["artifact-source"]
+
+
+def test_processing_job_creation_is_atomic_per_active_match() -> None:
+    database = FakeDatabase()
+    persistence = MongoPersistence(database)
+    first = ProcessingJobRecord(
+        job_id="job-1",
+        match_id="match-1",
+        job_type="analyze_match",
+        processing_run_id="run-1",
+        created_at=NOW,
+        updated_at=NOW,
+    )
+    second = ProcessingJobRecord(
+        job_id="job-2",
+        match_id="match-1",
+        job_type="analyze_match",
+        processing_run_id="run-2",
+        created_at=NOW,
+        updated_at=NOW,
+    )
+
+    first_document, first_created = asyncio.run(
+        persistence.create_processing_job_if_no_active(first)
+    )
+    second_document, second_created = asyncio.run(
+        persistence.create_processing_job_if_no_active(second)
+    )
+
+    assert first_created is True
+    assert second_created is False
+    assert first_document["jobId"] == second_document["jobId"] == "job-1"
 
 
 @pytest.mark.parametrize(

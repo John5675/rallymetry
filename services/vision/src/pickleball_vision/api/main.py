@@ -22,6 +22,10 @@ from pickleball_vision.api.errors import ApiError
 from pickleball_vision.api.routes import include_routes
 from pickleball_vision.api.schemas.common import ErrorDetail, ErrorResponse, JsonObject
 from pickleball_vision.api.services.persistence import ApplicationPersistence
+from pickleball_vision.api.services.render_workflows import (
+    AnalysisWorkflowClient,
+    RenderWorkflowClient,
+)
 from pickleball_vision.api.settings import ApiSettings
 from pickleball_vision.errors import PickleballVisionError
 from pickleball_vision.persistence.mongodb import MongoPersistence
@@ -150,10 +154,18 @@ async def _unexpected_error_handler(request: Request, error: Exception) -> JSONR
 def _lifespan(
     settings: ApiSettings,
     injected_persistence: ApplicationPersistence | None,
+    injected_workflow_client: AnalysisWorkflowClient | None,
 ) -> Callable[[FastAPI], AbstractAsyncContextManager[None]]:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         owned_persistence: MongoPersistence | None = None
+        if injected_workflow_client is not None:
+            app.state.workflow_client = injected_workflow_client
+        elif settings.render_api_key is not None and settings.render_workflow_task is not None:
+            app.state.workflow_client = RenderWorkflowClient(
+                api_key=settings.render_api_key,
+                task_identifier=settings.render_workflow_task,
+            )
         if injected_persistence is not None:
             app.state.persistence = injected_persistence
             app.state.database_ready = True
@@ -177,6 +189,7 @@ def _lifespan(
         finally:
             app.state.persistence = None
             app.state.database_ready = False
+            app.state.workflow_client = None
             if owned_persistence is not None:
                 try:
                     await owned_persistence.close()
@@ -193,6 +206,7 @@ def create_app(
     *,
     settings: ApiSettings | None = None,
     persistence: ApplicationPersistence | None = None,
+    workflow_client: AnalysisWorkflowClient | None = None,
 ) -> FastAPI:
     """Build the control-plane app without opening provider connections."""
 
@@ -200,7 +214,7 @@ def create_app(
     app = FastAPI(
         title="Pickleball Vision API",
         version="0.1.0",
-        lifespan=_lifespan(effective_settings, persistence),
+        lifespan=_lifespan(effective_settings, persistence, workflow_client),
         responses={
             404: {"model": ErrorResponse},
             422: {"model": ErrorResponse},
@@ -211,6 +225,7 @@ def create_app(
     app.state.api_settings = effective_settings
     app.state.persistence = persistence
     app.state.database_ready = persistence is not None
+    app.state.workflow_client = workflow_client
 
     app.add_middleware(
         CORSMiddleware,

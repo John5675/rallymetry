@@ -1,43 +1,43 @@
 {
   "planVersion": "1",
-  "pipelineVersion": "release-0.1-worker-v1",
+  "pipelineVersion": "release-0.1-render-workflow-v1",
   "stages": [
     {
       "stage": "PLAYER_PROCESSING",
-      "progress": 0.05,
+      "progress": 0.15,
       "argv": [
         "detect-people",
         "{source}",
         "--calibration",
-        "/opt/pickleball-vision/matches/{matchId}/calibration.json",
+        "{input}/calibration.json",
         "--output-dir",
         "{workspace}/person-detection"
       ]
     },
     {
       "stage": "PLAYER_PROCESSING",
-      "progress": 0.12,
+      "progress": 0.17,
       "argv": [
         "track-players",
         "{source}",
         "--calibration",
-        "/opt/pickleball-vision/matches/{matchId}/calibration.json",
+        "{input}/calibration.json",
         "--detections",
         "{workspace}/person-detection/detections.json",
         "--assignments",
-        "/opt/pickleball-vision/matches/{matchId}/player-assignments.json",
+        "{input}/player-assignments.json",
         "--output-dir",
         "{workspace}/player-tracking"
       ]
     },
     {
       "stage": "PLAYER_PROCESSING",
-      "progress": 0.18,
+      "progress": 0.20,
       "argv": [
         "analyze-players",
         "{source}",
         "--calibration",
-        "/opt/pickleball-vision/matches/{matchId}/calibration.json",
+        "{input}/calibration.json",
         "--tracks",
         "{workspace}/player-tracking/tracks.json",
         "--output-dir",
@@ -46,40 +46,42 @@
     },
     {
       "stage": "BALL_PROCESSING",
-      "progress": 0.28,
+      "progress": 0.30,
       "argv": [
         "ball",
         "detect",
         "{source}",
         "--config",
-        "/opt/pickleball-vision/models/ball/experiment.json",
+        "{input}/ball-experiment.json",
         "--weights",
-        "/opt/pickleball-vision/models/ball/best.pt",
+        "{input}/ball-weights.pt",
+        "--device",
+        "{device}",
         "--strategy",
         "court-roi-1920",
         "--calibration",
-        "/opt/pickleball-vision/matches/{matchId}/calibration.json",
+        "{input}/calibration.json",
         "--output-dir",
         "{workspace}/ball-detection"
       ]
     },
     {
       "stage": "BALL_PROCESSING",
-      "progress": 0.38,
+      "progress": 0.40,
       "argv": [
         "track-ball",
         "{source}",
         "--detections",
         "{workspace}/ball-detection/detections.json",
         "--calibration",
-        "/opt/pickleball-vision/matches/{matchId}/calibration.json",
+        "{input}/calibration.json",
         "--output-dir",
         "{workspace}/ball-tracking"
       ]
     },
     {
       "stage": "AUDIO_PROCESSING",
-      "progress": 0.44,
+      "progress": 0.55,
       "argv": [
         "analyze-audio",
         "{source}",
@@ -89,7 +91,7 @@
     },
     {
       "stage": "RALLY_PROCESSING",
-      "progress": 0.52,
+      "progress": 0.65,
       "argv": [
         "segment-rallies",
         "{source}",
@@ -104,15 +106,15 @@
       ]
     },
     {
-      "stage": "EVENT_PROCESSING",
-      "progress": 0.60,
+      "stage": "BOUNCE_PROCESSING",
+      "progress": 0.70,
       "argv": [
         "detect-bounces",
         "{source}",
         "--ball-tracks",
         "{workspace}/ball-tracking/ball_tracks.json",
         "--calibration",
-        "/opt/pickleball-vision/matches/{matchId}/calibration.json",
+        "{input}/calibration.json",
         "--rallies",
         "{workspace}/rallies/rallies.json",
         "--audio-events",
@@ -122,8 +124,8 @@
       ]
     },
     {
-      "stage": "EVENT_PROCESSING",
-      "progress": 0.67,
+      "stage": "CONTACT_PROCESSING",
+      "progress": 0.75,
       "argv": [
         "detect-contacts",
         "{source}",
@@ -142,8 +144,8 @@
       ]
     },
     {
-      "stage": "EVENT_PROCESSING",
-      "progress": 0.72,
+      "stage": "HITTER_PROCESSING",
+      "progress": 0.80,
       "argv": [
         "identify-hitters",
         "{source}",
@@ -157,7 +159,7 @@
     },
     {
       "stage": "SHOT_PROCESSING",
-      "progress": 0.80,
+      "progress": 0.85,
       "argv": [
         "reconstruct-shots",
         "{source}",
@@ -179,7 +181,7 @@
     },
     {
       "stage": "ANALYTICS",
-      "progress": 0.88,
+      "progress": 0.90,
       "argv": [
         "analyze-match",
         "{source}",
@@ -290,24 +292,6 @@
       "artifactType": "shot_debug_video",
       "category": "VIEWABLE_MEDIA",
       "access": "PUBLIC"
-    },
-    {
-      "path": "ball-tracking/ball_tracks.json",
-      "artifactType": "ball_tracks",
-      "category": "INTERNAL_ARTIFACT",
-      "access": "PRIVATE"
-    },
-    {
-      "path": "audio-analysis/audio-events.json",
-      "artifactType": "audio_events",
-      "category": "INTERNAL_ARTIFACT",
-      "access": "PRIVATE"
-    },
-    {
-      "path": "analytics/match-analytics.json",
-      "artifactType": "match_analytics",
-      "category": "INTERNAL_ARTIFACT",
-      "access": "PRIVATE"
     }
   ]
 }

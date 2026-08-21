@@ -67,9 +67,15 @@ and the relevant design document before changing code.
 - Use Vercel Blob for hosted binary and generated artifacts.
 - Do not store large videos or frame-level CV artifacts directly in MongoDB.
 - Keep heavy analysis outside the API process and outside HTTP request handling.
-- Use a separate Python analysis worker for heavy CV and audio processing.
-- MongoDB may act as the small-scale job queue.
-- Do not add Redis or Celery unless demonstrated requirements justify them.
+- Use on-demand Render Workflows for hosted CV and audio processing.
+- Do not run a continuously polling or always-on analysis worker.
+- MongoDB stores durable application job status but must not be polled as a job queue.
+- Do not add Redis, Celery, RabbitMQ, Kafka, or a Render Background Worker.
+- Render Workflow task inputs must contain small identifiers, never media or large results.
+- A workflow processes one match and publishes to MongoDB/Vercel Blob; it must never
+  commit generated output or redeploy the website.
+- Treat workflow filesystems as temporary and clean only the current job workspace.
+- Make workflow retries idempotent through a stable processing run identity.
 - Preserve the existing CLI and local pipeline.
 - The local pipeline must continue working without MongoDB, Vercel, or internet
   connectivity when possible.

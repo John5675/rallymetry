@@ -1,245 +1,171 @@
-# Friend-viewable deployment
+# Hosted deployment
 
-## Deployment boundary
-
-Milestone 23 deploys only the React/Vite application to Vercel. FastAPI runs as a
-small persistent Python service, and the heavy analysis worker remains a separate
-outbound-only process. Neither FastAPI nor the CV/audio pipeline runs in Vercel
-Functions.
+## Production shape
 
 ```text
-Friends
-   |
-   v
-Vercel: React/Vite
-   |
-   v
-Persistent FastAPI service
-   |
-   +---------------------> MongoDB Atlas
-
-Developer PC / worker machine
-   |
-   v
-MongoDB processing job -> CV + audio pipeline
-   |                         |
-   +-------------------------+
-   |
-   +--> MongoDB Atlas + private/public Vercel Blob
-                               |
-                               v
-                         Website results
+Friends -> Vercel React/Vite -> persistent FastAPI -> MongoDB Atlas
+                                      |
+                                      +-> Render Workflows queue
+                                             |
+                                      on-demand analyze_match
+                                             |
+                                      MongoDB + Vercel Blob
+                                             |
+                                      existing website refreshes data
 ```
 
-This topology is intended for approximately six users. It adds no Redis, Celery,
-inbound worker listener, or browser credential. Authentication is still deferred,
-so anyone who knows the deployment URL can open the dashboard and anyone who has a
-public Blob URL can open that generated artifact.
+Vercel hosts only the static React/Vite application. FastAPI runs on a small
+persistent Python host. Heavy analysis runs only in an on-demand Render Workflow
+task, never in FastAPI, Vercel Functions, or an always-on polling process.
 
-## Environment contract
+## Environment boundaries
 
-Copy the checked-in examples only as a list of names. Store real values in each
-host's encrypted environment or secret manager; do not commit a populated file.
+### Frontend
 
-### Frontend (Vercel build environment)
+```text
+VITE_API_BASE_URL=https://<fastapi-host>
+```
 
-| Variable | Example | Notes |
-| --- | --- | --- |
-| `VITE_API_BASE_URL` | `https://api.example.com` | Public HTTPS origin of FastAPI; exposed in the browser by design |
+No MongoDB, Blob, or Render credential is browser-visible.
 
-No MongoDB or Blob variable belongs in the frontend environment. Any `VITE_*`
-value is public build output.
+### FastAPI
 
-### FastAPI and worker
+```text
+MONGODB_URL=mongodb+srv://...
+MONGODB_DATABASE=rallymetry
+CORS_ORIGINS=http://localhost:5173,https://rallymetry.vercel.app
+RENDER_API_KEY=...
+RENDER_WORKFLOW_TASK=rallymetry-analysis/analyze_match
+```
 
-| Variable | Purpose |
-| --- | --- |
-| `MONGODB_URL` | Atlas connection string from the server/worker secret store |
-| `MONGODB_DATABASE` | Dedicated database, normally `rallymetry` |
-| `PICKLEBALL_VISION_ARTIFACT_BACKEND` | Set to `vercel_blob` for hosted artifacts |
-| `BLOB_READ_WRITE_TOKEN` | Private Blob store used for source and internal artifacts |
-| `PUBLIC_BLOB_READ_WRITE_TOKEN` | Separate public Blob store used only for explicit public viewable media |
+FastAPI needs the Render key only to call the async task-start API. It does not need
+model files and does not wait for task completion.
 
-FastAPI additionally reads `CORS_ORIGINS`. The worker additionally reads the
-`PICKLEBALL_VISION_WORKER_*` variables listed in
-[`services/vision/.env.example`](../services/vision/.env.example).
+### Render Workflow
 
-## 1. MongoDB Atlas
+```text
+MONGODB_URL=mongodb+srv://...
+MONGODB_DATABASE=rallymetry
+PICKLEBALL_VISION_ARTIFACT_BACKEND=vercel_blob
+BLOB_READ_WRITE_TOKEN=...
+PUBLIC_BLOB_READ_WRITE_TOKEN=...
+PIPELINE_CONFIG=<absolute path to render-workflow-pipeline-plan.json>
+MODEL_DEVICE=cpu
+WORKFLOW_TEMP_DIR=/tmp/rallymetry
+RENDER_WORKFLOW_PLAN=pro
+RENDER_WORKFLOW_TIMEOUT_SECONDS=21600
+```
 
-1. Create or select an Atlas cluster and a dedicated `rallymetry` database.
-2. Create a least-privilege application database user. Do not reuse a credential
-   belonging to another application.
-3. Allow outbound connections from the FastAPI host and worker machine through
-   Atlas Network Access. Avoid a global allow-list when fixed egress ranges are
-   available.
-4. Put the Atlas connection string in `MONGODB_URL` on FastAPI and the worker.
-   Set `MONGODB_DATABASE=rallymetry` so unrelated databases and collections remain
-   outside this application's scope.
-5. Start FastAPI once; its lifespan initializes the Rallymetry collection indexes.
-   A successful `/health` response with `databaseReady: true` confirms access.
+The workflow does not need `RENDER_API_KEY`. Secrets belong in deployment secret
+stores and must never be committed.
 
-MongoDB stores compact match, event, analytics, job, correction, and artifact
-manifest records. It never stores MP4 bytes, raw frames, audio waveforms, model
-weights, or huge frame-level arrays.
+## MongoDB Atlas
 
-## 2. Vercel Blob stores
+1. Use a dedicated `rallymetry` database inside the Atlas cluster. Do not reuse or
+   modify unrelated application collections.
+2. Create a least-privilege database user for Rallymetry and store the connection
+   string as `MONGODB_URL` on FastAPI and the workflow service.
+3. Permit outbound connections from the selected hosts according to the Atlas
+   network policy.
+4. Start FastAPI once so `initialize_indexes()` creates Rallymetry's indexes,
+   including the partial unique active-job index.
+5. MongoDB stores compact match, job, rally, contact, bounce, shot, analytics, and
+   artifact metadata. It does not store videos, weights, waveforms, frame dumps, or
+   large raw detections, and it is not polled as a task queue.
 
-Blob access is a property of the store, not an individual object. Use two stores:
+## Vercel Blob
 
-| Store | Application variable | Allowed content |
-| --- | --- | --- |
-| Private | `BLOB_READ_WRITE_TOKEN` | `SOURCE_MEDIA`, `INTERNAL_ARTIFACT`, private viewable drafts |
-| Public | `PUBLIC_BLOB_READ_WRITE_TOKEN` | Only explicit `PUBLIC` + `VIEWABLE_MEDIA` outputs |
+Use two stores:
 
-Create one private store and one public store in the Vercel dashboard under
-Storage. When connecting the public store, set the advanced environment-variable
-prefix to `PUBLIC_BLOB_`. The equivalent CLI connection for an existing public
-store is:
+- a private store for `SOURCE_MEDIA`, calibration/assignment/model setup, and any
+  deliberately retained internal artifact;
+- a public store only for friend-viewable `VIEWABLE_MEDIA`.
+
+Set the private token as `BLOB_READ_WRITE_TOKEN` and public token as
+`PUBLIC_BLOB_READ_WRITE_TOKEN` on the workflow. Never put either in `VITE_*`.
+Artifact paths are randomized. Source recordings remain private. An unlisted YouTube
+ID remains the normal browser playback source when present; the workflow still
+analyzes the explicitly persisted source artifact and never downloads YouTube.
+
+Before analysis, each match must reference one private source artifact and four
+private setup artifacts in `analysisSetup`; see
+[`render-workflows.md`](render-workflows.md#match-prerequisites).
+
+## FastAPI deployment
+
+The production image is [services/vision/Dockerfile](../services/vision/Dockerfile).
+Build it from `services/vision`:
 
 ```bash
-npx --yes vercel@latest integration resource connect \
-  rallymetry-viewable rallymetry \
-  --prefix PUBLIC_BLOB_ \
-  --yes
+docker build -t rallymetry-api .
+docker run --rm -p 8000:8000 --env-file .env rallymetry-api
 ```
 
-Copy each store's server-side read/write token into the corresponding FastAPI and
-worker secret. The `PUBLIC_BLOB_` prefix creates the expected
-`PUBLIC_BLOB_READ_WRITE_TOKEN`. Do not add either token to `apps/web`, any `VITE_*`
-variable, browser JavaScript, or MongoDB.
+The container startup command is:
 
-The storage adapter uses a generated random path component and asks Blob for an
-additional random suffix. Random names reduce accidental discovery but are not an
-authorization mechanism. Anyone with a public URL can view that object. The worker
-example plan deliberately marks annotated/top-down/debug videos and heatmaps
-`PUBLIC`; ball tracks, audio observations, analytics artifacts, and source media
-remain `PRIVATE`. Review that policy before every new artifact type.
-
-When a match has `youtubeVideoId`, the dashboard embeds YouTube for normal source
-playback. Do not upload a duplicate source copy to public Blob merely for playback.
-
-## 3. FastAPI deployment
-
-Use any provider that runs a persistent Docker container and provides outbound
-HTTPS access to Atlas and Blob. Do not deploy this image as a Vercel Function.
-
-Build and test the vendor-neutral image from the repository root:
-
-```bash
-docker build \
-  --file services/vision/Dockerfile \
-  --tag rallymetry-api:0.1 \
-  services/vision
-
-docker run --rm \
-  --publish 8000:8000 \
-  --env-file services/vision/.env.production \
-  rallymetry-api:0.1
+```text
+uvicorn pickleball_vision.api.main:app --host 0.0.0.0 --port $PORT
 ```
 
-The image startup command is:
+Configure the host health check as `GET /health`. A response can be `degraded` when
+MongoDB is unavailable, which is useful diagnostically but should fail deployment
+readiness policy if hosted data is required. FastAPI remains a persistent web
+service; do not convert it to a Vercel Function.
 
-```bash
-uvicorn pickleball_vision.api.main:app --host 0.0.0.0 --port "$PORT"
-```
+## Vercel frontend deployment
 
-Configure the host to check `GET /health`. The container health check verifies
-process liveness. The JSON response separately reports `databaseReady`; production
-is ready only when it is `true`. Terminate TLS at the host so the public API origin
-uses HTTPS.
+The root `vercel.json` owns the monorepo SPA contract:
 
-Set exact frontend origins on FastAPI, for example:
+- install command: `npm --prefix apps/web ci`
+- build command: `npm --prefix apps/web run build`
+- output directory: `apps/web/dist`
+- rewrite non-file routes to `/index.html`
 
-```bash
-export CORS_ORIGINS='http://localhost:5173,https://rallymetry.vercel.app,https://matches.example.com'
-```
+Set `VITE_API_BASE_URL` to the public FastAPI origin and deploy. Add the exact Vercel
+domain (and optional custom domain) to FastAPI's comma-separated `CORS_ORIGINS`.
 
-Replace the example production names with the real Vercel and custom domains.
-Preview domains must be explicitly added if they need API access. Do not use a
-credentialed wildcard.
+## Render Workflow deployment
 
-## 4. Vercel frontend deployment
+Render Workflows are configured separately in the Render Dashboard rather than as a
+Background Worker:
 
-The repository-root [`vercel.json`](../vercel.json) defines the monorepo contract:
+1. Choose **New > Workflow** and connect this repository.
+2. Root directory: `services/vision`.
+3. Build command: `uv sync --locked`.
+4. Start command: `uv run python -m pickleball_vision.workflows.app`.
+5. Add the workflow environment above.
+6. Confirm `analyze_match` registers with plan `pro`, timeout `21600`, and one retry.
+7. Copy the task identifier `{workflow-slug}/analyze_match` into FastAPI's
+   `RENDER_WORKFLOW_TASK`.
+8. Put a least-privilege Render API key in FastAPI's `RENDER_API_KEY`, redeploy the
+   API once, and verify the key is absent from frontend environment output.
 
-| Setting | Value |
-| --- | --- |
-| Framework | Vite |
-| Install command | `npm --prefix apps/web ci` |
-| Build command | `npm --prefix apps/web run build` |
-| Output directory | `apps/web/dist` |
-| SPA fallback | rewrite every application route to `/index.html` |
+The workflow queues work and provisions/deprovisions task compute. There is no
+Rallymetry polling command to keep running. Full local and hosted workflow commands,
+retry behavior, status semantics, and debugging are in
+[`render-workflows.md`](render-workflows.md).
 
-In the Vercel project, keep the project root at the repository root. Add
-`VITE_API_BASE_URL` to Production (and Preview when desired), using the public HTTPS
-FastAPI origin. Environment changes require a new deployment.
+## Smoke test
 
-Deploy from the repository root:
+1. `GET https://<fastapi-host>/health` returns `200` with database ready.
+2. The Vercel match list loads through the configured API origin with no CORS error.
+3. The target match has its private source and required setup artifact references.
+4. `POST /api/matches/<matchId>/process` returns `202` quickly with `jobId`,
+   `processingRunId`, and `renderTaskRunId`.
+5. A duplicate request returns that active job and creates no second Render run.
+6. Render Dashboard shows one `analyze_match` run. `GET /api/jobs/<jobId>` advances
+   through domain stages.
+7. On completion, structured endpoints return rallies/shots/analytics and the
+   artifact endpoint exposes only intended public viewable URLs.
+8. Refresh the already deployed website. The completed match appears without a new
+   Vercel deployment.
+9. Confirm `/tmp/rallymetry/<jobId>` no longer exists after both success and a forced
+   failure.
 
-```bash
-npx --yes vercel@latest link
-npx --yes vercel@latest env add VITE_API_BASE_URL production
-npx --yes vercel@latest --prod
-```
+## Rollback and failure diagnosis
 
-The committed SPA rewrite makes direct navigation and refreshes at
-`/matches/<matchId>` and `/matches/<matchId>/analysis` resolve to React. Static
-assets continue to be served from `apps/web/dist`.
-
-## 5. Worker startup
-
-The worker can run on the developer PC. It needs outbound access only and uses the
-same MongoDB database and both Blob tokens as FastAPI:
-
-```bash
-cd services/vision
-set -a
-source .env.production
-set +a
-uv sync --locked --extra dev
-uv run pickleball-vision worker \
-  --pipeline-plan ../../docs/examples/worker-pipeline-plan.json
-```
-
-Use `--once` for a single queued job smoke test. Before continuous use, replace the
-example plan's calibration, assignment, model configuration, and weights paths with
-reviewed files available on that worker. The worker remains single-concurrency by
-design.
-
-## 6. Smoke test
-
-Run these checks after the API and frontend are deployed:
-
-1. Verify FastAPI and MongoDB readiness:
-
-   ```bash
-   curl --fail --silent https://api.example.com/health
-   ```
-
-   Confirm `status` is `ok` and `databaseReady` is `true`.
-
-2. Verify production CORS using the exact frontend origin:
-
-   ```bash
-   curl --include --request OPTIONS https://api.example.com/api/matches \
-     --header 'Origin: https://rallymetry.vercel.app' \
-     --header 'Access-Control-Request-Method: GET'
-   ```
-
-   Confirm `access-control-allow-origin` equals the requesting frontend origin.
-
-3. Open the Vercel deployment, then directly refresh `/matches` and one
-   `/matches/<matchId>/analysis` route. Confirm neither returns a Vercel 404.
-4. Inspect browser network requests. They must target `VITE_API_BASE_URL`, return
-   JSON-friendly IDs, and contain no MongoDB URL or Blob write token.
-5. Open a match with `youtubeVideoId`; confirm normal playback uses YouTube.
-6. Open a generated annotated video or heatmap. Its manifest must be
-   `VIEWABLE_MEDIA` + `PUBLIC`, and its randomized public URL must load without a
-   token. Confirm a private source/internal URL is not rendered by the dashboard.
-7. Queue one job through `POST /api/matches/<matchId>/process`, start the worker with
-   `--once`, and confirm the job reaches `COMPLETE`, structured results appear in
-   Atlas, and selected public generated artifacts appear in the dashboard.
-
-If the frontend shows no matches, check `/health`, `VITE_API_BASE_URL`, production
-CORS, the selected `MONGODB_DATABASE`, and the browser network error before changing
-the analysis pipeline.
+Disabling `RENDER_WORKFLOW_TASK`/`RENDER_API_KEY` makes `/process` return a controlled
+`workflow_unavailable` error while read-only match pages remain available. A failed
+task records `FAILED`, `failedStage`, `errorCode`, and a safe message in MongoDB.
+Use `renderTaskRunId` to inspect full Render logs. Never copy provider credentials
+into error fields or browser logs.

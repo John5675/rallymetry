@@ -75,6 +75,19 @@ class ApplicationPersistence(Protocol):
 
     async def save_processing_job(self, record: ProcessingJobRecord) -> None: ...
 
+    async def create_processing_job_if_no_active(
+        self,
+        record: ProcessingJobRecord,
+    ) -> tuple[Document, bool]: ...
+
+    async def update_processing_job(
+        self,
+        job_id: str,
+        fields: Mapping[str, object],
+        *,
+        updated_at: datetime,
+    ) -> Document | None: ...
+
     async def get_processing_job(self, job_id: str) -> Document | None: ...
 
     async def get_artifact(self, artifact_id: str) -> Document | None: ...

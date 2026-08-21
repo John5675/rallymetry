@@ -364,8 +364,8 @@ Exit criteria:
 ## 11. Architecture lock-in — complete
 
 Lock the remaining product architecture to a React/Vite/TypeScript frontend,
-FastAPI product API, MongoDB Atlas structured store and small-scale job queue,
-Vercel Blob binary-artifact store, and a separate Python analysis worker that
+FastAPI product API, MongoDB Atlas structured store, Vercel Blob binary-artifact
+store, and a separate hosted analysis execution boundary that
 invokes the existing CV/audio pipeline. Preserve the local CLI and implement no
 product feature in this milestone.
 
@@ -375,18 +375,18 @@ Exit criteria:
   compatibility, hosted-adapter, credential, authentication-deferment, and
   six-user simplicity rules as durable repository constraints.
 - Architecture documentation defines browser, API, persistence, blob storage,
-  worker, and existing-pipeline responsibilities and their allowed dependency
+  analysis execution, and existing-pipeline responsibilities and their allowed dependency
   directions.
 - Heavy analysis is explicitly prohibited inside FastAPI HTTP request handling and
-  Vercel Functions; a separate Python worker owns long-running CV/audio execution.
-- MongoDB Atlas stores hosted structured records and may provide the initial
-  small-scale job queue through the official PyMongo Async API. Large videos and
+  Vercel Functions; a separate Python execution boundary owns long-running CV/audio work.
+- MongoDB Atlas stores hosted structured records and durable job status through the
+  official PyMongo Async API. Large videos and
   frame-level CV artifacts remain outside MongoDB.
 - Vercel Blob stores hosted source binaries and generated artifacts through
   server-side adapters; MongoDB and Blob credentials are never browser-visible.
 - The roadmap names Milestones 12–26 in their finalized order and contains no
   planned Spring Boot, PostgreSQL, Next.js, or default Redis/Celery architecture.
-- No FastAPI service, database integration, worker, frontend, deployment, auth, or
+- No FastAPI service, database integration, hosted execution, frontend, deployment, auth, or
   other product feature is implemented.
 - All existing tests, Ruff checks, Ruff formatting, static type checks, and the CLI
   health check pass without requiring MongoDB, Vercel, or internet connectivity.
@@ -578,7 +578,7 @@ Exit criteria:
   context, `UNKNOWN`, evaluation, provenance, CLI routing, and debug rendering.
 - Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
   pass.
-- No shot reconstruction/classification, line calling, analytics, backend, worker,
+- No shot reconstruction/classification, line calling, analytics, backend, hosted execution,
   or web behavior is implemented.
 
 ## 17. Shot reconstruction and classification — complete
@@ -614,7 +614,7 @@ Exit criteria:
 - Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
   pass.
 - No new neural network, exotic shot class, match analytics, AI coaching, backend,
-  worker, or web behavior is implemented.
+  hosted execution, or web behavior is implemented.
 
 ## 18. Deterministic match analytics — complete
 
@@ -648,7 +648,7 @@ Exit criteria:
   metrics, provenance rejection, serialization, and CLI routing.
 - Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
   pass.
-- No persistence, FastAPI, worker, queue, React/Vite, hosted media, correction
+- No persistence, FastAPI, hosted execution, React/Vite, hosted media, correction
   workflow, or AI coaching behavior is implemented.
 
 ## 19. MongoDB Atlas + Vercel Blob persistence — complete
@@ -683,7 +683,7 @@ Exit criteria:
   account or production secret.
 - Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
   pass.
-- No FastAPI routes, worker execution/leases, browser application, deployment,
+- No FastAPI routes, hosted analysis execution, browser application, deployment,
   authentication, or human-correction workflow is implemented.
 
 ## 20. FastAPI application API — complete
@@ -700,9 +700,9 @@ Exit criteria:
   exposing MongoDB `_id`, BSON, driver, or credential details.
 - Match-scoped players, rallies, shots, analytics, and artifact manifests are
   available through read-only JSON endpoints backed by the persistence layer.
-- `POST /api/matches/{matchId}/process` verifies the match, persists a `QUEUED`
-  processing-job record, and returns `202 Accepted` plus its job ID without invoking
-  any local pipeline function.
+- `POST /api/matches/{matchId}/process` verifies the match and hands asynchronous
+  execution to the Milestone 21 integration; it never invokes a local pipeline inside
+  the HTTP request.
 - `GET /api/jobs/{jobId}` returns durable status independently from request-local
   execution.
 - `GET /health`, validated `MONGODB_URL`/`MONGODB_DATABASE`/`CORS_ORIGINS` and
@@ -714,47 +714,47 @@ Exit criteria:
 - Existing CLI and local pipeline behavior remain unchanged and cloud-independent.
 - Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
   pass.
-- No CV/ML/audio execution, worker claim/lease behavior, upload endpoint, frontend,
+- No CV/ML/audio execution, hosted task behavior, upload endpoint, frontend,
   deployment, authentication, or human-correction workflow is implemented.
 
-## 21. Background analysis worker + MongoDB job queue — complete
+## 21. On-demand match processing with Render Workflows — complete
 
-Run the existing local analysis pipeline from a standalone, outbound-only Python
-worker. MongoDB coordinates one match at a time per worker through atomic claims,
-heartbeats, bounded leases, and explicit stage/progress records; no queue service is
-added.
+Run the existing local analysis pipeline as an on-demand Render Workflow task.
+Render owns task queuing, temporary compute provisioning, and deprovisioning; MongoDB
+retains durable Rallymetry job/stage status and results but is never polled as a queue.
 
 Exit criteria:
 
-- `processing_jobs` retains queued/claimed/stage/complete/failed state, timestamps,
-  owner, progress, attempt count, bounded retry policy, error details, pipeline
-  version, and source/result references without embedding media or large artifacts.
-- Official PyMongo Async operations atomically claim one eligible queued or stale
-  leased job so two workers cannot own the same attempt.
-- Ownership-checked heartbeat, stage/progress, completion, and failure updates cannot
-  be written by a different worker or stale lease holder.
-- Expired `CLAIMED` or processing-stage leases are recoverable until the configured
-  maximum attempts; exhausted jobs become `FAILED` rather than retrying indefinitely.
-- A standalone `pickleball-vision worker` command polls outbound-only, processes one
-  match at a time, handles shutdown cleanly, and supports a one-job mode for local
-  operation and tests.
-- Source staging supports `LOCAL_PATH` and `BLOB` without modifying original media
-  or adding a YouTube downloader.
+- `POST /api/matches/{matchId}/process` validates hosted source/setup artifacts,
+  atomically creates at most one active application job, starts the configured
+  `analyze_match` task with the async Render SDK, stores `renderTaskRunId`, and returns
+  `202 Accepted` without awaiting analysis.
+- `processing_jobs` retains `CREATED`, `QUEUED`, meaningful domain stages,
+  `COMPLETE`/`FAILED`, timestamps, progress, attempt/error data, stable
+  `processingRunId`, pipeline version, compact result summary, and artifact references.
+- Source video plus calibration, assignments, detector configuration, and weights are
+  staged from private Vercel Blob artifacts into `/tmp/rallymetry/<job-id>`; no
+  YouTube downloader or persistent task filesystem is introduced.
 - A production pipeline-runner adapter invokes configured existing
   `pickleball-vision` stage commands outside HTTP requests, requires an explicit
   inspectable pipeline plan, and records stage outputs rather than inventing missing
   manual/model inputs.
 - Structured rallies, contacts, bounces, shots, players, and analytics are persisted
-  through the existing collection boundaries; selected artifact files are published
-  through `ArtifactStore` using explicit access categories.
+  through the existing collection boundaries with `processingRunId`; retries replace
+  stable record IDs and reuse already-published run artifacts.
+- Only allow-listed friend-viewable videos/images are uploaded. Raw detections,
+  extracted audio, model internals, and other intermediates remain private/ephemeral.
+- The task uses Render `pro` (2 CPU/4 GB), an explicit six-hour timeout, and one
+  delayed retry for transient persistence/storage failures; permanent media/setup/
+  model failures terminate without another expensive run.
 - Failures retain stage, safe error type/message, attempt, and timestamps. Temporary
-  worker directories are isolated and source artifacts remain untouched.
-- Tests cover claiming, double-claim prevention, stale lease recovery, ownership,
-  successful processing/publication, and bounded failed processing without MongoDB,
-  Vercel, private media, or model execution.
-- Existing FastAPI and CLI behavior remain compatible, and no Redis, Celery, HTTP
-  analysis execution, frontend, deployment, authentication, or YouTube downloader is
-  introduced.
+  job directories are isolated and cleaned in `finally`; source artifacts remain untouched.
+- Tests cover API triggering, task-run ID persistence, trigger failure, duplicate
+  submission prevention, successful processing/publication, idempotent retry,
+  no-audio behavior, failure status, allow-listing, and cleanup without production secrets.
+- No continuously polling process, MongoDB queue, heartbeat/lease mechanism, Redis,
+  Celery, RabbitMQ, Kafka, Render Background Worker, HTTP analysis execution, or
+  per-match website deployment is introduced.
 - Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
   pass.
 
@@ -795,7 +795,8 @@ Exit criteria:
 ## 23. Vercel deployment + hosted media — complete
 
 Make the React/Vite dashboard deployable to Vercel for a small friend group while
-keeping FastAPI and the outbound-only analysis worker on persistent Python hosts.
+keeping FastAPI on a persistent Python host and heavy analysis on on-demand Render
+Workflow compute.
 Publish only deliberately friend-viewable generated media through a separate public
 Vercel Blob store; source recordings and internal artifacts remain private.
 
@@ -812,14 +813,14 @@ Exit criteria:
 - Hosted artifact storage routes private source/internal media to a private Blob
   store and explicitly public `VIEWABLE_MEDIA` to a separate public Blob store;
   randomized pathnames remain mandatory.
-- Worker publication policy makes friend-viewable generated videos and images
+- Workflow publication policy makes friend-viewable generated videos and images
   explicit while structured internal outputs remain private.
 - Existing unlisted YouTube IDs remain the normal source for browser playback and
   are not copied to Blob solely for viewing.
-- Root, FastAPI/worker, and frontend `.env.example` files list required variable
+- Root, FastAPI/workflow, and frontend `.env.example` files list required variable
   names and safe examples without secrets.
 - `docs/deployment.md` covers MongoDB Atlas, both Blob access classes, FastAPI,
-  Vercel, worker startup, variables, and an end-to-end smoke test.
+  Vercel, workflow setup, variables, and an end-to-end smoke test.
 - Python tests, Ruff checks/formatting, mypy, the CLI doctor, frontend lint/type
   checks/tests/build, and deployment-config validation pass.
 - No authentication, correction workflow, AI coaching, or FastAPI-on-Vercel

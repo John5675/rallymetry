@@ -33,7 +33,7 @@ _MULTIPART_THRESHOLD_BYTES = 10 * 1024 * 1024
 
 
 class ArtifactStore(Protocol):
-    """Storage contract used by the future API and analysis worker."""
+    """Storage contract used by the API and on-demand analysis workflow."""
 
     async def put(self, request: ArtifactPutRequest) -> ArtifactRecord:
         """Persist a local file and return compact provider-neutral metadata."""
@@ -194,6 +194,7 @@ class LocalArtifactStore:
             created_at=datetime.now(UTC),
             pipeline_version=request.pipeline_version,
             checksum_sha256=checksum,
+            processing_run_id=request.processing_run_id,
         )
 
     async def get(self, artifact: ArtifactRecord, destination: Path) -> Path:
@@ -315,6 +316,7 @@ class VercelBlobArtifactStore:
             pipeline_version=request.pipeline_version,
             url=result.url,
             checksum_sha256=checksum,
+            processing_run_id=request.processing_run_id,
         )
 
     async def get(self, artifact: ArtifactRecord, destination: Path) -> Path:

@@ -73,24 +73,44 @@ class ArtifactProvider(StrEnum):
 
 
 class ProcessingJobStatus(StrEnum):
-    """Durable queue and pipeline states for the single-match worker."""
+    """Durable application stages for one on-demand workflow run."""
 
+    CREATED = "CREATED"
     QUEUED = "QUEUED"
-    CLAIMED = "CLAIMED"
+    STARTING = "STARTING"
+    DOWNLOADING_MEDIA = "DOWNLOADING_MEDIA"
+    PREPARING_MEDIA = "PREPARING_MEDIA"
     PLAYER_PROCESSING = "PLAYER_PROCESSING"
     BALL_PROCESSING = "BALL_PROCESSING"
     AUDIO_PROCESSING = "AUDIO_PROCESSING"
     RALLY_PROCESSING = "RALLY_PROCESSING"
-    EVENT_PROCESSING = "EVENT_PROCESSING"
+    BOUNCE_PROCESSING = "BOUNCE_PROCESSING"
+    CONTACT_PROCESSING = "CONTACT_PROCESSING"
+    HITTER_PROCESSING = "HITTER_PROCESSING"
     SHOT_PROCESSING = "SHOT_PROCESSING"
     ANALYTICS = "ANALYTICS"
-    PUBLISHING = "PUBLISHING"
+    RENDERING_ARTIFACTS = "RENDERING_ARTIFACTS"
+    UPLOADING_RESULTS = "UPLOADING_RESULTS"
+    CANCEL_REQUESTED = "CANCEL_REQUESTED"
+    CANCELED = "CANCELED"
     COMPLETE = "COMPLETE"
     FAILED = "FAILED"
 
 
+ACTIVE_PROCESSING_JOB_STATUSES = frozenset(
+    status
+    for status in ProcessingJobStatus
+    if status
+    not in {
+        ProcessingJobStatus.COMPLETE,
+        ProcessingJobStatus.FAILED,
+        ProcessingJobStatus.CANCELED,
+    }
+)
+
+
 class SourceMediaType(StrEnum):
-    """Supported worker source-media locations; YouTube is intentionally absent."""
+    """Supported analysis source locations; YouTube is intentionally absent."""
 
     LOCAL_PATH = "LOCAL_PATH"
     BLOB = "BLOB"
@@ -113,6 +133,7 @@ class MatchRecord:
     title: str | None = None
     youtube_video_id: str | None = None
     source_artifact_id: str | None = None
+    analysis_setup: Mapping[str, str] = field(default_factory=dict)
     pipeline_version: str | None = None
     model_versions: Mapping[str, str] = field(default_factory=dict)
     summary: Mapping[str, object] = field(default_factory=dict)
@@ -133,6 +154,11 @@ class MatchRecord:
             "source_artifact_id",
             _optional_text(self.source_artifact_id, "source_artifact_id"),
         )
+        setup = dict(self.analysis_setup)
+        for name, artifact_id in setup.items():
+            _required_text(name, "analysis_setup key")
+            _required_text(artifact_id, f"analysis_setup[{name!r}]")
+        object.__setattr__(self, "analysis_setup", setup)
         object.__setattr__(
             self,
             "pipeline_version",
@@ -161,6 +187,7 @@ class MatchRecord:
             "modelVersions": dict(self.model_versions),
             "summary": dict(self.summary),
             "artifactIds": list(self.artifact_ids),
+            "analysisSetup": dict(self.analysis_setup),
             "createdAt": self.created_at,
             "updatedAt": self.updated_at,
         }
@@ -234,6 +261,7 @@ class StructuredDomainRecord:
     timestamp_seconds: float | None = None
     pipeline_version: str | None = None
     model_version: str | None = None
+    processing_run_id: str | None = None
     created_at: datetime = field(default_factory=utc_now)
 
     def __post_init__(self) -> None:
@@ -254,6 +282,11 @@ class StructuredDomainRecord:
             "model_version",
             _optional_text(self.model_version, "model_version"),
         )
+        object.__setattr__(
+            self,
+            "processing_run_id",
+            _optional_text(self.processing_run_id, "processing_run_id"),
+        )
         object.__setattr__(self, "created_at", _utc_datetime(self.created_at, "created_at"))
 
     def to_document(self) -> Document:
@@ -269,6 +302,7 @@ class StructuredDomainRecord:
             "timestampSeconds": self.timestamp_seconds,
             "pipelineVersion": self.pipeline_version,
             "modelVersion": self.model_version,
+            "processingRunId": self.processing_run_id,
         }
         document.update({key: value for key, value in optional.items() if value is not None})
         return document
@@ -284,6 +318,7 @@ class AnalyticsRecord:
     metrics: Mapping[str, object]
     input_artifact_ids: tuple[str, ...] = ()
     pipeline_version: str | None = None
+    processing_run_id: str | None = None
     created_at: datetime = field(default_factory=utc_now)
 
     def __post_init__(self) -> None:
@@ -311,6 +346,11 @@ class AnalyticsRecord:
             "pipeline_version",
             _optional_text(self.pipeline_version, "pipeline_version"),
         )
+        object.__setattr__(
+            self,
+            "processing_run_id",
+            _optional_text(self.processing_run_id, "processing_run_id"),
+        )
         object.__setattr__(self, "created_at", _utc_datetime(self.created_at, "created_at"))
 
     def to_document(self) -> Document:
@@ -325,24 +365,28 @@ class AnalyticsRecord:
         }
         if self.pipeline_version is not None:
             document["pipelineVersion"] = self.pipeline_version
+        if self.processing_run_id is not None:
+            document["processingRunId"] = self.processing_run_id
         return document
 
 
 @dataclass(frozen=True, slots=True)
 class ProcessingJobRecord:
-    """Small leased-job record stored independently from analysis results."""
+    """Durable status record for one on-demand Render Workflow run."""
 
     job_id: str
     match_id: str
     job_type: str
-    status: ProcessingJobStatus = ProcessingJobStatus.QUEUED
+    status: ProcessingJobStatus = ProcessingJobStatus.CREATED
     progress: float = 0.0
     stage: str | None = None
-    claimed_at: datetime | None = None
+    render_triggered_at: datetime | None = None
     started_at: datetime | None = None
-    heartbeat_at: datetime | None = None
     completed_at: datetime | None = None
-    worker_id: str | None = None
+    failed_at: datetime | None = None
+    failed_stage: str | None = None
+    render_task_run_id: str | None = None
+    processing_run_id: str | None = None
     attempt_count: int = 0
     error_code: str | None = None
     error_message: str | None = None
@@ -351,6 +395,7 @@ class ProcessingJobRecord:
     source_path: str | None = None
     source_artifact_id: str | None = None
     result_artifact_ids: tuple[str, ...] = ()
+    result_summary: Mapping[str, object] = field(default_factory=dict)
     created_at: datetime = field(default_factory=utc_now)
     updated_at: datetime = field(default_factory=utc_now)
 
@@ -361,11 +406,30 @@ class ProcessingJobRecord:
         if not 0.0 <= self.progress <= 1.0:
             raise PersistenceValidationError("progress must be between 0 and 1")
         object.__setattr__(self, "stage", _optional_text(self.stage, "stage"))
-        for field_name in ("claimed_at", "started_at", "heartbeat_at", "completed_at"):
+        for field_name in (
+            "render_triggered_at",
+            "started_at",
+            "completed_at",
+            "failed_at",
+        ):
             value = getattr(self, field_name)
             if value is not None:
                 object.__setattr__(self, field_name, _utc_datetime(value, field_name))
-        object.__setattr__(self, "worker_id", _optional_text(self.worker_id, "worker_id"))
+        object.__setattr__(
+            self,
+            "failed_stage",
+            _optional_text(self.failed_stage, "failed_stage"),
+        )
+        object.__setattr__(
+            self,
+            "render_task_run_id",
+            _optional_text(self.render_task_run_id, "render_task_run_id"),
+        )
+        object.__setattr__(
+            self,
+            "processing_run_id",
+            _optional_text(self.processing_run_id, "processing_run_id"),
+        )
         if self.attempt_count < 0:
             raise PersistenceValidationError("attempt_count must be nonnegative")
         object.__setattr__(self, "error_code", _optional_text(self.error_code, "error_code"))
@@ -393,6 +457,11 @@ class ProcessingJobRecord:
                 for value in self.result_artifact_ids
             ),
         )
+        object.__setattr__(
+            self,
+            "result_summary",
+            _copy_mapping(self.result_summary, "result_summary"),
+        )
         object.__setattr__(self, "created_at", _utc_datetime(self.created_at, "created_at"))
         object.__setattr__(self, "updated_at", _utc_datetime(self.updated_at, "updated_at"))
         if self.updated_at < self.created_at:
@@ -408,11 +477,10 @@ class ProcessingJobRecord:
             raise PersistenceValidationError("source_path is only valid for LOCAL_PATH jobs")
         if self.status is ProcessingJobStatus.COMPLETE and self.progress != 1.0:
             raise PersistenceValidationError("COMPLETE jobs must have progress 1.0")
-        if (
-            self.status in {ProcessingJobStatus.COMPLETE, ProcessingJobStatus.FAILED}
-            and self.completed_at is None
-        ):
-            raise PersistenceValidationError("terminal jobs require completed_at")
+        if self.status is ProcessingJobStatus.COMPLETE and self.completed_at is None:
+            raise PersistenceValidationError("COMPLETE jobs require completed_at")
+        if self.status is ProcessingJobStatus.FAILED and self.failed_at is None:
+            raise PersistenceValidationError("FAILED jobs require failed_at")
 
     def to_document(self) -> Document:
         document: Document = {
@@ -424,16 +492,20 @@ class ProcessingJobRecord:
             "progress": self.progress,
             "attemptCount": self.attempt_count,
             "resultArtifactIds": list(self.result_artifact_ids),
+            "resultSummary": dict(self.result_summary),
+            "active": self.status in ACTIVE_PROCESSING_JOB_STATUSES,
             "createdAt": self.created_at,
             "updatedAt": self.updated_at,
         }
         optional: dict[str, object | None] = {
             "stage": self.stage,
-            "claimedAt": self.claimed_at,
+            "renderTriggeredAt": self.render_triggered_at,
             "startedAt": self.started_at,
-            "heartbeatAt": self.heartbeat_at,
             "completedAt": self.completed_at,
-            "workerId": self.worker_id,
+            "failedAt": self.failed_at,
+            "failedStage": self.failed_stage,
+            "renderTaskRunId": self.render_task_run_id,
+            "processingRunId": self.processing_run_id,
             "errorCode": self.error_code,
             "errorMessage": self.error_message,
             "pipelineVersion": self.pipeline_version,
@@ -518,6 +590,7 @@ class ArtifactRecord:
     pipeline_version: str | None = None
     url: str | None = None
     checksum_sha256: str | None = None
+    processing_run_id: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -550,6 +623,11 @@ class ArtifactRecord:
             _optional_text(self.pipeline_version, "pipeline_version"),
         )
         object.__setattr__(self, "url", _optional_text(self.url, "url"))
+        object.__setattr__(
+            self,
+            "processing_run_id",
+            _optional_text(self.processing_run_id, "processing_run_id"),
+        )
         if self.checksum_sha256 is not None and not _SHA256_PATTERN.fullmatch(self.checksum_sha256):
             raise PersistenceValidationError("checksum_sha256 must be lowercase SHA-256 hex")
         if self.provider is ArtifactProvider.LOCAL and self.url is not None:
@@ -582,6 +660,7 @@ class ArtifactRecord:
             "url": self.url,
             "pipelineVersion": self.pipeline_version,
             "checksumSha256": self.checksum_sha256,
+            "processingRunId": self.processing_run_id,
         }
         document.update({key: value for key, value in optional.items() if value is not None})
         return document
@@ -598,6 +677,7 @@ class ArtifactPutRequest:
     access: ArtifactAccess | None = None
     content_type: str | None = None
     pipeline_version: str | None = None
+    processing_run_id: str | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -615,6 +695,11 @@ class ArtifactPutRequest:
             self,
             "pipeline_version",
             _optional_text(self.pipeline_version, "pipeline_version"),
+        )
+        object.__setattr__(
+            self,
+            "processing_run_id",
+            _optional_text(self.processing_run_id, "processing_run_id"),
         )
         if (
             self.category is not ArtifactCategory.VIEWABLE_MEDIA
@@ -689,6 +774,12 @@ def processing_job_from_document(document: Mapping[str, object]) -> ProcessingJo
     created_at = _document_datetime(document, "createdAt", required=True)
     updated_at = _document_datetime(document, "updatedAt", required=True)
     assert created_at is not None and updated_at is not None
+    result_summary_raw = document.get("resultSummary", {})
+    result_summary = (
+        {str(key): value for key, value in result_summary_raw.items()}
+        if isinstance(result_summary_raw, Mapping)
+        else {}
+    )
     return ProcessingJobRecord(
         job_id=job_id,
         match_id=match_id,
@@ -696,11 +787,13 @@ def processing_job_from_document(document: Mapping[str, object]) -> ProcessingJo
         status=status,
         progress=float(progress),
         stage=_document_string(document, "stage"),
-        claimed_at=_document_datetime(document, "claimedAt"),
+        render_triggered_at=_document_datetime(document, "renderTriggeredAt"),
         started_at=_document_datetime(document, "startedAt"),
-        heartbeat_at=_document_datetime(document, "heartbeatAt"),
         completed_at=_document_datetime(document, "completedAt"),
-        worker_id=_document_string(document, "workerId"),
+        failed_at=_document_datetime(document, "failedAt"),
+        failed_stage=_document_string(document, "failedStage"),
+        render_task_run_id=_document_string(document, "renderTaskRunId"),
+        processing_run_id=_document_string(document, "processingRunId"),
         attempt_count=attempt_count,
         error_code=_document_string(document, "errorCode"),
         error_message=_document_string(document, "errorMessage"),
@@ -709,6 +802,7 @@ def processing_job_from_document(document: Mapping[str, object]) -> ProcessingJo
         source_path=_document_string(document, "sourcePath"),
         source_artifact_id=_document_string(document, "sourceArtifactId"),
         result_artifact_ids=tuple(result_ids_raw),
+        result_summary=result_summary,
         created_at=created_at,
         updated_at=updated_at,
     )
@@ -749,6 +843,7 @@ def artifact_record_from_document(document: Mapping[str, object]) -> ArtifactRec
             pipeline_version=_document_string(document, "pipelineVersion"),
             url=_document_string(document, "url"),
             checksum_sha256=_document_string(document, "checksumSha256"),
+            processing_run_id=_document_string(document, "processingRunId"),
         )
     except ValueError as error:
         raise PersistenceValidationError("persisted artifact enum value is invalid") from error

@@ -3,8 +3,8 @@
 ## Scope
 
 Milestone 19 adds optional storage adapters without changing the existing local
-analysis pipeline. That milestone itself does not execute analysis jobs, claim queue
-leases, download YouTube media, or expose cloud credentials to a browser. Milestone
+analysis pipeline. That milestone itself does not execute analysis jobs, download
+YouTube media, or expose cloud credentials to a browser. Milestone
 20 consumes this boundary through the separate [FastAPI application API](api.md).
 
 Hosted structured records use MongoDB Atlas through the official PyMongo Async API.
@@ -27,12 +27,12 @@ algorithms do not import provider SDKs.
 The local backend needs no cloud service, credentials, or network. Diagnostic
 configuration reports only whether credentials are configured; it never returns
 their values. `.env.example` contains empty placeholders only. Application and
-worker deployments must inject real secrets through their environment.
+workflow deployments must inject real secrets through their environment.
 
 ### Provision Vercel Blob stores
 
 Link the repository to a dedicated Vercel project without deploying it, create a
-private store in the region nearest the analysis worker, and pull the development
+private store in the region nearest the analysis workflow, and pull the development
 environment into the ignored `.env.local` file:
 
 ```bash
@@ -52,15 +52,15 @@ npx --yes vercel@latest env pull .env.local --yes
 
 Vercel creates and connects `BLOB_READ_WRITE_TOKEN`; never copy its value into a
 tracked file. The Python settings layer intentionally does not load dotenv files,
-so a local worker must export the pulled values before it starts:
+so local workflow development must export the pulled values before it starts:
 
 ```bash
 cd services/vision
 set -a
 source ../../.env.local
 set +a
-uv run pickleball-vision worker \
-  --pipeline-plan ../../docs/examples/worker-pipeline-plan.json
+export PIPELINE_CONFIG="$PWD/../../docs/examples/render-workflow-pipeline-plan.json"
+render workflows dev -- uv run python -m pickleball_vision.workflows.app
 ```
 
 Friend-viewable deployment uses a second public Blob store whose token is injected
@@ -68,7 +68,7 @@ as `PUBLIC_BLOB_READ_WRITE_TOKEN`. Blob access is store-wide and cannot be chang
 per object, so the routed adapter sends explicit public `VIEWABLE_MEDIA` only to
 that store. Private viewable drafts, `SOURCE_MEDIA`, and `INTERNAL_ARTIFACT` remain
 on the private store. Connect the public store with the `PUBLIC_BLOB_` environment
-prefix; see [`deployment.md`](deployment.md#2-vercel-blob-stores).
+prefix; see [`deployment.md`](deployment.md#vercel-blob).
 
 ## MongoDB collections
 
@@ -84,16 +84,15 @@ a match does not become one unbounded document.
 | `bounces` | Structured bounce records | unique match/record; match/time |
 | `shots` | Structured shot records | unique match/record; match/time |
 | `analytics` | Deterministic metrics, calculation version, input references | unique match/analytics ID |
-| `processing_jobs` | Leased job state, progress, attempts, errors, source/result references | match/create time; status/update time; status/heartbeat/attempt/create claim index |
+| `processing_jobs` | Workflow status, progress, attempts, Render/run IDs, errors, source/result references | match/create time; status/update time; unique active match |
 | `corrections` | Versionable correction records for the later workflow | match/target |
 | `artifacts` | Provider-neutral artifact manifests | unique pathname; match/time; match/category |
 
-The Milestone 21 [analysis worker](worker.md) owns job execution. It atomically
-claims one eligible document, writes ownership-checked heartbeats and stage updates,
-reclaims stale leases up to a bounded attempt count, and marks exhausted or explicit
-failures terminal. Job documents retain only coordination metadata and artifact
-references; pipeline outputs continue to use their separate collections or artifact
-storage.
+Render Workflows owns task queuing/execution; MongoDB is not polled as a queue. The
+Milestone 21 [on-demand workflow](render-workflows.md) writes application domain
+stages and final status. A partial unique active-match index prevents accidental
+duplicate submissions. Job documents retain only compact status/provenance and
+artifact references; outputs use separate collections or artifact storage.
 
 Before a write, the adapter validates BSON-safe values, rejects byte arrays and
 known inline binary fields, rejects unsafe MongoDB keys, rejects non-finite numbers,
@@ -110,6 +109,7 @@ operations. A successful `put` returns an `ArtifactRecord` with:
 - URL when the provider supplies one
 - content type and byte size
 - UTC creation time and optional pipeline version
+- optional stable `processingRunId` for idempotent workflow publication
 - SHA-256 checksum when available
 - optional match association
 

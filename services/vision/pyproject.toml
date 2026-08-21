@@ -19,6 +19,7 @@ dependencies = [
   "numpy>=2,<2.5",
   "opencv-python>=4.10,<5",
   "pymongo>=4.15,<5",
+  "render_sdk>=0.7,<0.8",
   "ultralytics>=8.4,<9",
   "uvicorn>=0.35,<1",
   "vercel>=0.5,<1",

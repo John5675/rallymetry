@@ -2,7 +2,7 @@
 
 Milestone 22 adds a strict TypeScript React application under `apps/web`. It is a
 presentation client for the FastAPI application contract; it is not an analytics
-engine, media downloader, worker, persistence adapter, or credential boundary.
+engine, media downloader, workflow runner, persistence adapter, or credential boundary.
 
 ## Routes
 
@@ -93,6 +93,6 @@ or internet access.
 Vercel builds from the repository root with `npm --prefix apps/web run build` and
 serves `apps/web/dist`. Configure `VITE_API_BASE_URL` to the public HTTPS FastAPI
 origin in the Vercel build environment. Only that origin is browser configuration;
-MongoDB and both Blob write tokens remain on the API/worker hosts. Direct navigation
+MongoDB and both Blob write tokens remain on API/workflow services. Direct navigation
 to all routes uses the committed SPA fallback. Full setup and smoke-test commands
 are in [`deployment.md`](deployment.md).

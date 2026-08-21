@@ -1,4 +1,4 @@
-"""Trusted pipeline-plan and publication models for worker orchestration."""
+"""Trusted pipeline-plan and publication models for analysis orchestration."""
 
 from __future__ import annotations
 

@@ -8,6 +8,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from pickleball_vision.api.main import create_app
+from pickleball_vision.api.services.render_workflows import WorkflowRun
 from pickleball_vision.api.settings import ApiSettings
 from pickleball_vision.config import PersistenceSettings
 from pickleball_vision.persistence.models import (
@@ -129,6 +130,37 @@ class InMemoryApplicationPersistence:
     async def save_processing_job(self, record: ProcessingJobRecord) -> None:
         self.jobs[record.job_id] = record.to_document()
 
+    async def create_processing_job_if_no_active(
+        self,
+        record: ProcessingJobRecord,
+    ) -> tuple[Document, bool]:
+        for document in self.jobs.values():
+            if document.get("matchId") == record.match_id and document.get("active") is True:
+                return dict(document), False
+        document = record.to_document()
+        self.jobs[record.job_id] = document
+        return dict(document), True
+
+    async def update_processing_job(
+        self,
+        job_id: str,
+        fields: Mapping[str, object],
+        *,
+        updated_at: datetime,
+    ) -> Document | None:
+        document = self.jobs.get(job_id)
+        if document is None:
+            return None
+        for key, value in fields.items():
+            if value is None:
+                document.pop(key, None)
+            else:
+                document[key] = value
+        document["updatedAt"] = updated_at
+        if document.get("status") in {"COMPLETE", "FAILED", "CANCELED"}:
+            document["active"] = False
+        return dict(document)
+
     async def get_processing_job(self, job_id: str) -> Document | None:
         document = self.jobs.get(job_id)
         return dict(document) if document is not None else None
@@ -158,6 +190,12 @@ def seed_persistence() -> InMemoryApplicationPersistence:
         title="Seed match",
         youtube_video_id="abc123XYZ_9",
         source_artifact_id="artifact_source",
+        analysis_setup={
+            "calibrationArtifactId": "artifact_calibration",
+            "playerAssignmentsArtifactId": "artifact_assignments",
+            "ballExperimentArtifactId": "artifact_ball_experiment",
+            "ballWeightsArtifactId": "artifact_ball_weights",
+        },
         summary={"rallyCount": 1},
         created_at=NOW,
         updated_at=NOW,
@@ -245,7 +283,43 @@ def seed_persistence() -> InMemoryApplicationPersistence:
     persistence.analytics.append(analytics.to_document())
     persistence.artifacts.append(artifact.to_document())
     persistence.artifacts.append(source_artifact.to_document())
+    for artifact_id, artifact_type, filename in (
+        ("artifact_calibration", "court_calibration", "calibration.json"),
+        ("artifact_assignments", "player_assignments", "player-assignments.json"),
+        ("artifact_ball_experiment", "ball_experiment", "ball-experiment.json"),
+        ("artifact_ball_weights", "ball_weights", "ball-weights.pt"),
+    ):
+        persistence.artifacts.append(
+            ArtifactRecord(
+                artifact_id=artifact_id,
+                match_id="match_seed",
+                artifact_type=artifact_type,
+                category=ArtifactCategory.INTERNAL_ARTIFACT,
+                pathname=f"internal_artifact/match_seed/random/{filename}",
+                provider=ArtifactProvider.VERCEL_BLOB,
+                access=ArtifactAccess.PRIVATE,
+                content_type="application/octet-stream",
+                size_bytes=10,
+                created_at=NOW,
+                url=f"https://private.example.test/{filename}",
+            ).to_document()
+        )
     return persistence
+
+
+class FakeWorkflowClient:
+    def __init__(self, *, fail: bool = False) -> None:
+        self.fail = fail
+        self.starts: list[tuple[str, str]] = []
+
+    async def start_analysis(self, *, job_id: str, match_id: str) -> WorkflowRun:
+        self.starts.append((job_id, match_id))
+        if self.fail:
+            raise RuntimeError("synthetic Render outage")
+        return WorkflowRun(run_id="trn-test-123", status="pending")
+
+    async def get_run(self, run_id: str) -> WorkflowRun:
+        return WorkflowRun(run_id=run_id, status="pending")
 
 
 def test_health_request_logging_request_id_and_cors(
@@ -365,7 +439,12 @@ def test_match_scoped_structured_endpoints_do_not_expose_mongo_ids() -> None:
 
 def test_process_endpoint_only_persists_queued_job_and_returns_202() -> None:
     persistence = seed_persistence()
-    app = create_app(settings=ApiSettings(), persistence=persistence)
+    workflow = FakeWorkflowClient()
+    app = create_app(
+        settings=ApiSettings(),
+        persistence=persistence,
+        workflow_client=workflow,
+    )
 
     with TestClient(app) as client:
         queued = client.post("/api/matches/match_seed/process")
@@ -378,9 +457,44 @@ def test_process_endpoint_only_persists_queued_job_and_returns_202() -> None:
     assert payload["progress"] == 0.0
     assert payload["sourceType"] == "BLOB"
     assert payload["sourceArtifactId"] == "artifact_source"
+    assert payload["renderTaskRunId"] == "trn-test-123"
+    assert payload["processingRunId"].startswith("run_")
     assert len(persistence.jobs) == 1
+    assert workflow.starts == [(payload["jobId"], "match_seed")]
     assert fetched.status_code == 200
     assert fetched.json() == payload
+
+
+def test_duplicate_process_request_returns_active_job_without_second_render_run() -> None:
+    persistence = seed_persistence()
+    workflow = FakeWorkflowClient()
+    app = create_app(settings=ApiSettings(), persistence=persistence, workflow_client=workflow)
+
+    with TestClient(app) as client:
+        first = client.post("/api/matches/match_seed/process")
+        second = client.post("/api/matches/match_seed/process")
+
+    assert first.status_code == second.status_code == 202
+    assert second.json()["jobId"] == first.json()["jobId"]
+    assert len(workflow.starts) == 1
+
+
+def test_render_trigger_failure_marks_job_failed_and_returns_safe_503() -> None:
+    persistence = seed_persistence()
+    app = create_app(
+        settings=ApiSettings(),
+        persistence=persistence,
+        workflow_client=FakeWorkflowClient(fail=True),
+    )
+
+    with TestClient(app) as client:
+        response = client.post("/api/matches/match_seed/process")
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "workflow_trigger_failed"
+    job = next(iter(persistence.jobs.values()))
+    assert job["status"] == "FAILED"
+    assert job["errorCode"] == "RENDER_TRIGGER_FAILED"
 
 
 def test_process_endpoint_requires_available_source_media() -> None:
@@ -394,6 +508,23 @@ def test_process_endpoint_requires_available_source_media() -> None:
 
     assert response.status_code == 409
     assert response.json()["error"]["code"] == "source_media_required"
+    assert not persistence.jobs
+
+
+def test_process_endpoint_requires_private_hosted_analysis_setup() -> None:
+    persistence = seed_persistence()
+    persistence.matches["match_seed"]["analysisSetup"] = {}
+    app = create_app(
+        settings=ApiSettings(),
+        persistence=persistence,
+        workflow_client=FakeWorkflowClient(),
+    )
+
+    with TestClient(app) as client:
+        response = client.post("/api/matches/match_seed/process")
+
+    assert response.status_code == 409
+    assert response.json()["error"]["code"] == "analysis_setup_required"
     assert not persistence.jobs
 
 

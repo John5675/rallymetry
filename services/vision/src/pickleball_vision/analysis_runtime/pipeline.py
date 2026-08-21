@@ -4,12 +4,21 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 import shutil
 from collections.abc import Awaitable, Callable, Mapping
 from pathlib import Path
 from typing import TypeAlias
 
-from pickleball_vision.errors import WorkerConfigurationError, WorkerPipelineError
+from pickleball_vision.analysis_runtime.models import (
+    ArtifactPublication,
+    ArtifactResultPlan,
+    PipelinePlan,
+    PipelineRunResult,
+    PipelineStagePlan,
+    StructuredResultPlan,
+)
+from pickleball_vision.errors import AnalysisConfigurationError, AnalysisPipelineError
 from pickleball_vision.persistence.models import (
     AnalyticsRecord,
     ArtifactAccess,
@@ -20,14 +29,6 @@ from pickleball_vision.persistence.models import (
     StructuredCollection,
     StructuredDomainRecord,
 )
-from pickleball_vision.worker.models import (
-    ArtifactPublication,
-    ArtifactResultPlan,
-    PipelinePlan,
-    PipelineRunResult,
-    PipelineStagePlan,
-    StructuredResultPlan,
-)
 
 StageCallback: TypeAlias = Callable[[ProcessingJobStatus, float], Awaitable[None]]
 
@@ -36,9 +37,11 @@ _STAGE_ORDER = {
     ProcessingJobStatus.BALL_PROCESSING: 1,
     ProcessingJobStatus.AUDIO_PROCESSING: 2,
     ProcessingJobStatus.RALLY_PROCESSING: 3,
-    ProcessingJobStatus.EVENT_PROCESSING: 4,
-    ProcessingJobStatus.SHOT_PROCESSING: 5,
-    ProcessingJobStatus.ANALYTICS: 6,
+    ProcessingJobStatus.BOUNCE_PROCESSING: 4,
+    ProcessingJobStatus.CONTACT_PROCESSING: 5,
+    ProcessingJobStatus.HITTER_PROCESSING: 6,
+    ProcessingJobStatus.SHOT_PROCESSING: 7,
+    ProcessingJobStatus.ANALYTICS: 8,
 }
 _ALLOWED_COMMANDS = {
     ProcessingJobStatus.PLAYER_PROCESSING: {
@@ -50,11 +53,9 @@ _ALLOWED_COMMANDS = {
     ProcessingJobStatus.BALL_PROCESSING: {"ball", "track-ball"},
     ProcessingJobStatus.AUDIO_PROCESSING: {"analyze-audio"},
     ProcessingJobStatus.RALLY_PROCESSING: {"segment-rallies"},
-    ProcessingJobStatus.EVENT_PROCESSING: {
-        "detect-bounces",
-        "detect-contacts",
-        "identify-hitters",
-    },
+    ProcessingJobStatus.BOUNCE_PROCESSING: {"detect-bounces"},
+    ProcessingJobStatus.CONTACT_PROCESSING: {"detect-contacts"},
+    ProcessingJobStatus.HITTER_PROCESSING: {"identify-hitters"},
     ProcessingJobStatus.SHOT_PROCESSING: {"reconstruct-shots"},
     ProcessingJobStatus.ANALYTICS: {"analyze-match"},
 }
@@ -76,20 +77,20 @@ class PipelineRunner:
 
 def _mapping(value: object, context: str) -> Mapping[str, object]:
     if not isinstance(value, Mapping) or not all(isinstance(key, str) for key in value):
-        raise WorkerConfigurationError(f"{context} must be an object")
+        raise AnalysisConfigurationError(f"{context} must be an object")
     return value
 
 
 def _text(value: object, context: str) -> str:
     if not isinstance(value, str) or not value.strip():
-        raise WorkerConfigurationError(f"{context} must be a non-empty string")
+        raise AnalysisConfigurationError(f"{context} must be a non-empty string")
     return value.strip()
 
 
 def _relative_path(value: object, context: str) -> Path:
     path = Path(_text(value, context))
     if path.is_absolute() or ".." in path.parts:
-        raise WorkerConfigurationError(f"{context} must be a safe workspace-relative path")
+        raise AnalysisConfigurationError(f"{context} must be a safe workspace-relative path")
     return path
 
 
@@ -106,7 +107,7 @@ def load_pipeline_plan(path: Path) -> PipelinePlan:
     try:
         payload = json.loads(resolved.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as error:
-        raise WorkerConfigurationError(
+        raise AnalysisConfigurationError(
             f"unable to load pipeline plan {resolved}: {error}"
         ) from error
     root = _mapping(payload, "pipeline plan")
@@ -114,7 +115,7 @@ def load_pipeline_plan(path: Path) -> PipelinePlan:
     pipeline_version = _text(root.get("pipelineVersion"), "pipelineVersion")
     raw_stages = root.get("stages")
     if not isinstance(raw_stages, list) or not raw_stages:
-        raise WorkerConfigurationError("stages must be a non-empty array")
+        raise AnalysisConfigurationError("stages must be a non-empty array")
     stages: list[PipelineStagePlan] = []
     previous_order = -1
     previous_progress = 0.0
@@ -123,30 +124,30 @@ def load_pipeline_plan(path: Path) -> PipelinePlan:
         try:
             stage = ProcessingJobStatus(_text(item.get("stage"), f"stages[{index}].stage"))
         except ValueError as error:
-            raise WorkerConfigurationError(f"stages[{index}].stage is unsupported") from error
+            raise AnalysisConfigurationError(f"stages[{index}].stage is unsupported") from error
         if stage not in _STAGE_ORDER:
-            raise WorkerConfigurationError(f"{stage.value} is not an executable pipeline stage")
+            raise AnalysisConfigurationError(f"{stage.value} is not an executable pipeline stage")
         raw_progress = item.get("progress")
         if not isinstance(raw_progress, (int, float)) or isinstance(raw_progress, bool):
-            raise WorkerConfigurationError(f"stages[{index}].progress must be numeric")
+            raise AnalysisConfigurationError(f"stages[{index}].progress must be numeric")
         progress = float(raw_progress)
         order = _STAGE_ORDER[stage]
         if order < previous_order:
-            raise WorkerConfigurationError("pipeline stages must follow domain processing order")
-        if not previous_progress < progress < 0.9:
-            raise WorkerConfigurationError(
-                "stage progress must increase strictly and remain below 0.9"
+            raise AnalysisConfigurationError("pipeline stages must follow domain processing order")
+        if not previous_progress < progress < 0.94:
+            raise AnalysisConfigurationError(
+                "stage progress must increase strictly and remain below 0.94"
             )
         raw_argv = item.get("argv")
         if not isinstance(raw_argv, list) or not raw_argv:
-            raise WorkerConfigurationError(f"stages[{index}].argv must be a non-empty array")
+            raise AnalysisConfigurationError(f"stages[{index}].argv must be a non-empty array")
         argv = tuple(_text(value, f"stages[{index}].argv") for value in raw_argv)
         if argv[0] not in _ALLOWED_COMMANDS[stage]:
-            raise WorkerConfigurationError(
+            raise AnalysisConfigurationError(
                 f"command {argv[0]!r} is not allowed during {stage.value}"
             )
         if argv[0] == "ball" and (len(argv) < 2 or argv[1] != "detect"):
-            raise WorkerConfigurationError(
+            raise AnalysisConfigurationError(
                 "BALL_PROCESSING permits `ball detect` inference but not training commands"
             )
         stages.append(PipelineStagePlan(stage=stage, progress=progress, argv=argv))
@@ -166,17 +167,17 @@ def load_pipeline_plan(path: Path) -> PipelinePlan:
 
 def _load_structured_result_plans(value: object) -> tuple[StructuredResultPlan, ...]:
     if not isinstance(value, list):
-        raise WorkerConfigurationError("structuredResults must be an array")
+        raise AnalysisConfigurationError("structuredResults must be an array")
     allowed = {"players", "analytics", *(collection.value for collection in StructuredCollection)}
     plans: list[StructuredResultPlan] = []
     for index, raw in enumerate(value):
         item = _mapping(raw, f"structuredResults[{index}]")
         collection = _text(item.get("collection"), f"structuredResults[{index}].collection")
         if collection not in allowed:
-            raise WorkerConfigurationError(f"unsupported structured collection {collection!r}")
+            raise AnalysisConfigurationError(f"unsupported structured collection {collection!r}")
         id_field = _optional_text(item.get("idField"), f"structuredResults[{index}].idField")
         if collection not in {"analytics"} and id_field is None:
-            raise WorkerConfigurationError(f"{collection} structured results require idField")
+            raise AnalysisConfigurationError(f"{collection} structured results require idField")
         plans.append(
             StructuredResultPlan(
                 collection=collection,
@@ -201,7 +202,7 @@ def _load_structured_result_plans(value: object) -> tuple[StructuredResultPlan, 
 
 def _load_artifact_result_plans(value: object) -> tuple[ArtifactResultPlan, ...]:
     if not isinstance(value, list):
-        raise WorkerConfigurationError("artifacts must be an array")
+        raise AnalysisConfigurationError("artifacts must be an array")
     plans: list[ArtifactResultPlan] = []
     for index, raw in enumerate(value):
         item = _mapping(raw, f"artifacts[{index}]")
@@ -214,14 +215,14 @@ def _load_artifact_result_plans(value: object) -> tuple[ArtifactResultPlan, ...]
                 else None
             )
         except ValueError as error:
-            raise WorkerConfigurationError(f"artifacts[{index}] has an invalid policy") from error
+            raise AnalysisConfigurationError(f"artifacts[{index}] has an invalid policy") from error
         if access is ArtifactAccess.PUBLIC and category is not ArtifactCategory.VIEWABLE_MEDIA:
-            raise WorkerConfigurationError(
+            raise AnalysisConfigurationError(
                 f"artifacts[{index}] may use PUBLIC access only with VIEWABLE_MEDIA"
             )
         required = item.get("required", True)
         if not isinstance(required, bool):
-            raise WorkerConfigurationError(f"artifacts[{index}].required must be boolean")
+            raise AnalysisConfigurationError(f"artifacts[{index}].required must be boolean")
         plans.append(
             ArtifactResultPlan(
                 path=_relative_path(item.get("path"), f"artifacts[{index}].path"),
@@ -240,9 +241,18 @@ def _load_artifact_result_plans(value: object) -> tuple[ArtifactResultPlan, ...]
 class PlannedCliPipelineRunner(PipelineRunner):
     """Run only `pickleball-vision` subcommands from a trusted local JSON plan."""
 
-    def __init__(self, plan: PipelinePlan, *, executable: str | None = None) -> None:
+    def __init__(
+        self,
+        plan: PipelinePlan,
+        *,
+        executable: str | None = None,
+        environment: Mapping[str, str] | None = None,
+    ) -> None:
         self.plan = plan
         self._executable = executable
+        self._environment = dict(os.environ)
+        if environment is not None:
+            self._environment.update(environment)
 
     async def run(
         self,
@@ -255,13 +265,16 @@ class PlannedCliPipelineRunner(PipelineRunner):
         workspace.mkdir(parents=True, exist_ok=True)
         executable = self._executable or shutil.which("pickleball-vision")
         if executable is None:
-            raise WorkerPipelineError("pickleball-vision executable is unavailable")
-        log_dir = workspace / "worker-logs"
+            raise AnalysisPipelineError("pickleball-vision executable is unavailable")
+        log_dir = workspace.parent / "working" / "pipeline-logs"
         log_dir.mkdir(parents=True, exist_ok=True)
         substitutions = {
             "{source}": str(source_path.resolve()),
             "{workspace}": str(workspace.resolve()),
+            "{input}": str((workspace.parent / "input").resolve()),
+            "{working}": str((workspace.parent / "working").resolve()),
             "{matchId}": job.match_id,
+            "{device}": self._environment.get("MODEL_DEVICE", "cpu"),
         }
         for index, stage_plan in enumerate(self.plan.stages):
             await on_stage(stage_plan.stage, stage_plan.progress)
@@ -274,17 +287,18 @@ class PlannedCliPipelineRunner(PipelineRunner):
                         executable,
                         *argv,
                         cwd=workspace,
+                        env=self._environment,
                         stdout=stdout,
                         stderr=stderr,
                     )
                     return_code = await process.wait()
             except OSError as error:
-                raise WorkerPipelineError(
+                raise AnalysisPipelineError(
                     f"unable to launch local CLI: {type(error).__name__}",
                     stage=stage_plan.stage.value,
                 ) from error
             if return_code != 0:
-                raise WorkerPipelineError(
+                raise AnalysisPipelineError(
                     f"local CLI command {argv[0]} exited with status {return_code}",
                     stage=stage_plan.stage.value,
                 )
@@ -308,7 +322,7 @@ class PlannedCliPipelineRunner(PipelineRunner):
                 players.extend(self._player_record(job, record, spec) for record in records)
             elif spec.collection == "analytics":
                 if len(records) != 1:
-                    raise WorkerPipelineError("analytics result must contain exactly one object")
+                    raise AnalysisPipelineError("analytics result must contain exactly one object")
                 analytics = self._analytics_record(job, records[0])
             else:
                 collection = StructuredCollection(spec.collection)
@@ -319,10 +333,10 @@ class PlannedCliPipelineRunner(PipelineRunner):
         for artifact_spec in self.plan.artifacts:
             source = (workspace / artifact_spec.path).resolve()
             if not source.is_relative_to(workspace.resolve()):
-                raise WorkerPipelineError("artifact result path escaped the worker workspace")
+                raise AnalysisPipelineError("artifact result path escaped the analysis workspace")
             if not source.is_file():
                 if artifact_spec.required:
-                    raise WorkerPipelineError(
+                    raise AnalysisPipelineError(
                         f"required artifact was not produced: {artifact_spec.path}"
                     )
                 continue
@@ -345,11 +359,11 @@ class PlannedCliPipelineRunner(PipelineRunner):
     def _load_json_result(workspace: Path, relative_path: Path) -> object:
         path = (workspace / relative_path).resolve()
         if not path.is_relative_to(workspace.resolve()):
-            raise WorkerPipelineError("structured result path escaped the worker workspace")
+            raise AnalysisPipelineError("structured result path escaped the analysis workspace")
         try:
             return json.loads(path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as error:
-            raise WorkerPipelineError(
+            raise AnalysisPipelineError(
                 f"unable to load structured result {relative_path}"
             ) from error
 
@@ -365,7 +379,7 @@ class PlannedCliPipelineRunner(PipelineRunner):
         if spec.collection == "analytics" and isinstance(selected, Mapping):
             return (_mapping(selected, f"result {spec.path}"),)
         if not isinstance(selected, list):
-            raise WorkerPipelineError(f"result {spec.path} must contain a record array")
+            raise AnalysisPipelineError(f"result {spec.path} must contain a record array")
         return tuple(_mapping(item, f"record in {spec.path}") for item in selected)
 
     def _domain_record(
@@ -382,6 +396,7 @@ class PlannedCliPipelineRunner(PipelineRunner):
             confidence=self._optional_number(payload, spec.confidence_field, spec.path),
             timestamp_seconds=self._optional_number(payload, spec.timestamp_field, spec.path),
             pipeline_version=self.plan.pipeline_version,
+            processing_run_id=job.processing_run_id,
         )
 
     def _player_record(
@@ -407,7 +422,7 @@ class PlannedCliPipelineRunner(PipelineRunner):
     ) -> AnalyticsRecord:
         metrics_value = payload.get("metrics", payload)
         if not isinstance(metrics_value, Mapping):
-            raise WorkerPipelineError("analytics result must be an object")
+            raise AnalysisPipelineError("analytics result must be an object")
         analytics_id = self._optional_payload_text(payload, "analyticsId") or "match-analytics"
         calculation_version = (
             self._optional_payload_text(payload, "calculationVersion")
@@ -420,6 +435,7 @@ class PlannedCliPipelineRunner(PipelineRunner):
             calculation_version=calculation_version,
             metrics=dict(metrics_value),
             pipeline_version=self.plan.pipeline_version,
+            processing_run_id=job.processing_run_id,
         )
 
     @staticmethod
@@ -429,10 +445,10 @@ class PlannedCliPipelineRunner(PipelineRunner):
         path: Path,
     ) -> str:
         if field is None:
-            raise WorkerPipelineError(f"result {path} is missing an ID-field configuration")
+            raise AnalysisPipelineError(f"result {path} is missing an ID-field configuration")
         value = payload.get(field)
         if not isinstance(value, str) or not value.strip():
-            raise WorkerPipelineError(f"result {path} contains an invalid {field}")
+            raise AnalysisPipelineError(f"result {path} contains an invalid {field}")
         return value
 
     @staticmethod
@@ -452,5 +468,5 @@ class PlannedCliPipelineRunner(PipelineRunner):
         if value is None:
             return None
         if not isinstance(value, (int, float)) or isinstance(value, bool):
-            raise WorkerPipelineError(f"result {path} contains non-numeric {field}")
+            raise AnalysisPipelineError(f"result {path} contains non-numeric {field}")
         return float(value)

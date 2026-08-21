@@ -26,16 +26,26 @@ from pickleball_vision.api.schemas.records import (
     PlayerResponse,
 )
 from pickleball_vision.api.services.persistence import ApplicationPersistence
+from pickleball_vision.api.services.render_workflows import AnalysisWorkflowClient
 from pickleball_vision.persistence.models import (
     ArtifactCategory,
     ArtifactProvider,
     Document,
     MatchRecord,
     ProcessingJobRecord,
+    ProcessingJobStatus,
     SourceMediaType,
 )
 
 ResponseModel = TypeVar("ResponseModel", bound=BaseModel)
+REQUIRED_ANALYSIS_SETUP = frozenset(
+    {
+        "ballExperimentArtifactId",
+        "ballWeightsArtifactId",
+        "calibrationArtifactId",
+        "playerAssignmentsArtifactId",
+    }
+)
 
 
 def _record(model: type[ResponseModel], document: Document) -> ResponseModel:
@@ -53,8 +63,14 @@ def _record(model: type[ResponseModel], document: Document) -> ResponseModel:
 class MatchApplicationService:
     """HTTP-facing use cases without CV, ML, audio, or analytics execution."""
 
-    def __init__(self, persistence: ApplicationPersistence) -> None:
+    def __init__(
+        self,
+        persistence: ApplicationPersistence,
+        *,
+        workflow_client: AnalysisWorkflowClient | None = None,
+    ) -> None:
         self._persistence = persistence
+        self._workflow_client = workflow_client
 
     async def create_match(self, request: MatchCreateRequest) -> MatchResponse:
         now = datetime.now(UTC)
@@ -63,6 +79,7 @@ class MatchApplicationService:
             title=request.title,
             youtube_video_id=request.youtube_video_id,
             source_artifact_id=request.source_artifact_id,
+            analysis_setup=request.analysis_setup,
             created_at=now,
             updated_at=now,
         )
@@ -186,28 +203,114 @@ class MatchApplicationService:
                 message="The match source-media artifact is unavailable",
             )
         provider = artifact.get("provider")
-        if provider == ArtifactProvider.LOCAL.value:
-            source_type = SourceMediaType.LOCAL_PATH
-        elif provider == ArtifactProvider.VERCEL_BLOB.value:
+        if provider == ArtifactProvider.VERCEL_BLOB.value:
             source_type = SourceMediaType.BLOB
         else:
             raise ApiError(
                 status_code=409,
                 code="source_media_unavailable",
-                message="The match source-media provider is unsupported",
+                message="On-demand analysis requires a Vercel Blob SOURCE_MEDIA artifact",
+            )
+        setup = match.get("analysisSetup")
+        if not isinstance(setup, dict):
+            setup = {}
+        missing_setup = sorted(REQUIRED_ANALYSIS_SETUP.difference(setup))
+        if missing_setup:
+            raise ApiError(
+                status_code=409,
+                code="analysis_setup_required",
+                message="The match requires calibration, player assignments, and ball-model setup",
+                details={"missing": missing_setup},
+            )
+        for name in sorted(REQUIRED_ANALYSIS_SETUP):
+            setup_artifact_id = setup.get(name)
+            if not isinstance(setup_artifact_id, str) or not setup_artifact_id:
+                raise ApiError(
+                    status_code=409,
+                    code="analysis_setup_invalid",
+                    message="The match analysis setup contains an invalid artifact reference",
+                    details={"field": name},
+                )
+            setup_artifact = await self._persistence.get_artifact(setup_artifact_id)
+            if (
+                setup_artifact is None
+                or setup_artifact.get("matchId") != match_id
+                or setup_artifact.get("category") != ArtifactCategory.INTERNAL_ARTIFACT.value
+                or setup_artifact.get("provider") != ArtifactProvider.VERCEL_BLOB.value
+            ):
+                raise ApiError(
+                    status_code=409,
+                    code="analysis_setup_unavailable",
+                    message="A required private analysis setup artifact is unavailable",
+                    details={"field": name},
+                )
+        if self._workflow_client is None:
+            raise ApiError(
+                status_code=503,
+                code="workflow_unavailable",
+                message="On-demand analysis is not configured",
             )
         now = datetime.now(UTC)
+        processing_run_id = f"run_{uuid.uuid4().hex}"
         record = ProcessingJobRecord(
             job_id=f"job_{uuid.uuid4().hex}",
             match_id=match_id,
             job_type="analyze_match",
+            status=ProcessingJobStatus.CREATED,
+            stage=ProcessingJobStatus.CREATED.value,
+            processing_run_id=processing_run_id,
             source_type=source_type,
             source_artifact_id=source_artifact_id,
             created_at=now,
             updated_at=now,
         )
-        await self._persistence.save_processing_job(record)
-        return _record(JobResponse, record.to_document())
+        document, created = await self._persistence.create_processing_job_if_no_active(record)
+        if not created:
+            return _record(JobResponse, document)
+        try:
+            workflow_run = await self._workflow_client.start_analysis(
+                job_id=record.job_id,
+                match_id=match_id,
+            )
+        except Exception as error:
+            failed_at = datetime.now(UTC)
+            await self._persistence.update_processing_job(
+                record.job_id,
+                {
+                    "status": ProcessingJobStatus.FAILED.value,
+                    "stage": ProcessingJobStatus.FAILED.value,
+                    "progress": 0.0,
+                    "failedAt": failed_at,
+                    "failedStage": ProcessingJobStatus.CREATED.value,
+                    "errorCode": "RENDER_TRIGGER_FAILED",
+                    "errorMessage": "Unable to queue on-demand analysis",
+                },
+                updated_at=failed_at,
+            )
+            raise ApiError(
+                status_code=503,
+                code="workflow_trigger_failed",
+                message="Unable to queue on-demand analysis",
+                details={"exceptionType": type(error).__name__},
+            ) from error
+        triggered_at = datetime.now(UTC)
+        queued = await self._persistence.update_processing_job(
+            record.job_id,
+            {
+                "status": ProcessingJobStatus.QUEUED.value,
+                "stage": ProcessingJobStatus.QUEUED.value,
+                "renderTriggeredAt": triggered_at,
+                "renderTaskRunId": workflow_run.run_id,
+            },
+            updated_at=triggered_at,
+        )
+        if queued is None:
+            raise ApiError(
+                status_code=503,
+                code="workflow_job_update_failed",
+                message="Analysis was queued but its task-run ID could not be persisted",
+            )
+        return _record(JobResponse, queued)
 
     async def get_job(self, job_id: str) -> JobResponse:
         document = await self._persistence.get_processing_job(job_id)

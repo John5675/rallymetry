@@ -30,12 +30,14 @@ class MatchCreateRequest(ApiInputModel):
     title: ShortText | None = None
     youtube_video_id: YouTubeVideoId | None = None
     source_artifact_id: Identifier | None = None
+    analysis_setup: dict[str, Identifier] = Field(default_factory=dict)
 
 
 class MatchPatchRequest(ApiInputModel):
     title: ShortText | None = None
     youtube_video_id: YouTubeVideoId | None = None
     source_artifact_id: Identifier | None = None
+    analysis_setup: dict[str, Identifier] | None = None
 
     @model_validator(mode="after")
     def require_change(self) -> MatchPatchRequest:
@@ -49,6 +51,7 @@ class MatchResponse(ApiOutputModel):
     title: str | None = None
     youtube_video_id: str | None = None
     source_artifact_id: str | None = None
+    analysis_setup: dict[str, str] = Field(default_factory=dict)
     pipeline_version: str | None = None
     model_versions: dict[str, str] = Field(default_factory=dict)
     summary: JsonObject = Field(default_factory=dict)

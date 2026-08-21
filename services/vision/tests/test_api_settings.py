@@ -16,6 +16,8 @@ def test_api_settings_load_cors_mongodb_and_storage_environment() -> None:
             "PICKLEBALL_VISION_ARTIFACT_BACKEND": "vercel_blob",
             "BLOB_READ_WRITE_TOKEN": "server-secret",
             "PUBLIC_BLOB_READ_WRITE_TOKEN": "public-server-secret",
+            "RENDER_API_KEY": "render-secret",
+            "RENDER_WORKFLOW_TASK": "rallymetry-analysis/analyze_match",
         }
     )
 
@@ -28,6 +30,8 @@ def test_api_settings_load_cors_mongodb_and_storage_environment() -> None:
     assert "server-secret" not in repr(public)
     assert "public-server-secret" not in repr(public)
     assert "user:secret" not in repr(public)
+    assert "render-secret" not in repr(public)
+    assert public["renderWorkflowConfigured"] is True
 
 
 def test_api_settings_accept_local_vercel_and_custom_frontend_origins() -> None:
@@ -55,3 +59,15 @@ def test_api_settings_reject_invalid_cors_origins(origins: str) -> None:
         ApiSettings.from_env({"CORS_ORIGINS": origins})
 
     assert raised.value.details["setting"] == "CORS_ORIGINS"
+
+
+def test_api_settings_require_render_trigger_values_together() -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        ApiSettings.from_env({"RENDER_API_KEY": "secret"})
+
+    assert raised.value.details["setting"] == "RENDER_WORKFLOW_TASK"
+
+
+def test_api_settings_validate_render_task_slug() -> None:
+    with pytest.raises(ConfigurationError):
+        ApiSettings.from_env({"RENDER_API_KEY": "secret", "RENDER_WORKFLOW_TASK": "analyze_match"})

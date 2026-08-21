@@ -9,11 +9,10 @@ from typing import Protocol, cast
 
 from bson import BSON
 from pymongo import ASCENDING, DESCENDING, AsyncMongoClient, ReturnDocument
-from pymongo.errors import PyMongoError
+from pymongo.errors import DuplicateKeyError, PyMongoError
 
 from pickleball_vision.config import PersistenceSettings
 from pickleball_vision.errors import PersistenceOperationError, PersistenceValidationError
-from pickleball_vision.persistence.job_queue import JobCollection, MongoJobQueue
 from pickleball_vision.persistence.models import (
     AnalyticsRecord,
     ArtifactRecord,
@@ -22,6 +21,7 @@ from pickleball_vision.persistence.models import (
     MatchRecord,
     PlayerRecord,
     ProcessingJobRecord,
+    ProcessingJobStatus,
     StructuredCollection,
     StructuredDomainRecord,
 )
@@ -50,7 +50,7 @@ _PROHIBITED_BINARY_FIELDS = {
     "rawvideoframes",
     "videobytes",
 }
-_MATCH_PATCH_FIELDS = frozenset({"sourceArtifactId", "title", "youtubeVideoId"})
+_MATCH_PATCH_FIELDS = frozenset({"analysisSetup", "sourceArtifactId", "title", "youtubeVideoId"})
 
 
 class _AsyncCursor(Protocol):
@@ -71,7 +71,10 @@ class _AsyncCollection(Protocol):
         unique: bool = False,
         sparse: bool = False,
         name: str | None = None,
+        partialFilterExpression: Mapping[str, object] | None = None,
     ) -> str: ...
+
+    async def insert_one(self, document: Mapping[str, object]) -> object: ...
 
     async def replace_one(
         self,
@@ -208,11 +211,20 @@ class MongoPersistence:
 
         index_definitions: dict[
             str,
-            tuple[tuple[str | Sequence[tuple[str, int]], bool, bool, str], ...],
+            tuple[
+                tuple[
+                    str | Sequence[tuple[str, int]],
+                    bool,
+                    bool,
+                    str,
+                    Mapping[str, object] | None,
+                ],
+                ...,
+            ],
         ] = {
             "matches": (
-                ("youtubeVideoId", True, True, "uq_matches_youtube_video_id"),
-                ("updatedAt", False, False, "ix_matches_updated_at"),
+                ("youtubeVideoId", True, True, "uq_matches_youtube_video_id", None),
+                ("updatedAt", False, False, "ix_matches_updated_at", None),
             ),
             "players": (
                 (
@@ -220,6 +232,7 @@ class MongoPersistence:
                     True,
                     False,
                     "uq_players_match_player",
+                    None,
                 ),
             ),
             "rallies": self._event_indexes("rally"),
@@ -232,6 +245,7 @@ class MongoPersistence:
                     True,
                     False,
                     "uq_analytics_match_id",
+                    None,
                 ),
             ),
             "processing_jobs": (
@@ -240,23 +254,21 @@ class MongoPersistence:
                     False,
                     False,
                     "ix_jobs_match_created",
+                    None,
                 ),
                 (
                     (("status", ASCENDING), ("updatedAt", ASCENDING)),
                     False,
                     False,
                     "ix_jobs_status_updated",
+                    None,
                 ),
                 (
-                    (
-                        ("status", ASCENDING),
-                        ("heartbeatAt", ASCENDING),
-                        ("attemptCount", ASCENDING),
-                        ("createdAt", ASCENDING),
-                    ),
+                    "matchId",
+                    True,
                     False,
-                    False,
-                    "ix_jobs_claim_lease",
+                    "uq_jobs_one_active_match",
+                    {"active": True},
                 ),
             ),
             "corrections": (
@@ -269,34 +281,45 @@ class MongoPersistence:
                     False,
                     False,
                     "ix_corrections_target",
+                    None,
                 ),
             ),
             "artifacts": (
-                ("pathname", True, False, "uq_artifacts_pathname"),
+                ("pathname", True, False, "uq_artifacts_pathname", None),
                 (
                     (("matchId", ASCENDING), ("createdAt", ASCENDING)),
                     False,
                     False,
                     "ix_artifacts_match_created",
+                    None,
                 ),
                 (
                     (("matchId", ASCENDING), ("category", ASCENDING)),
                     False,
                     False,
                     "ix_artifacts_match_category",
+                    None,
                 ),
             ),
         }
         try:
             for collection_name, definitions in index_definitions.items():
                 collection = self._database[collection_name]
-                for keys, unique, sparse, name in definitions:
-                    await collection.create_index(
-                        keys,
-                        unique=unique,
-                        sparse=sparse,
-                        name=name,
-                    )
+                for keys, unique, sparse, name, partial_filter in definitions:
+                    if partial_filter is None:
+                        await collection.create_index(
+                            keys,
+                            unique=unique,
+                            sparse=sparse,
+                            name=name,
+                        )
+                    else:
+                        await collection.create_index(
+                            keys,
+                            unique=unique,
+                            name=name,
+                            partialFilterExpression=partial_filter,
+                        )
         except PyMongoError as error:
             raise PersistenceOperationError(
                 "initialize_indexes",
@@ -306,19 +329,30 @@ class MongoPersistence:
     @staticmethod
     def _event_indexes(
         kind: str,
-    ) -> tuple[tuple[str | Sequence[tuple[str, int]], bool, bool, str], ...]:
+    ) -> tuple[
+        tuple[
+            str | Sequence[tuple[str, int]],
+            bool,
+            bool,
+            str,
+            Mapping[str, object] | None,
+        ],
+        ...,
+    ]:
         return (
             (
                 (("matchId", ASCENDING), ("recordId", ASCENDING)),
                 True,
                 False,
                 f"uq_{kind}_match_record",
+                None,
             ),
             (
                 (("matchId", ASCENDING), ("timestampSeconds", ASCENDING)),
                 False,
                 True,
                 f"ix_{kind}_match_time",
+                None,
             ),
         )
 
@@ -345,6 +379,101 @@ class MongoPersistence:
 
     async def save_processing_job(self, record: ProcessingJobRecord) -> None:
         await self._replace("processing_jobs", record.to_document(), "save_processing_job")
+
+    async def create_processing_job_if_no_active(
+        self,
+        record: ProcessingJobRecord,
+    ) -> tuple[Document, bool]:
+        """Atomically create one active match job, or return the existing active job."""
+
+        document = record.to_document()
+        validate_compact_document(document)
+        if document.get("active") is not True:
+            raise PersistenceValidationError("new processing jobs must be active")
+        try:
+            await self._database["processing_jobs"].insert_one(document)
+            return document, True
+        except DuplicateKeyError:
+            existing = await self._find_one(
+                "processing_jobs",
+                {"matchId": record.match_id, "active": True},
+                "get_active_processing_job",
+            )
+            if existing is None:
+                raise PersistenceOperationError(
+                    "create_processing_job",
+                    reason="active-job uniqueness conflict could not be reconciled",
+                ) from None
+            return existing, False
+        except PyMongoError as error:
+            raise PersistenceOperationError(
+                "create_processing_job",
+                reason=_driver_reason(error),
+            ) from error
+
+    async def update_processing_job(
+        self,
+        job_id: str,
+        fields: Mapping[str, object],
+        *,
+        updated_at: datetime,
+    ) -> Document | None:
+        """Apply one bounded workflow-status update without queue or lease semantics."""
+
+        allowed = {
+            "attemptCount",
+            "completedAt",
+            "errorCode",
+            "errorMessage",
+            "failedAt",
+            "failedStage",
+            "pipelineVersion",
+            "processingRunId",
+            "progress",
+            "renderTaskRunId",
+            "renderTriggeredAt",
+            "resultArtifactIds",
+            "resultSummary",
+            "stage",
+            "startedAt",
+            "status",
+        }
+        unsupported = set(fields).difference(allowed)
+        if unsupported:
+            raise PersistenceValidationError(
+                "processing job update contains unsupported fields: "
+                + ", ".join(sorted(unsupported))
+            )
+        values: Document = {key: value for key, value in fields.items() if value is not None}
+        unset_values: Document = {key: "" for key, value in fields.items() if value is None}
+        values["updatedAt"] = updated_at
+        status = values.get("status")
+        if status is not None:
+            try:
+                parsed = ProcessingJobStatus(str(status))
+            except ValueError as error:
+                raise PersistenceValidationError("processing job status is invalid") from error
+            values["status"] = parsed.value
+            values["active"] = parsed not in {
+                ProcessingJobStatus.COMPLETE,
+                ProcessingJobStatus.FAILED,
+                ProcessingJobStatus.CANCELED,
+            }
+        validate_compact_document(values)
+        try:
+            update: Document = {"$set": values}
+            if unset_values:
+                update["$unset"] = unset_values
+            return await self._database["processing_jobs"].find_one_and_update(
+                {"_id": job_id},
+                update,
+                return_document=ReturnDocument.AFTER,
+            )
+        except PyMongoError as error:
+            raise PersistenceOperationError(
+                "update_processing_job",
+                reason=_driver_reason(error),
+            ) from error
 
     async def save_correction(self, record: CorrectionRecord) -> None:
         await self._replace("corrections", record.to_document(), "save_correction")
@@ -499,11 +628,22 @@ class MongoPersistence:
             "get_artifact",
         )
 
-    def job_queue(self) -> MongoJobQueue:
-        """Return the project-owned lease adapter over this database connection."""
-
-        collection = cast(JobCollection, self._database["processing_jobs"])
-        return MongoJobQueue(collection)
+    async def find_processing_run_artifact(
+        self,
+        *,
+        match_id: str,
+        processing_run_id: str,
+        artifact_type: str,
+    ) -> Document | None:
+        return await self._find_one(
+            "artifacts",
+            {
+                "matchId": match_id,
+                "processingRunId": processing_run_id,
+                "artifactType": artifact_type,
+            },
+            "find_processing_run_artifact",
+        )
 
     async def list_match_artifacts(self, match_id: str) -> tuple[Document, ...]:
         documents, _ = await self._list_documents(

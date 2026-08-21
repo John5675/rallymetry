@@ -21,7 +21,9 @@ depend on `ApplicationPersistence`; the production lifespan supplies
 | `CORS_ORIGINS` | No | `http://localhost:5173` | Comma-separated browser origins |
 | `PICKLEBALL_VISION_ARTIFACT_BACKEND` | No | `local` | Artifact backend reported by health/config |
 | `PICKLEBALL_VISION_LOCAL_ARTIFACT_ROOT` | No | `output/artifacts` | Local artifact root |
-| `BLOB_READ_WRITE_TOKEN` | Only for Blob operations in later services | unset | Server-side Blob credential |
+| `BLOB_READ_WRITE_TOKEN` | Not needed by FastAPI trigger | unset | Workflow-side Blob credential |
+| `RENDER_API_KEY` | For `/process` | unset | Server-side Render task-start credential |
+| `RENDER_WORKFLOW_TASK` | With Render key | unset | `{workflow-slug}/analyze_match` identifier |
 
 `CORS_ORIGINS` values must be complete HTTP or HTTPS origins without paths, queries,
 or fragments. A wildcard may be used only by itself. CORS credentials are disabled
@@ -39,6 +41,8 @@ From `services/vision`:
 export MONGODB_URL='mongodb+srv://<user>:<password>@<cluster>/'
 export MONGODB_DATABASE='pickleball_vision'
 export CORS_ORIGINS='http://localhost:5173'
+export RENDER_API_KEY='<server-side-key>'
+export RENDER_WORKFLOW_TASK='rallymetry-analysis/analyze_match'
 
 uv run uvicorn pickleball_vision.api.main:app \
   --host 127.0.0.1 \
@@ -57,7 +61,7 @@ browser code.
 | `POST` | `/api/matches` | Create compact match metadata (`201`) |
 | `GET` | `/api/matches` | Paginated matches |
 | `GET` | `/api/matches/{matchId}` | One match |
-| `PATCH` | `/api/matches/{matchId}` | Update title, YouTube ID, or source artifact reference |
+| `PATCH` | `/api/matches/{matchId}` | Update title, YouTube/source, or analysis setup references |
 | `GET` | `/api/matches/{matchId}/players` | Logical players |
 | `GET` | `/api/matches/{matchId}/rallies` | Paginated structured rallies |
 | `GET` | `/api/matches/{matchId}/shots` | Paginated structured shots |
@@ -79,7 +83,8 @@ not download the video.
 
 ## Process submission
 
-`POST /api/matches/{matchId}/process` first verifies the match, creates a
+`POST /api/matches/{matchId}/process` verifies the match and its private hosted
+source/setup artifacts, atomically creates at most one active
 `ProcessingJobRecord` with:
 
 ```json
@@ -88,20 +93,24 @@ not download the video.
   "matchId": "match_<id>",
   "jobType": "analyze_match",
   "status": "QUEUED",
+  "stage": "QUEUED",
   "progress": 0.0,
   "attemptCount": 0,
   "sourceType": "BLOB",
   "sourceArtifactId": "artifact_<id>",
+  "processingRunId": "run_<id>",
+  "renderTaskRunId": "trn-...",
   "resultArtifactIds": []
 }
 ```
 
-The match must reference an existing `SOURCE_MEDIA` artifact; a missing or invalid
-source returns `409`. The response is `202 Accepted` and includes a `Location`
-header pointing to `/api/jobs/{jobId}`. No background task is attached to the
-response. The separate Milestone 21 worker owns atomic claiming, leases, pipeline
-execution, result persistence, and artifact publication. `GET /api/jobs/{jobId}`
-also exposes its safe stage/timestamp/attempt/error fields as they become available.
+The API uses the official async Render SDK to start the configured `analyze_match`
+task and stores its initial task-run ID; it does not await task completion. Missing
+source/setup returns `409`, and a trigger failure records `FAILED` and returns a safe
+`503`. A duplicate request returns the existing active job without a second Render
+run. The response is `202 Accepted` with a `Location` header. The task writes domain
+progress; `GET /api/jobs/{jobId}` exposes safe stage/timestamp/attempt/error fields.
+See [`render-workflows.md`](render-workflows.md).
 
 ## Errors and request logging
 

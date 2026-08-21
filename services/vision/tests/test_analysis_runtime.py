@@ -7,9 +7,12 @@ from pathlib import Path
 
 import pytest
 
-from pickleball_vision.errors import WorkerConfigurationError
+from pickleball_vision.analysis_runtime.pipeline import (
+    PlannedCliPipelineRunner,
+    load_pipeline_plan,
+)
+from pickleball_vision.errors import AnalysisConfigurationError
 from pickleball_vision.persistence.models import ProcessingJobRecord, ProcessingJobStatus
-from pickleball_vision.worker.pipeline import PlannedCliPipelineRunner, load_pipeline_plan
 
 NOW = datetime(2026, 8, 19, 12, 0, tzinfo=UTC)
 
@@ -100,7 +103,7 @@ def test_pipeline_plan_rejects_arbitrary_commands(tmp_path: Path) -> None:
     plan_path = tmp_path / "plan.json"
     _write_plan(plan_path, command="bash")
 
-    with pytest.raises(WorkerConfigurationError):
+    with pytest.raises(AnalysisConfigurationError):
         load_pipeline_plan(plan_path)
 
 
@@ -111,5 +114,5 @@ def test_pipeline_plan_rejects_public_internal_artifact(tmp_path: Path) -> None:
     payload["artifacts"][0]["category"] = "INTERNAL_ARTIFACT"
     plan_path.write_text(json.dumps(payload), encoding="utf-8")
 
-    with pytest.raises(WorkerConfigurationError, match="PUBLIC access"):
+    with pytest.raises(AnalysisConfigurationError, match="PUBLIC access"):
         load_pipeline_plan(plan_path)

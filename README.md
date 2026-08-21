@@ -40,11 +40,11 @@ structured domain objects. Optional hosted persistence stores compact match reco
 through the official PyMongo Async API and large artifacts through interchangeable
 local-filesystem or Vercel Blob adapters without making cloud access a CLI
 prerequisite. A separate FastAPI control plane now exposes JSON match/result records
-and queues durable processing-job status without running analysis in HTTP requests.
-A separate outbound-only worker now atomically claims those MongoDB jobs, maintains
-bounded leases and heartbeats, stages local or Blob media, invokes an explicit
-operator-controlled plan of existing CLI stages, persists compact structured
-results, and publishes selected artifacts through the configured store.
+and creates durable processing-job status without running analysis in HTTP requests.
+FastAPI triggers one on-demand Render Workflow task for each accepted match. Render
+stages private Blob media and setup, invokes an explicit operator-controlled plan of
+existing CLI stages, persists compact structured results, publishes an allow-list of
+viewable artifacts, cleans temporary storage, and then deprovisions its compute.
 The strict TypeScript browser application presents match status, public review
 media, structured timelines, rallies, shots, player metrics, deterministic analytics,
 heatmaps, and defensible court-plane landing maps through the FastAPI contract.
@@ -62,24 +62,24 @@ heatmaps, and defensible court-plane landing maps through the FastAPI contract.
 - `AGENTS.md`: durable rules for humans and coding agents
 
 The locked product stack is a React/Vite/TypeScript frontend, a FastAPI product API,
-MongoDB Atlas for hosted structured data and the initial small-scale job queue,
-Vercel Blob for hosted media/artifacts, and a separate Python analysis worker that
-invokes the existing pipeline. Heavy analysis will not run in Vercel Functions or
-inside FastAPI HTTP requests. The persistence adapters, FastAPI control plane,
-analysis worker, and browser dashboard are implemented. Milestone 23 adds the Vercel
+MongoDB Atlas for hosted structured data and durable job status, Vercel Blob for
+hosted media/artifacts, and on-demand Render Workflows that invoke the existing
+pipeline. Heavy analysis does not run in Vercel Functions, inside FastAPI requests,
+or in an always-on polling worker. The persistence adapters, FastAPI control plane,
+workflow task, and browser dashboard are implemented. Milestone 23 adds the Vercel
 SPA build contract, a vendor-neutral persistent FastAPI container, exact
 environment-driven CORS, and separate private/public Blob routing. See
 the
 [architecture contract](docs/architecture.md) and
 [hosted persistence contract](docs/persistence.md), plus the
-[API contract](docs/api.md), [worker contract](docs/worker.md), and
+[API contract](docs/api.md), [Render Workflows contract](docs/render-workflows.md), and
 [web dashboard guide](docs/web.md), and [deployment guide](docs/deployment.md).
 
 ## Optional hosted persistence
 
 Local artifacts remain the default and require no credentials. Copy `.env.example`
 as a reference, then inject real values through your shell or deployment secret
-store only when a future API or worker uses the hosted adapters:
+store only when the hosted API or on-demand workflow uses the adapters:
 
 ```bash
 export MONGODB_URL='mongodb+srv://<user>:<password>@<cluster>/'
@@ -87,6 +87,8 @@ export MONGODB_DATABASE='pickleball_vision'
 export PICKLEBALL_VISION_ARTIFACT_BACKEND='vercel_blob'
 export BLOB_READ_WRITE_TOKEN='<private-store-server-token>'
 export PUBLIC_BLOB_READ_WRITE_TOKEN='<public-store-server-token>'
+export RENDER_API_KEY='<server-side-render-api-key>'
+export RENDER_WORKFLOW_TASK='rallymetry-analysis/analyze_match'
 ```
 
 Do not expose either credential to a browser. MongoDB stores compact structured
@@ -94,7 +96,7 @@ records and artifact references; videos, frames, audio waveforms, model weights,
 large detections, and debug media remain in an artifact store.
 
 For the supported Vercel project link, private/public store creation, local environment
-pull, and worker startup sequence, see the
+pull, and workflow setup sequence, see the
 [hosted persistence setup](docs/persistence.md#provision-vercel-blob-stores).
 
 Run the API from `services/vision` after configuring MongoDB:
@@ -104,18 +106,19 @@ export CORS_ORIGINS='http://localhost:5173'
 uv run uvicorn pickleball_vision.api.main:app --host 127.0.0.1 --port 8000
 ```
 
-`POST /api/matches/{matchId}/process` returns `202 Accepted` with a queued job ID
-after verifying the match has a `SOURCE_MEDIA` artifact. Run a single local claim
-with the trusted example plan (after replacing its match/model path placeholders):
+`POST /api/matches/{matchId}/process` returns `202 Accepted` after verifying the match
+has a private Blob `SOURCE_MEDIA` artifact and four private setup artifacts. It creates
+one durable MongoDB job, starts the configured Render task, stores its task-run ID,
+and returns without waiting for analysis. For local task registration and execution:
 
 ```bash
-uv run pickleball-vision worker \
-  --pipeline-plan ../../docs/examples/worker-pipeline-plan.json \
-  --once
+render workflows dev -- uv run python -m pickleball_vision.workflows.app
 ```
 
-Omit `--once` for continuous single-concurrency polling. The worker only needs
-outbound MongoDB Atlas and Vercel Blob access; it opens no inbound server.
+Use a second terminal to run `render workflows tasks list --local` and start
+`analyze_match` with a JSON object containing only `job_id` and `match_id`. There is
+no continuously running Rallymetry polling process; Render provisions compute only
+for the task run. See [the workflow guide](docs/render-workflows.md).
 
 ## Run the web dashboard
 
@@ -137,6 +140,7 @@ not contain MongoDB or Vercel Blob credentials. See the
 - Python 3.11 or newer
 - [uv](https://docs.astral.sh/uv/) (recommended)
 - Node.js 22 or newer and npm
+- Render CLI 2.11+ for local Workflow registration/execution (hosted workflow only)
 
 The locked Python environment supplies the FFmpeg libraries and extraction binary;
 a separate system FFmpeg installation is not required.
