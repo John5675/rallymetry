@@ -83,6 +83,7 @@ class SetupStager(Protocol):
         match_id: str,
         match_document: Mapping[str, object],
         workspace: Path,
+        source_path: Path | None = None,
     ) -> Mapping[str, Path]: ...
 
 
@@ -158,6 +159,7 @@ class OnDemandAnalysisOrchestrator:
                     match_id=match_id,
                     match_document=match_document,
                     workspace=workspace,
+                    source_path=source_path,
                 )
             media = await asyncio.to_thread(self._media_inspector, source_path)
             output_dir = workspace / "output"

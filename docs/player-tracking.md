@@ -20,6 +20,13 @@ recorded path to the immutable `detections.json`. For custom layouts, pass
 `--assignments` and optionally `--detections`. The latter must match the detection
 file recorded by the assignments.
 
+Manual assignments now retain the selected bottom-center image anchor as well as the
+raw detection index. `--portable-profile` is reserved for isolated hosted workspaces:
+it rematches those image anchors to fresh detections at the reviewed frame and court
+side under a bounded distance gate. The normal local command remains provenance-strict,
+and portable mode never chooses the four highest-confidence people or silently forces
+an unmatched identity.
+
 Human-readable names are optional and remain independent of the four stable roles.
 Put a `player-names.json` beside `player-assignments.json`, or pass it explicitly
 with `--player-names`:

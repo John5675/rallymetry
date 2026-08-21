@@ -7,7 +7,7 @@ import logging
 import math
 from collections import defaultdict
 from contextlib import suppress
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 import cv2
@@ -115,6 +115,97 @@ def _group_detections(
     for index, detection in enumerate(detections):
         grouped[detection.frame_number].append(IndexedDetection(index, detection))
     return {frame: tuple(items) for frame, items in grouped.items()}
+
+
+def _rebind_manual_anchors(
+    assignments: LogicalPlayerAssignments,
+    *,
+    detections: tuple[PersonDetection, ...],
+    calibration_path: Path,
+    source: VideoMetadata,
+    isolation_settings: PlayerIsolationSettings,
+) -> LogicalPlayerAssignments:
+    """Match portable manual image anchors to this run's immutable detections."""
+
+    calibration = load_calibration(calibration_path)
+    maximum_distance_px = math.hypot(source.width, source.height) * 0.08
+    pairs: list[tuple[float, LogicalPlayerRole, int]] = []
+    rebound_by_role = assignments.by_role()
+    roles_without_image_anchor: set[LogicalPlayerRole] = set()
+    for assignment in assignments.assignments:
+        if assignment.anchor_image_point is None:
+            roles_without_image_anchor.add(assignment.logical_player)
+            continue
+        for index, detection in enumerate(detections):
+            if detection.frame_number != assignment.anchor_frame_number:
+                continue
+            ground = assess_ground_contact(
+                detection,
+                calibration=calibration,
+                frame_height_px=source.height,
+                settings=isolation_settings,
+            )
+            if ground.side is not assignment.observed_side:
+                continue
+            distance_px = math.hypot(
+                ground.image_point.x_px - assignment.anchor_image_point.x_px,
+                ground.image_point.y_px - assignment.anchor_image_point.y_px,
+            )
+            if distance_px <= maximum_distance_px:
+                pairs.append((distance_px, assignment.logical_player, index))
+
+    selected_roles: set[LogicalPlayerRole] = set()
+    selected_indices: set[int] = set()
+    for _, role, index in sorted(pairs):
+        if role in selected_roles or index in selected_indices:
+            continue
+        detection = detections[index]
+        rebound_by_role[role] = replace(
+            rebound_by_role[role],
+            anchor_detection_index=index,
+            anchor_frame_number=detection.frame_number,
+            anchor_timestamp_s=detection.timestamp_s,
+        )
+        selected_roles.add(role)
+        selected_indices.add(index)
+
+    for role in roles_without_image_anchor:
+        assignment = rebound_by_role[role]
+        index = assignment.anchor_detection_index
+        if not 0 <= index < len(detections):
+            continue
+        detection = detections[index]
+        if detection.frame_number != assignment.anchor_frame_number:
+            continue
+        if not math.isclose(
+            detection.timestamp_s,
+            assignment.anchor_timestamp_s,
+            abs_tol=max(1 / source.fps, 1e-3),
+        ):
+            continue
+        selected_roles.add(role)
+        selected_indices.add(index)
+
+    missing = set(LOGICAL_PLAYER_ROLES) - selected_roles
+    if missing:
+        labels = ", ".join(sorted(role.value for role in missing))
+        raise PlayerTrackingInputError(
+            "portable manual anchors could not be matched to fresh detections for: "
+            f"{labels}; create or enrich player assignments from this recording"
+        )
+    return replace(
+        assignments, assignments=tuple(rebound_by_role[role] for role in LOGICAL_PLAYER_ROLES)
+    )
+
+
+def _validate_calibration_metadata(calibration_path: Path, source: VideoMetadata) -> None:
+    calibration = load_calibration(calibration_path)
+    if (
+        calibration.source.frame_width_px != source.width
+        or calibration.source.frame_height_px != source.height
+        or not math.isclose(calibration.source.fps, source.fps, rel_tol=5e-3)
+    ):
+        raise PlayerTrackingInputError("the calibration metadata does not match the video")
 
 
 def _load_candidate_seed_indices(
@@ -313,6 +404,7 @@ def track_players_in_video(
     detections_path: Path | None = None,
     assignments_path: Path | None = None,
     player_names_path: Path | None = None,
+    allow_portable_profile: bool = False,
     tracker: MultiObjectTracker | None = None,
 ) -> PlayerTrackingArtifacts:
     """Track all people, then resolve the existing four logical player assignments."""
@@ -340,7 +432,10 @@ def track_players_in_video(
         if detections_path is not None
         else Path(assignments.detections_path).expanduser().resolve()
     )
-    if Path(assignments.detections_path).expanduser().resolve() != resolved_detections_path:
+    if (
+        not allow_portable_profile
+        and Path(assignments.detections_path).expanduser().resolve() != resolved_detections_path
+    ):
         raise PlayerTrackingInputError(
             "the selected detections.json differs from the manual assignment provenance"
         )
@@ -348,8 +443,20 @@ def track_players_in_video(
     _validate_video_provenance(source, detection_run.source)
     calibration = load_calibration(calibration_path)
     resolved_calibration_path = calibration_path.expanduser().resolve()
-    if calibration.source.video_path.expanduser().resolve() != source.path:
+    if (
+        not allow_portable_profile
+        and calibration.source.video_path.expanduser().resolve() != source.path
+    ):
         raise PlayerTrackingInputError("the calibration was created from a different video")
+    _validate_calibration_metadata(resolved_calibration_path, source)
+    if allow_portable_profile:
+        assignments = _rebind_manual_anchors(
+            assignments,
+            detections=detection_run.detections,
+            calibration_path=resolved_calibration_path,
+            source=source,
+            isolation_settings=isolation_settings,
+        )
 
     tracks_path = resolved_output_dir / TRACKS_NAME
     annotated_path = resolved_output_dir / ANNOTATED_VIDEO_NAME
@@ -360,12 +467,19 @@ def track_players_in_video(
         )
 
     detections_by_frame = _group_detections(detection_run.detections)
-    candidate_seed_indices = _load_candidate_seed_indices(
-        resolved_candidates_path,
-        assignments=assignments,
-        detections_path=resolved_detections_path,
-        detection_count=len(detection_run.detections),
-    )
+    candidate_seed_indices: dict[LogicalPlayerRole, tuple[int, ...]]
+    if allow_portable_profile:
+        candidate_seed_indices = {
+            assignment.logical_player: (assignment.anchor_detection_index,)
+            for assignment in assignments.assignments
+        }
+    else:
+        candidate_seed_indices = _load_candidate_seed_indices(
+            resolved_candidates_path,
+            assignments=assignments,
+            detections_path=resolved_detections_path,
+            detection_count=len(detection_run.detections),
+        )
     effective_tracker = tracker or UltralyticsByteTracker(tracking_settings, fps=source.fps)
     raw_observations = _run_raw_tracker(
         source=source,
@@ -431,6 +545,12 @@ def track_players_in_video(
         configuration={
             "player_tracking": tracking_settings.as_dict(),
             "ground_contact_geometry": isolation_settings.as_dict(),
+            "portable_profile_rebinding": allow_portable_profile,
+            "candidate_seed_source": (
+                "rebound_manual_image_anchors"
+                if allow_portable_profile
+                else "primary_player_candidate_tracklets"
+            ),
         },
         appearance={
             "method": "two_band_hsv_clothing_histogram",

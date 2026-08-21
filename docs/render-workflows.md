@@ -237,6 +237,15 @@ Inspect infrastructure state and detailed traces in Render Dashboard's workflow
 `GET /api/jobs/{jobId}`. Safe MongoDB messages omit credentials; full tracebacks stay
 in Render logs.
 
+Hosted setup files remain immutable Blob artifacts. The workflow rewrites only its
+temporary calibration copy so `source.video_path` names the staged media file, while
+retaining the original pathname in `runtime_binding`. Player tracking uses
+`--portable-profile` to match enriched manual image anchors against the fresh immutable
+person detections for that run. Width, height, FPS, court side, anchor frame, and a
+bounded image-distance gate must still agree; failure remains explicit instead of
+silently assigning a nearby person. A new camera angle or materially different player
+setup still requires a new reviewed calibration/assignment profile.
+
 ## Smoke test
 
 1. Confirm `/health` reports MongoDB ready.

@@ -11,7 +11,7 @@ from pickleball_vision.analysis_runtime.pipeline import (
     PlannedCliPipelineRunner,
     load_pipeline_plan,
 )
-from pickleball_vision.errors import AnalysisConfigurationError
+from pickleball_vision.errors import AnalysisConfigurationError, AnalysisPipelineError
 from pickleball_vision.persistence.models import ProcessingJobRecord, ProcessingJobStatus
 
 NOW = datetime(2026, 8, 19, 12, 0, tzinfo=UTC)
@@ -116,3 +116,38 @@ def test_pipeline_plan_rejects_public_internal_artifact(tmp_path: Path) -> None:
 
     with pytest.raises(AnalysisConfigurationError, match="PUBLIC access"):
         load_pipeline_plan(plan_path)
+
+
+def test_planned_runner_surfaces_cli_stderr_tail(tmp_path: Path) -> None:
+    plan_path = tmp_path / "plan.json"
+    _write_plan(plan_path)
+    executable = tmp_path / "failing-command"
+    executable.write_text(
+        "#!/bin/sh\necho 'portable anchor mismatch' >&2\nexit 2\n",
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"source")
+
+    async def on_stage(stage: ProcessingJobStatus, progress: float) -> None:
+        del stage, progress
+
+    with pytest.raises(AnalysisPipelineError, match="portable anchor mismatch"):
+        asyncio.run(
+            PlannedCliPipelineRunner(
+                load_pipeline_plan(plan_path),
+                executable=str(executable),
+            ).run(
+                ProcessingJobRecord(
+                    job_id="job-failure",
+                    match_id="match-failure",
+                    job_type="analyze_match",
+                    created_at=NOW,
+                    updated_at=NOW,
+                ),
+                source_path=source,
+                workspace=tmp_path / "workspace",
+                on_stage=on_stage,
+            )
+        )

@@ -24,7 +24,10 @@ from pickleball_vision.player_tracking import (
     RawTrackerObservation,
     TrackerMetadata,
 )
-from pickleball_vision.player_tracking_workflow import track_players_in_video
+from pickleball_vision.player_tracking_workflow import (
+    _rebind_manual_anchors,
+    track_players_in_video,
+)
 from pickleball_vision.video import inspect_video
 
 
@@ -137,6 +140,12 @@ def test_tracking_workflow_writes_separate_raw_and_logical_artifacts(
                     frame_height_px=source.height,
                     settings=isolation_settings,
                 ).side,
+                assess_ground_contact(
+                    detections[anchor_frame * 4 + index],
+                    calibration=calibration,
+                    frame_height_px=source.height,
+                    settings=isolation_settings,
+                ).image_point,
             )
             for index, role in enumerate(LOGICAL_PLAYER_ROLES)
         ),
@@ -183,3 +192,68 @@ def test_tracking_workflow_writes_separate_raw_and_logical_artifacts(
         assert round(capture.get(cv2.CAP_PROP_FRAME_COUNT)) == source.frame_count
     finally:
         capture.release()
+
+
+def test_portable_manual_anchors_rebind_by_image_position(
+    synthetic_video: Path,
+    synthetic_calibration: Path,
+) -> None:
+    source = inspect_video(synthetic_video)
+    calibration = load_calibration(synthetic_calibration)
+    settings = PlayerIsolationSettings(min_candidate_observations=2)
+    court_points = (CourtPoint(1, 2), CourtPoint(5, 2), CourtPoint(1, 11), CourtPoint(5, 11))
+    original: list[PersonDetection] = []
+    for point in court_points:
+        image = calibration.court_to_image(point)
+        original.append(
+            PersonDetection(
+                BoundingBox(
+                    image.x_px - 3,
+                    max(0, image.y_px - 10),
+                    image.x_px + 3,
+                    image.y_px,
+                ),
+                0.9,
+                5,
+                5 / source.fps,
+            )
+        )
+    assignments = LogicalPlayerAssignments(
+        "2026-08-14T00:00:00+00:00",
+        "/original/player-candidates.json",
+        "/original/detections.json",
+        tuple(
+            ManualPlayerAssignment(
+                role,
+                f"candidate-{index}",
+                9000 + index,
+                5,
+                5 / source.fps,
+                assess_ground_contact(
+                    original[index],
+                    calibration=calibration,
+                    frame_height_px=source.height,
+                    settings=settings,
+                ).side,
+                assess_ground_contact(
+                    original[index],
+                    calibration=calibration,
+                    frame_height_px=source.height,
+                    settings=settings,
+                ).image_point,
+            )
+            for index, role in enumerate(LOGICAL_PLAYER_ROLES)
+        ),
+    )
+    fresh = tuple(reversed(original))
+
+    rebound = _rebind_manual_anchors(
+        assignments,
+        detections=fresh,
+        calibration_path=synthetic_calibration,
+        source=source,
+        isolation_settings=settings,
+    )
+
+    assert [item.anchor_detection_index for item in rebound.assignments] == [3, 2, 1, 0]
+    assert all(item.anchor_image_point is not None for item in rebound.assignments)

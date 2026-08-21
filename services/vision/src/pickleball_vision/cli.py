@@ -289,6 +289,14 @@ def build_parser() -> argparse.ArgumentParser:
             "defaults to player-names.json beside assignments when present"
         ),
     )
+    track_parser.add_argument(
+        "--portable-profile",
+        action="store_true",
+        help=(
+            "rebind enriched manual image anchors to fresh detections in a temporary "
+            "hosted-media workspace"
+        ),
+    )
 
     analyze_parser = subparsers.add_parser(
         "analyze-players",
@@ -1086,6 +1094,7 @@ def _run_track_players(
     detections_path: Path | None,
     assignments_path: Path | None,
     player_names_path: Path | None,
+    allow_portable_profile: bool,
     settings: Settings,
 ) -> int:
     artifacts = track_players_in_video(
@@ -1097,6 +1106,7 @@ def _run_track_players(
         detections_path=detections_path,
         assignments_path=assignments_path,
         player_names_path=player_names_path,
+        allow_portable_profile=allow_portable_profile,
     )
     logging.getLogger("pickleball_vision.cli").info(
         "logical_players_tracked",
@@ -1653,6 +1663,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 detections_path=cast(Path | None, args.detections),
                 assignments_path=cast(Path | None, args.assignments),
                 player_names_path=cast(Path | None, args.player_names),
+                allow_portable_profile=cast(bool, args.portable_profile),
                 settings=settings,
             )
         if args.command == "analyze-players":

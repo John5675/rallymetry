@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import json
 from collections.abc import Mapping
+from contextlib import suppress
 from pathlib import Path
 from typing import Protocol
 
@@ -45,6 +47,7 @@ class MatchSetupStager:
         match_id: str,
         match_document: Mapping[str, object],
         workspace: Path,
+        source_path: Path | None = None,
     ) -> Mapping[str, Path]:
         raw_setup = match_document.get("analysisSetup")
         if not isinstance(raw_setup, Mapping):
@@ -72,4 +75,44 @@ class MatchSetupStager:
                 raise AnalysisConfigurationError(f"analysis setup artifact {field} is not private")
             destination = workspace / "input" / filename
             staged[field] = await self._artifact_store.get(artifact, destination)
+        if source_path is not None:
+            _bind_calibration_to_runtime_source(
+                staged["calibrationArtifactId"],
+                source_path=source_path,
+            )
         return staged
+
+
+def _bind_calibration_to_runtime_source(path: Path, *, source_path: Path) -> None:
+    """Rebind only the temporary calibration copy to the staged source pathname."""
+
+    try:
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(payload, dict):
+            raise ValueError("root must be an object")
+        source = payload.get("source")
+        if not isinstance(source, dict):
+            raise ValueError("source must be an object")
+        original_path = source.get("video_path")
+        if not isinstance(original_path, str) or not original_path:
+            raise ValueError("source.video_path must be a non-empty string")
+        runtime_path = str(source_path.expanduser().resolve())
+        source["video_path"] = runtime_path
+        payload["runtime_binding"] = {
+            "mode": "temporary_hosted_copy",
+            "original_video_path": original_path,
+            "runtime_video_path": runtime_path,
+            "original_artifact_modified": False,
+        }
+        temporary = path.with_name(f".{path.name}.runtime.tmp")
+        temporary.write_text(
+            json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n",
+            encoding="utf-8",
+        )
+        temporary.replace(path)
+    except (OSError, json.JSONDecodeError, TypeError, ValueError) as error:
+        with suppress(OSError):
+            path.with_name(f".{path.name}.runtime.tmp").unlink(missing_ok=True)
+        raise AnalysisConfigurationError(
+            f"unable to bind staged calibration to source media: {error}"
+        ) from error

@@ -26,6 +26,7 @@
         "{workspace}/person-detection/detections.json",
         "--assignments",
         "{input}/player-assignments.json",
+        "--portable-profile",
         "--output-dir",
         "{workspace}/player-tracking"
       ]

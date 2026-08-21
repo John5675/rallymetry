@@ -544,9 +544,10 @@ class ManualPlayerAssignment:
     anchor_frame_number: int
     anchor_timestamp_s: float
     observed_side: CourtSide
+    anchor_image_point: ImagePoint | None = None
 
     def as_dict(self) -> dict[str, object]:
-        return {
+        payload: dict[str, object] = {
             "logical_player": self.logical_player.value,
             "candidate_id": self.candidate_id,
             "assignment_source": "manual",
@@ -555,6 +556,9 @@ class ManualPlayerAssignment:
             "anchor_timestamp_s": self.anchor_timestamp_s,
             "observed_court_side": self.observed_side.value,
         }
+        if self.anchor_image_point is not None:
+            payload["anchor_image_point"] = self.anchor_image_point.as_dict()
+        return payload
 
 
 @dataclass(frozen=True, slots=True)
@@ -609,6 +613,7 @@ def make_manual_assignment(
         anchor_frame_number=observation.detection.frame_number,
         anchor_timestamp_s=observation.detection.timestamp_s,
         observed_side=observation.ground_contact.side,
+        anchor_image_point=observation.ground_contact.image_point,
     )
 
 
@@ -707,6 +712,23 @@ def load_player_assignments(path: Path) -> LogicalPlayerAssignments:
             anchor = _assignment_json_object(
                 raw["anchor_raw_detection"], field=f"{field}.anchor_raw_detection"
             )
+            anchor_image_raw = raw.get("anchor_image_point")
+            anchor_image_point = None
+            if anchor_image_raw is not None:
+                anchor_image = _assignment_json_object(
+                    anchor_image_raw,
+                    field=f"{field}.anchor_image_point",
+                )
+                anchor_image_point = ImagePoint(
+                    x_px=_assignment_json_float(
+                        anchor_image["x_px"],
+                        field=f"{field}.anchor_image_point.x_px",
+                    ),
+                    y_px=_assignment_json_float(
+                        anchor_image["y_px"],
+                        field=f"{field}.anchor_image_point.y_px",
+                    ),
+                )
             assignments.append(
                 ManualPlayerAssignment(
                     logical_player=LogicalPlayerRole(
@@ -731,6 +753,7 @@ def load_player_assignments(path: Path) -> LogicalPlayerAssignments:
                             raw["observed_court_side"], field=f"{field}.observed_court_side"
                         )
                     ),
+                    anchor_image_point=anchor_image_point,
                 )
             )
         corrected_raw = inputs.get("corrected_from_assignments")

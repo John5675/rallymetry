@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -15,7 +16,11 @@ from pickleball_vision.persistence.models import (
     ProcessingJobRecord,
     SourceMediaType,
 )
-from pickleball_vision.workflows.setup import SETUP_FILENAMES, MatchSetupStager
+from pickleball_vision.workflows.setup import (
+    SETUP_FILENAMES,
+    MatchSetupStager,
+    _bind_calibration_to_runtime_source,
+)
 
 NOW = datetime(2026, 8, 20, 12, 0, tzinfo=UTC)
 
@@ -188,3 +193,24 @@ def test_workflow_accepts_explicit_shared_analysis_profile_owner(tmp_path: Path)
 
     assert {path.name for path in staged.values()} == set(SETUP_FILENAMES.values())
     assert len(store.destinations) == 4
+
+
+def test_runtime_calibration_binding_changes_only_the_staged_copy(tmp_path: Path) -> None:
+    staged = tmp_path / "input" / "calibration.json"
+    staged.parent.mkdir(parents=True)
+    staged.write_text(
+        '{"schema_version":2,"source":{"video_path":"/original/match.mp4"}}',
+        encoding="utf-8",
+    )
+    runtime_source = tmp_path / "input" / "source.mp4"
+
+    _bind_calibration_to_runtime_source(staged, source_path=runtime_source)
+
+    payload = json.loads(staged.read_text(encoding="utf-8"))
+    assert payload["source"]["video_path"] == str(runtime_source.resolve())
+    assert payload["runtime_binding"] == {
+        "mode": "temporary_hosted_copy",
+        "original_video_path": "/original/match.mp4",
+        "runtime_video_path": str(runtime_source.resolve()),
+        "original_artifact_modified": False,
+    }

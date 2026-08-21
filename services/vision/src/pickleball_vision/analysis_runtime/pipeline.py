@@ -298,11 +298,29 @@ class PlannedCliPipelineRunner(PipelineRunner):
                     stage=stage_plan.stage.value,
                 ) from error
             if return_code != 0:
+                detail = self._failure_detail(stderr_path, stdout_path)
+                suffix = f": {detail}" if detail else ""
                 raise AnalysisPipelineError(
-                    f"local CLI command {argv[0]} exited with status {return_code}",
+                    f"local CLI command {argv[0]} exited with status {return_code}{suffix}",
                     stage=stage_plan.stage.value,
                 )
         return self._load_results(job, workspace)
+
+    @staticmethod
+    def _failure_detail(*paths: Path) -> str:
+        for path in paths:
+            try:
+                with path.open("rb") as stream:
+                    stream.seek(0, os.SEEK_END)
+                    size = stream.tell()
+                    stream.seek(max(0, size - 8192))
+                    decoded = stream.read().decode("utf-8", errors="replace")
+            except OSError:
+                continue
+            lines = [line.strip() for line in decoded.splitlines() if line.strip()]
+            if lines:
+                return " | ".join(lines[-8:])[-2000:]
+        return ""
 
     @staticmethod
     def _substitute(argument: str, substitutions: Mapping[str, str]) -> str:
