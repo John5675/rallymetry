@@ -85,4 +85,47 @@ describe("ApiClient", () => {
       }),
     );
   });
+
+  it("creates and removes human corrections through FastAPI only", async () => {
+    const correction = {
+      correctionId: "correction-1",
+      correctionType: "SHOT_TYPE",
+      targetRecordId: "shot-1",
+    };
+    const fetchMock = vi
+      .fn()
+      .mockResolvedValueOnce(jsonResponse(correction, 201))
+      .mockResolvedValueOnce(new Response(null, { status: 204 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const client = new ApiClient("https://api.example.test");
+
+    await expect(
+      client.createCorrection("match-1", {
+        correctionType: "SHOT_TYPE",
+        targetRecordId: "shot-1",
+        humanCorrection: { shotType: "DRIVE" },
+        verified: true,
+      }),
+    ).resolves.toEqual(correction);
+    await expect(client.removeCorrection("match-1", "correction-1")).resolves.toBeUndefined();
+
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      "https://api.example.test/api/matches/match-1/corrections",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          correctionType: "SHOT_TYPE",
+          targetRecordId: "shot-1",
+          humanCorrection: { shotType: "DRIVE" },
+          verified: true,
+        }),
+      }),
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      "https://api.example.test/api/matches/match-1/corrections/correction-1",
+      expect.objectContaining({ method: "DELETE" }),
+    );
+  });
 });

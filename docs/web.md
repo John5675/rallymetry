@@ -10,7 +10,7 @@ engine, media downloader, workflow runner, persistence adapter, or credential bo
 | --- | --- |
 | `/` | Redirect to the match library |
 | `/matches` | Match title, date, logical players, processing state, public thumbnail |
-| `/matches/:matchId` | Overview, video/timeline, players, rallies, shots, and court maps |
+| `/matches/:matchId` | Overview, video/timeline, players, rallies, shots, court maps, and human corrections |
 | `/matches/:matchId/analysis` | Deterministic player, position, tactical, provenance, and landing analysis |
 
 Vite owns the local development fallback for these client routes. The repository
@@ -31,9 +31,21 @@ MongoDB URL, Blob token, or any other secret in a `VITE_*` variable because Vite
 exposes those values to browser code.
 
 The client loads match-scoped players, rallies, shots, contacts, bounces, analytics,
-and artifact manifests. List endpoints are consumed through their documented
+corrections, and artifact manifests. List endpoints are consumed through their documented
 pagination envelope. FastAPI error envelopes become typed client errors. A missing
 analytics record stays unavailable rather than being approximated in React.
+
+## Human correction workspace
+
+The match page supports player identity, rally boundary, bounce, hitter, and shot
+type review. Its comparison surface labels the immutable value as **AI prediction**
+and the separate review value as **Human correction**. Saving an existing target
+creates a new revision; removing it restores the machine semantic value without
+deleting either source prediction or the correction audit record. Only corrections
+marked verified are used by API effective views and correction-aware analytics.
+
+The browser sends compact semantic values and optional notes. It never edits MongoDB
+directly, uploads model artifacts through this workflow, or recalculates analytics.
 
 ## Media and timeline behavior
 

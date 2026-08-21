@@ -4,6 +4,7 @@ from fastapi import FastAPI
 
 from pickleball_vision.api.routes import (
     analytics,
+    corrections,
     events,
     health,
     jobs,
@@ -22,6 +23,7 @@ def include_routes(app: FastAPI) -> None:
     app.include_router(shots.router)
     app.include_router(events.router)
     app.include_router(analytics.router)
+    app.include_router(corrections.router)
     app.include_router(jobs.router)
 
 

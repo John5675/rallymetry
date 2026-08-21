@@ -7,6 +7,7 @@ from datetime import datetime
 from pydantic import Field
 
 from pickleball_vision.api.schemas.common import ApiOutputModel, Identifier, JsonObject
+from pickleball_vision.api.schemas.corrections import CorrectionResponse
 
 
 class PlayerResponse(ApiOutputModel):
@@ -16,6 +17,8 @@ class PlayerResponse(ApiOutputModel):
     logical_identity: str | None = None
     team: str | None = None
     metadata: JsonObject = Field(default_factory=dict)
+    effective_player: JsonObject | None = None
+    verified_corrections: list[CorrectionResponse] = Field(default_factory=list)
     created_at: datetime
     updated_at: datetime
 
@@ -29,6 +32,8 @@ class DomainRecordResponse(ApiOutputModel):
     match_id: Identifier
     record_id: Identifier
     payload: JsonObject
+    effective_payload: JsonObject = Field(default_factory=dict)
+    verified_corrections: list[CorrectionResponse] = Field(default_factory=list)
     confidence: float | None = Field(default=None, ge=0, le=1)
     timestamp_seconds: float | None = Field(default=None, ge=0)
     pipeline_version: str | None = None
@@ -48,6 +53,8 @@ class AnalyticsResponse(ApiOutputModel):
     analytics_id: Identifier
     calculation_version: str
     metrics: JsonObject
+    prediction_metrics: JsonObject | None = None
+    applied_correction_ids: list[str] = Field(default_factory=list)
     input_artifact_ids: list[str] = Field(default_factory=list)
     pipeline_version: str | None = None
     created_at: datetime

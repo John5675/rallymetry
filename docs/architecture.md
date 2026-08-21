@@ -100,7 +100,10 @@ derived-event boundaries and never turns infrastructure state into match evidenc
 
 The workflow may call stable Python interfaces or the preserved CLI boundary. Hosted
 concerns must not be spread through detector, calibration, tracking, audio, or
-analytics modules.
+analytics modules. The human-correction layer is append/revision oriented: machine
+records remain unchanged, MongoDB stores a separate target-specific correction, and
+API projections resolve only active verified corrections. This gives the dashboard
+an effective semantic view while retaining predictions for audit and evaluation.
 
 ### MongoDB Atlas
 

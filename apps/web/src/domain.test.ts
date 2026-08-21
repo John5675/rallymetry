@@ -71,6 +71,28 @@ describe("dashboard domain projections", () => {
     expect(points[0]).toEqual(expect.objectContaining({ id: "known", x: 2.1, y: 8.4 }));
   });
 
+  it("uses verified effective semantics while retaining raw records", () => {
+    const correctedBounce = record("b1", { bounceId: "bounce-1", timestamp: 4 });
+    correctedBounce.effectivePayload = {
+      bounceId: "bounce-1",
+      timestampSeconds: 4.2,
+      isBounce: false,
+    };
+    const correctedShot = record("s1", {
+      shotId: "shot-1",
+      shotType: "UNKNOWN",
+      landingCourtPosition: { x: 1, y: 2 },
+    });
+    correctedShot.effectivePayload = {
+      ...correctedShot.payload,
+      shotType: "DRIVE",
+    };
+
+    expect(buildTimelineEvents([], [], [correctedBounce], [])).toEqual([]);
+    expect(shotCourtPoints([correctedShot])[0]?.shotType).toBe("DRIVE");
+    expect(correctedShot.payload.shotType).toBe("UNKNOWN");
+  });
+
   it("never selects a private artifact as browser-playable media", () => {
     expect(findPrimaryVideo([artifact({ access: "PRIVATE" })])).toBeNull();
     expect(findPrimaryVideo([artifact({ access: "PUBLIC" })])?.url).toContain("blob.example");

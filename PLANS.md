@@ -854,9 +854,43 @@ Exit criteria:
 - Python and frontend tests, lint, formatting, type checks, builds, and the CLI doctor
   pass.
 
+## 24. Human correction workflow — complete
+
+Add an auditable correction layer for machine-derived player identities, rally
+boundaries, bounces, hitters, and shot types. Corrections remain separate from
+immutable predictions, can be removed without data loss, and are suitable for
+later human-reviewed evaluation or training exports.
+
+Exit criteria:
+
+- A versioned correction record retains match and target identity, correction type,
+  the original prediction/value, prediction confidence and version, the separate
+  human correction, reviewer verification state, timestamps, and optional visual or
+  audio evidence references.
+- Corrections live in the dedicated MongoDB `corrections` collection behind the
+  persistence abstraction; unique active-target constraints prevent ambiguous
+  competing corrections while revision timestamps remain auditable.
+- FastAPI exposes match-scoped list/create/update/delete endpoints with validated,
+  BSON-free schemas, stable error responses, and no CV/ML execution in requests.
+- Player, rally, bounce, hitter, and shot-type corrections validate target-specific
+  value shapes and never mutate or delete the original structured prediction.
+- API reads expose both the machine prediction and any verified corrected semantic
+  value. Analytics correction resolution uses verified corrections where relevant
+  while retaining the source prediction for audit and evaluation.
+- The React dashboard clearly distinguishes AI predictions from verified human
+  corrections and supports creating, editing, and removing corrections without
+  direct MongoDB access or browser credentials.
+- Correction records retain enough provenance to export human-verified examples
+  later, but this milestone does not train or tune a model from them.
+- Persistence, API, correction-resolution, and frontend tests prove that creating,
+  updating, applying, and deleting corrections never destroy original predictions.
+- Python and frontend tests, lint, formatting, type checks, builds, and the CLI
+  doctor pass.
+- No AI coaching, authentication, model retraining, or final quality-audit behavior
+  is introduced.
+
 ## Future milestones — not current
 
-24. Human correction workflow
 25. AI coaching
 26. Final architecture / quality audit
 

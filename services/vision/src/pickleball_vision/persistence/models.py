@@ -542,16 +542,29 @@ class ProcessingJobRecord:
 
 @dataclass(frozen=True, slots=True)
 class CorrectionRecord:
-    """Persistable correction proposal; the editing workflow is Milestone 24."""
+    """Auditable human correction that never replaces its prediction snapshot."""
 
     correction_id: str
     match_id: str
+    correction_type: str
     target_collection: str
     target_record_id: str
-    changes: Mapping[str, object]
+    prediction: Mapping[str, object]
+    human_correction: Mapping[str, object]
+    prediction_confidence: float | None = None
+    prediction_version: str | None = None
+    verified: bool = True
     reason: str | None = None
-    created_by: str | None = None
+    corrected_by: str | None = None
+    visual_evidence: Mapping[str, object] | None = None
+    audio_evidence: Mapping[str, object] | None = None
+    active: bool = True
+    revision: int = 1
+    history: tuple[Mapping[str, object], ...] = ()
     created_at: datetime = field(default_factory=utc_now)
+    corrected_at: datetime = field(default_factory=utc_now)
+    updated_at: datetime = field(default_factory=utc_now)
+    deleted_at: datetime | None = None
 
     def __post_init__(self) -> None:
         object.__setattr__(
@@ -562,6 +575,11 @@ class CorrectionRecord:
         object.__setattr__(self, "match_id", _required_text(self.match_id, "match_id"))
         object.__setattr__(
             self,
+            "correction_type",
+            _required_text(self.correction_type, "correction_type"),
+        )
+        object.__setattr__(
+            self,
             "target_collection",
             _required_text(self.target_collection, "target_collection"),
         )
@@ -570,29 +588,82 @@ class CorrectionRecord:
             "target_record_id",
             _required_text(self.target_record_id, "target_record_id"),
         )
-        object.__setattr__(self, "changes", _copy_mapping(self.changes, "changes"))
+        object.__setattr__(self, "prediction", _copy_mapping(self.prediction, "prediction"))
+        object.__setattr__(
+            self,
+            "human_correction",
+            _copy_mapping(self.human_correction, "human_correction"),
+        )
+        if self.prediction_confidence is not None and not 0 <= self.prediction_confidence <= 1:
+            raise PersistenceValidationError("prediction_confidence must be between zero and one")
+        object.__setattr__(
+            self,
+            "prediction_version",
+            _optional_text(self.prediction_version, "prediction_version"),
+        )
         object.__setattr__(self, "reason", _optional_text(self.reason, "reason"))
         object.__setattr__(
             self,
-            "created_by",
-            _optional_text(self.created_by, "created_by"),
+            "corrected_by",
+            _optional_text(self.corrected_by, "corrected_by"),
+        )
+        if self.visual_evidence is not None:
+            object.__setattr__(
+                self,
+                "visual_evidence",
+                _copy_mapping(self.visual_evidence, "visual_evidence"),
+            )
+        if self.audio_evidence is not None:
+            object.__setattr__(
+                self,
+                "audio_evidence",
+                _copy_mapping(self.audio_evidence, "audio_evidence"),
+            )
+        if self.revision < 1:
+            raise PersistenceValidationError("correction revision must be positive")
+        object.__setattr__(
+            self,
+            "history",
+            tuple(_copy_mapping(item, "history item") for item in self.history),
         )
         object.__setattr__(self, "created_at", _utc_datetime(self.created_at, "created_at"))
+        object.__setattr__(self, "corrected_at", _utc_datetime(self.corrected_at, "corrected_at"))
+        object.__setattr__(self, "updated_at", _utc_datetime(self.updated_at, "updated_at"))
+        if self.deleted_at is not None:
+            object.__setattr__(self, "deleted_at", _utc_datetime(self.deleted_at, "deleted_at"))
+        if self.active and self.deleted_at is not None:
+            raise PersistenceValidationError("active correction cannot have deleted_at")
 
     def to_document(self) -> Document:
         document: Document = {
             "_id": self.correction_id,
             "correctionId": self.correction_id,
             "matchId": self.match_id,
+            "correctionType": self.correction_type,
             "targetCollection": self.target_collection,
             "targetRecordId": self.target_record_id,
-            "changes": dict(self.changes),
+            "prediction": dict(self.prediction),
+            "predictionConfidence": self.prediction_confidence,
+            "predictionVersion": self.prediction_version,
+            "humanCorrection": dict(self.human_correction),
+            "verified": self.verified,
+            "active": self.active,
+            "revision": self.revision,
+            "history": [dict(item) for item in self.history],
             "createdAt": self.created_at,
+            "correctedAt": self.corrected_at,
+            "updatedAt": self.updated_at,
         }
         if self.reason is not None:
             document["reason"] = self.reason
-        if self.created_by is not None:
-            document["createdBy"] = self.created_by
+        if self.corrected_by is not None:
+            document["correctedBy"] = self.corrected_by
+        if self.visual_evidence is not None:
+            document["visualEvidence"] = dict(self.visual_evidence)
+        if self.audio_evidence is not None:
+            document["audioEvidence"] = dict(self.audio_evidence)
+        if self.deleted_at is not None:
+            document["deletedAt"] = self.deleted_at
         return document
 
 

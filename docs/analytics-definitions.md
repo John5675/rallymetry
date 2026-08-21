@@ -219,6 +219,24 @@ layers. Shot classes are interpretive labels, not match statistics.
 
 ## Deterministic match analytics 1.0
 
+### Verified human correction precedence
+
+Hosted analytics reads resolve active, verified corrections before calculating
+correction-sensitive semantic metrics. The precedence is:
+
+1. immutable structured machine prediction;
+2. active verified human correction for the same match/type/target;
+3. no correction when the record is unverified, removed, or invalid.
+
+Rally-boundary revisions affect duration-based rally metrics. Hitter, shot-type, and
+player-identity revisions affect hit counts, classified/unknown counts, per-class
+rates, and third-shot rates. Bounce corrections are retained for downstream
+bounce-based analysis but do not create an undefined statistic. Position metrics
+remain derived from structured player positions and are not changed by unrelated
+event corrections. API analytics returns the original `predictionMetrics` alongside
+the effective `metrics` and the applied correction IDs, so evaluation never loses
+the machine baseline.
+
 Milestone 18 adds `match_analytics_1.0`. It consumes only validated, versioned
 `Rally`, `Shot`, and `PlayerPosition` records from `rallies.json`, `shots.json`, and
 `player_positions.json`. A `Shot` retains its `Contact` link and optional `Bounce`

@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Protocol
 
 from pickleball_vision.persistence.models import (
+    CorrectionRecord,
     Document,
     MatchRecord,
     ProcessingJobRecord,
@@ -38,6 +39,15 @@ class ApplicationPersistence(Protocol):
     ) -> Document | None: ...
 
     async def list_match_players(self, match_id: str) -> tuple[Document, ...]: ...
+
+    async def get_match_player(self, match_id: str, player_id: str) -> Document | None: ...
+
+    async def get_match_domain_record(
+        self,
+        collection: str,
+        match_id: str,
+        record_id: str,
+    ) -> Document | None: ...
 
     async def list_match_rallies(
         self,
@@ -95,6 +105,17 @@ class ApplicationPersistence(Protocol):
     async def get_latest_processing_job_for_match(self, match_id: str) -> Document | None: ...
 
     async def get_artifact(self, artifact_id: str) -> Document | None: ...
+
+    async def save_correction(self, record: CorrectionRecord) -> None: ...
+
+    async def get_correction(self, correction_id: str) -> Document | None: ...
+
+    async def list_match_corrections(
+        self,
+        match_id: str,
+        *,
+        active_only: bool = True,
+    ) -> tuple[Document, ...]: ...
 
 
 def copy_documents(documents: Sequence[Document]) -> tuple[Document, ...]:

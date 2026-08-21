@@ -197,6 +197,12 @@ def test_mongodb_adapter_initializes_indexes_and_separate_collections() -> None:
         index["name"] == "uq_artifacts_pathname" and index["unique"] is True
         for index in database["artifacts"].indexes
     )
+    assert any(
+        index["name"] == "uq_corrections_active_target"
+        and index["unique"] is True
+        and index["partialFilterExpression"] == {"active": True}
+        for index in database["corrections"].indexes
+    )
 
 
 def test_mongodb_adapter_persists_compact_records_without_one_huge_match_document() -> None:
@@ -242,10 +248,16 @@ def test_mongodb_adapter_persists_compact_records_without_one_huge_match_documen
     correction = CorrectionRecord(
         correction_id="correction-1",
         match_id="match-1",
+        correction_type="RALLY_BOUNDARY",
         target_collection="rallies",
         target_record_id="rally-1",
-        changes={"winnerTeam": "NEAR"},
+        prediction={"startFrame": 10, "endFrame": 100},
+        prediction_confidence=0.8,
+        prediction_version="rally-v1",
+        human_correction={"startFrame": 12, "endFrame": 98},
         created_at=NOW,
+        corrected_at=NOW,
+        updated_at=NOW,
     )
     artifact = ArtifactRecord(
         artifact_id="artifact-source",
@@ -315,6 +327,49 @@ def test_processing_job_creation_is_atomic_per_active_match() -> None:
     assert first_created is True
     assert second_created is False
     assert first_document["jobId"] == second_document["jobId"] == "job-1"
+
+
+def test_correction_prediction_snapshot_is_immutable_at_persistence_boundary() -> None:
+    database = FakeDatabase()
+    persistence = MongoPersistence(database)
+    original = CorrectionRecord(
+        correction_id="correction-1",
+        match_id="match-1",
+        correction_type="SHOT_TYPE",
+        target_collection="shots",
+        target_record_id="shot-1",
+        prediction={"shotType": "UNKNOWN"},
+        prediction_confidence=0.4,
+        prediction_version="shots-v1",
+        human_correction={"shotType": "DRIVE"},
+        created_at=NOW,
+        corrected_at=NOW,
+        updated_at=NOW,
+    )
+    corrupted = CorrectionRecord(
+        correction_id="correction-1",
+        match_id="match-1",
+        correction_type="SHOT_TYPE",
+        target_collection="shots",
+        target_record_id="shot-1",
+        prediction={"shotType": "SERVE"},
+        prediction_confidence=0.9,
+        prediction_version="shots-v2",
+        human_correction={"shotType": "DRIVE"},
+        revision=2,
+        created_at=NOW,
+        corrected_at=NOW,
+        updated_at=NOW,
+    )
+
+    asyncio.run(persistence.save_correction(original))
+    with pytest.raises(PersistenceValidationError):
+        asyncio.run(persistence.save_correction(corrupted))
+
+    stored = asyncio.run(persistence.get_correction("correction-1"))
+    assert stored is not None
+    assert stored["prediction"] == {"shotType": "UNKNOWN"}
+    assert stored["predictionVersion"] == "shots-v1"
 
 
 @pytest.mark.parametrize(

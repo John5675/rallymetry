@@ -85,7 +85,7 @@ a match does not become one unbounded document.
 | `shots` | Structured shot records | unique match/record; match/time |
 | `analytics` | Deterministic metrics, calculation version, input references | unique match/analytics ID |
 | `processing_jobs` | Workflow status, progress, attempts, Render/run IDs, errors, source/result references | match/create time; status/update time; unique active match |
-| `corrections` | Versionable correction records for the later workflow | match/target |
+| `corrections` | Immutable prediction snapshots plus revisioned human semantic corrections | unique active match/type/target; match/corrected time |
 | `artifacts` | Provider-neutral artifact manifests | unique pathname; match/time; match/category |
 
 Render Workflows owns task queuing/execution; MongoDB is not polled as a queue. The
@@ -99,6 +99,19 @@ known inline binary fields, rejects unsafe MongoDB keys, rejects non-finite numb
 and enforces a conservative 2 MiB application document ceiling. In particular,
 MP4 data, raw frames, audio waveforms, weights, huge detection arrays, and debug
 artifact bytes must be placed in an artifact store and referenced by ID.
+
+### Correction integrity
+
+One active correction may exist for a match, correction type, collection, and target
+record. The document stores the original `prediction`, its confidence/version, the
+current `humanCorrection`, reviewer verification, optional multimodal evidence,
+revision history, and correction/removal timestamps. Persistence rejects any update
+that changes the target or prediction snapshot. API removal is a soft removal so the
+review history remains useful for audit and future evaluation/training export.
+
+Corrections never modify `players`, `rallies`, `bounces`, or `shots`. Consumers build
+an effective semantic view from active verified corrections while the original
+machine collections remain byte-for-byte available.
 
 ## Artifact contract
 

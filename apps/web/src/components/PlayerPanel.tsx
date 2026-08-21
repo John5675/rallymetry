@@ -18,7 +18,11 @@ interface PlayerPanelProps {
 const SHOT_TYPES = ["DINK", "DRIVE", "DROP", "VOLLEY", "OVERHEAD"] as const;
 
 export function PlayerPanel({ player, analytics, artifacts }: PlayerPanelProps) {
-  const identity = player.logicalIdentity ?? player.playerId;
+  const effectiveIdentity = player.effectivePlayer?.logicalIdentity;
+  const identity =
+    typeof effectiveIdentity === "string"
+      ? effectiveIdentity
+      : player.logicalIdentity ?? player.playerId;
   const totalHits = metricNumber(analytics, ["players", identity, "totalHits"]);
   const distance = metricNumber(analytics, [
     "players",
@@ -49,6 +53,11 @@ export function PlayerPanel({ player, analytics, artifacts }: PlayerPanelProps) 
           <span>{player.logicalIdentity?.replaceAll("_", " ") ?? "Player"}</span>
           <h3>{playerName(player)}</h3>
           <p>{player.team ?? "Team not assigned"}</p>
+          {(player.verifiedCorrections?.length ?? 0) > 0 ? (
+            <small className="human-correction-note">
+              Human corrected · AI: {player.displayName ?? player.logicalIdentity ?? player.playerId}
+            </small>
+          ) : null}
         </div>
       </header>
       <div className="player-mini-metrics">

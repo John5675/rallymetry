@@ -69,6 +69,10 @@ browser code.
 | `GET` | `/api/matches/{matchId}/bounces` | Paginated structured bounces |
 | `GET` | `/api/matches/{matchId}/analytics` | Latest deterministic analytics record |
 | `GET` | `/api/matches/{matchId}/artifacts` | Artifact manifests, not artifact bytes |
+| `GET` | `/api/matches/{matchId}/corrections` | Active human correction ledger |
+| `POST` | `/api/matches/{matchId}/corrections` | Create a correction with an immutable prediction snapshot (`201`) |
+| `PATCH` | `/api/matches/{matchId}/corrections/{correctionId}` | Add a human correction revision |
+| `DELETE` | `/api/matches/{matchId}/corrections/{correctionId}` | Soft-remove a correction without touching its prediction (`204`) |
 | `POST` | `/api/matches/{matchId}/process` | Persist a queued analysis job (`202`) |
 | `GET` | `/api/jobs/{jobId}` | Durable job status |
 
@@ -76,6 +80,28 @@ List endpoints use `limit` (default 50, maximum 100) and `offset` where the
 collection can grow. API schemas expose application IDs such as `matchId`, `jobId`,
 and `recordId`; MongoDB `_id`, BSON types, driver errors, and credentials are not part
 of the response contract.
+
+Player and structured-domain responses retain their machine fields and additionally
+expose verified correction projections. `payload` is always the original prediction;
+`effectivePayload` is the semantic value after active verified corrections, and
+`verifiedCorrections` identifies the human records that produced it. Analytics
+similarly returns correction-aware `metrics`, the untouched `predictionMetrics`, and
+`appliedCorrectionIds`. Unverified corrections remain visible in the correction
+ledger but do not affect effective reads or analytics.
+
+## Human correction contract
+
+Corrections support `PLAYER_IDENTITY`, `RALLY_BOUNDARY`, `BOUNCE`, `HITTER`, and
+`SHOT_TYPE`. The server derives and validates the target collection; clients cannot
+redirect a correction into an arbitrary collection. Creation snapshots
+`prediction`, `predictionConfidence`, and `predictionVersion` from the target record.
+Later edits may change only the human layer, verification/evidence, and review note.
+Each update increments `revision` and retains the superseded human value in
+`history`. Removal sets the correction inactive; it does not delete or alter the
+machine record.
+
+Optional `visualEvidence` and `audioEvidence` are compact structured references or
+summaries only. Video, images, waveforms, and other binaries remain artifacts.
 
 `youtubeVideoId`, when provided, is the exact 11-character YouTube video ID using
 letters, numbers, `_`, or `-`. It is metadata for browser embedding; the API does

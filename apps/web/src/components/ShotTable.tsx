@@ -36,18 +36,22 @@ export function ShotTable({ shots, players }: ShotTableProps) {
         </thead>
         <tbody>
           {ordered.map((shot) => {
-            const landing = asObject(shot.payload.landingCourtPosition);
+            const payload = shot.effectivePayload ?? shot.payload;
+            const corrected = (shot.verifiedCorrections?.length ?? 0) > 0;
+            const landing = asObject(payload.landingCourtPosition);
             const x = landing === null ? null : numberValue(landing, "x");
             const y = landing === null ? null : numberValue(landing, "y");
             const timestamp =
-              numberValue(shot.payload, "contactTimestamp") ?? shot.timestampSeconds;
-            const confidence = numberValue(shot.payload, "confidence") ?? shot.confidence;
+              numberValue(payload, "contactTimestamp") ?? shot.timestampSeconds;
+            const confidence = numberValue(payload, "confidence") ?? shot.confidence;
+            const hitter = stringValue(payload, "hitterId");
+            const shotType = stringValue(payload, "shotType") ?? "UNKNOWN";
             return (
               <tr key={shot.recordId}>
-                <td><strong>#{numberValue(shot.payload, "shotIndex") ?? "N/A"}</strong></td>
-                <td>{stringValue(shot.payload, "rallyId") ?? "N/A"}</td>
-                <td>{playerNameById(players, stringValue(shot.payload, "hitterId"))}</td>
-                <td><span className="shot-type">{stringValue(shot.payload, "shotType") ?? "UNKNOWN"}</span></td>
+                <td><strong>#{numberValue(payload, "shotIndex") ?? "N/A"}</strong></td>
+                <td>{stringValue(payload, "rallyId") ?? "N/A"}</td>
+                <td>{playerNameById(players, hitter)}{corrected && hitter !== stringValue(shot.payload, "hitterId") ? <small className="human-correction-note">AI: {playerNameById(players, stringValue(shot.payload, "hitterId"))}</small> : null}</td>
+                <td><span className="shot-type">{shotType}</span>{corrected && shotType !== stringValue(shot.payload, "shotType") ? <small className="human-correction-note">AI: {stringValue(shot.payload, "shotType") ?? "UNKNOWN"}</small> : null}</td>
                 <td>{formatDuration(timestamp)}</td>
                 <td>{formatConfidence(confidence)}</td>
                 <td>{x === null || y === null ? "N/A" : `${x.toFixed(2)}, ${y.toFixed(2)}`}</td>

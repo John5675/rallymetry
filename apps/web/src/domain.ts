@@ -88,7 +88,11 @@ export function analyticsNumber(
 }
 
 export function playerName(player: Player): string {
-  return player.displayName ?? player.logicalIdentity ?? player.playerId;
+  const corrected = player.effectivePlayer;
+  const correctedName = corrected?.displayName ?? corrected?.logicalIdentity ?? corrected?.playerId;
+  return typeof correctedName === "string"
+    ? correctedName
+    : player.displayName ?? player.logicalIdentity ?? player.playerId;
 }
 
 export function playerNameById(players: Player[], playerId: string | null): string {
@@ -160,8 +164,9 @@ export function findPrimaryVideo(artifacts: Artifact[]): Artifact | null {
 }
 
 function recordTimestamp(record: DomainRecord, ...payloadKeys: string[]): number | null {
+  const payload = record.effectivePayload ?? record.payload;
   for (const key of payloadKeys) {
-    const value = numberValue(record.payload, key);
+    const value = numberValue(payload, key);
     if (value !== null) {
       return value;
     }
@@ -170,9 +175,10 @@ function recordTimestamp(record: DomainRecord, ...payloadKeys: string[]): number
 }
 
 function recordConfidence(record: DomainRecord): number | null {
+  const payload = record.effectivePayload ?? record.payload;
   return (
-    numberValue(record.payload, "fusedConfidence") ??
-    numberValue(record.payload, "confidence") ??
+    numberValue(payload, "fusedConfidence") ??
+    numberValue(payload, "confidence") ??
     record.confidence
   );
 }
@@ -185,7 +191,8 @@ export function buildTimelineEvents(
 ): TimelineEvent[] {
   const events: TimelineEvent[] = [];
   for (const rally of rallies) {
-    const rallyId = stringValue(rally.payload, "rallyId") ?? rally.recordId;
+    const payload = rally.effectivePayload ?? rally.payload;
+    const rallyId = stringValue(payload, "rallyId") ?? rally.recordId;
     const start = recordTimestamp(rally, "startTimestamp");
     const end = recordTimestamp(rally, "endTimestamp");
     if (start !== null) {
@@ -213,12 +220,20 @@ export function buildTimelineEvents(
     ["shot", shots, "shotId"],
   ] as const) {
     for (const record of records) {
-      const timestamp = recordTimestamp(record, "timestamp", "contactTimestamp", "mediaTimestamp");
+      const payload = record.effectivePayload ?? record.payload;
+      if (kind === "bounce" && payload.isBounce === false) continue;
+      const timestamp = recordTimestamp(
+        record,
+        "timestamp",
+        "timestampSeconds",
+        "contactTimestamp",
+        "mediaTimestamp",
+      );
       if (timestamp !== null) {
         events.push({
           id: `${kind}-${record.recordId}`,
           kind,
-          label: stringValue(record.payload, key) ?? record.recordId,
+          label: stringValue(payload, key) ?? record.recordId,
           timestampSeconds: timestamp,
           confidence: recordConfidence(record),
         });
@@ -231,7 +246,8 @@ export function buildTimelineEvents(
 export function shotCourtPoints(shots: DomainRecord[]): CourtPoint[] {
   const points: CourtPoint[] = [];
   for (const shot of shots) {
-    const landing = asObject(shot.payload.landingCourtPosition);
+    const payload = shot.effectivePayload ?? shot.payload;
+    const landing = asObject(payload.landingCourtPosition);
     const x = landing === null ? null : numberValue(landing, "x");
     const y = landing === null ? null : numberValue(landing, "y");
     if (
@@ -248,8 +264,8 @@ export function shotCourtPoints(shots: DomainRecord[]): CourtPoint[] {
       id: shot.recordId,
       x,
       y,
-      label: stringValue(shot.payload, "shotId") ?? shot.recordId,
-      shotType: stringValue(shot.payload, "shotType") ?? "UNKNOWN",
+      label: stringValue(payload, "shotId") ?? shot.recordId,
+      shotType: stringValue(payload, "shotType") ?? "UNKNOWN",
       confidence: recordConfidence(shot),
     });
   }

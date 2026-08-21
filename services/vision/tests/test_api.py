@@ -17,6 +17,7 @@ from pickleball_vision.persistence.models import (
     ArtifactCategory,
     ArtifactProvider,
     ArtifactRecord,
+    CorrectionRecord,
     Document,
     MatchRecord,
     PlayerRecord,
@@ -38,6 +39,7 @@ class InMemoryApplicationPersistence:
         self.analytics: list[Document] = []
         self.artifacts: list[Document] = []
         self.jobs: dict[str, Document] = {}
+        self.corrections: dict[str, Document] = {}
 
     async def save_match(self, record: MatchRecord) -> None:
         self.matches[record.match_id] = record.to_document()
@@ -85,6 +87,33 @@ class InMemoryApplicationPersistence:
 
     async def list_match_players(self, match_id: str) -> tuple[Document, ...]:
         return tuple(dict(document) for document in self.players if document["matchId"] == match_id)
+
+    async def get_match_player(self, match_id: str, player_id: str) -> Document | None:
+        return next(
+            (
+                dict(document)
+                for document in self.players
+                if document["matchId"] == match_id and document["playerId"] == player_id
+            ),
+            None,
+        )
+
+    async def get_match_domain_record(
+        self,
+        collection: str,
+        match_id: str,
+        record_id: str,
+    ) -> Document | None:
+        documents = getattr(self, collection)
+        assert isinstance(documents, list)
+        return next(
+            (
+                dict(document)
+                for document in documents
+                if document["matchId"] == match_id and document["recordId"] == record_id
+            ),
+            None,
+        )
 
     async def list_match_rallies(
         self,
@@ -184,6 +213,31 @@ class InMemoryApplicationPersistence:
             if document.get("artifactId") == artifact_id:
                 return dict(document)
         return None
+
+    async def save_correction(self, record: CorrectionRecord) -> None:
+        replacement = record.to_document()
+        existing = self.corrections.get(record.correction_id)
+        if existing is not None:
+            assert existing["prediction"] == replacement["prediction"]
+            assert existing["predictionVersion"] == replacement["predictionVersion"]
+        self.corrections[record.correction_id] = replacement
+
+    async def get_correction(self, correction_id: str) -> Document | None:
+        document = self.corrections.get(correction_id)
+        return dict(document) if document is not None else None
+
+    async def list_match_corrections(
+        self,
+        match_id: str,
+        *,
+        active_only: bool = True,
+    ) -> tuple[Document, ...]:
+        return tuple(
+            dict(document)
+            for document in self.corrections.values()
+            if document["matchId"] == match_id
+            and (not active_only or document.get("active") is True)
+        )
 
     async def save_artifact(self, record: ArtifactRecord) -> None:
         document = record.to_document()
@@ -458,6 +512,72 @@ def test_match_scoped_structured_endpoints_do_not_expose_mongo_ids() -> None:
     for response in (players, rallies, shots, contacts, bounces, analytics, artifacts):
         assert response.status_code == 200
         assert "_id" not in response.text
+
+
+def test_correction_crud_preserves_prediction_and_exposes_effective_semantics() -> None:
+    persistence = seed_persistence()
+    app = create_app(settings=ApiSettings(), persistence=persistence)
+
+    with TestClient(app) as client:
+        created = client.post(
+            "/api/matches/match_seed/corrections",
+            json={
+                "correctionType": "SHOT_TYPE",
+                "targetRecordId": "shot_1",
+                "humanCorrection": {"shotType": "DRIVE"},
+                "verified": True,
+                "reason": "Frame review shows a hard drive",
+            },
+        )
+        correction_id = created.json()["correctionId"]
+        shots = client.get("/api/matches/match_seed/shots")
+        analytics = client.get("/api/matches/match_seed/analytics")
+        updated = client.patch(
+            f"/api/matches/match_seed/corrections/{correction_id}",
+            json={"humanCorrection": {"shotType": "RETURN"}},
+        )
+        removed = client.delete(f"/api/matches/match_seed/corrections/{correction_id}")
+        after_removal = client.get("/api/matches/match_seed/shots")
+        listed = client.get("/api/matches/match_seed/corrections")
+
+    assert created.status_code == 201
+    assert created.json()["prediction"] == {"shotType": "SERVE"}
+    assert shots.json()["items"][0]["payload"]["shotType"] == "SERVE"
+    assert shots.json()["items"][0]["effectivePayload"]["shotType"] == "DRIVE"
+    assert analytics.json()["predictionMetrics"] == {"rallyCount": {"value": 1}}
+    assert analytics.json()["appliedCorrectionIds"] == [correction_id]
+    assert updated.status_code == 200
+    assert updated.json()["prediction"] == created.json()["prediction"]
+    assert updated.json()["predictionVersion"] == created.json()["predictionVersion"]
+    assert updated.json()["revision"] == 2
+    assert updated.json()["history"][0]["humanCorrection"] == {"shotType": "DRIVE"}
+    assert removed.status_code == 204
+    assert listed.json() == {"items": [], "total": 0}
+    assert after_removal.json()["items"][0]["payload"]["shotType"] == "SERVE"
+    assert after_removal.json()["items"][0]["effectivePayload"]["shotType"] == "SERVE"
+
+
+def test_correction_rejects_unknown_target_and_duplicate_active_layer() -> None:
+    persistence = seed_persistence()
+    app = create_app(settings=ApiSettings(), persistence=persistence)
+    request = {
+        "correctionType": "HITTER",
+        "targetRecordId": "shot_1",
+        "humanCorrection": {"playerId": "PARTNER"},
+    }
+
+    with TestClient(app) as client:
+        missing = client.post(
+            "/api/matches/match_seed/corrections",
+            json={**request, "targetRecordId": "shot_missing"},
+        )
+        first = client.post("/api/matches/match_seed/corrections", json=request)
+        duplicate = client.post("/api/matches/match_seed/corrections", json=request)
+
+    assert missing.status_code == 404
+    assert first.status_code == 201
+    assert duplicate.status_code == 409
+    assert duplicate.json()["error"]["code"] == "correction_exists"
 
 
 def test_process_endpoint_only_persists_queued_job_and_returns_202() -> None:

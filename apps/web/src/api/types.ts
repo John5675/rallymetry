@@ -62,6 +62,8 @@ export interface Player {
   logicalIdentity: string | null;
   team: string | null;
   metadata: Record<string, JsonValue>;
+  effectivePlayer?: Record<string, JsonValue> | null;
+  verifiedCorrections?: Correction[];
   createdAt: string;
   updatedAt: string;
 }
@@ -70,6 +72,8 @@ export interface DomainRecord {
   matchId: string;
   recordId: string;
   payload: Record<string, JsonValue>;
+  effectivePayload?: Record<string, JsonValue>;
+  verifiedCorrections?: Correction[];
   confidence: number | null;
   timestampSeconds: number | null;
   pipelineVersion: string | null;
@@ -82,9 +86,51 @@ export interface Analytics {
   analyticsId: string;
   calculationVersion: string;
   metrics: Record<string, JsonValue>;
+  predictionMetrics?: Record<string, JsonValue> | null;
+  appliedCorrectionIds?: string[];
   inputArtifactIds: string[];
   pipelineVersion: string | null;
   createdAt: string;
+}
+
+export type CorrectionType =
+  | "PLAYER_IDENTITY"
+  | "RALLY_BOUNDARY"
+  | "BOUNCE"
+  | "HITTER"
+  | "SHOT_TYPE";
+
+export interface Correction {
+  correctionId: string;
+  matchId: string;
+  correctionType: CorrectionType;
+  targetCollection: string;
+  targetRecordId: string;
+  prediction: Record<string, JsonValue>;
+  predictionConfidence: number | null;
+  predictionVersion: string | null;
+  humanCorrection: Record<string, JsonValue>;
+  verified: boolean;
+  active: boolean;
+  revision: number;
+  history: Record<string, JsonValue>[];
+  reason: string | null;
+  correctedBy: string | null;
+  visualEvidence: Record<string, JsonValue> | null;
+  audioEvidence: Record<string, JsonValue> | null;
+  createdAt: string;
+  correctedAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+}
+
+export interface CorrectionInput {
+  correctionType: CorrectionType;
+  targetRecordId: string;
+  humanCorrection: Record<string, JsonValue>;
+  verified: boolean;
+  reason?: string;
+  correctedBy?: string;
 }
 
 export type ArtifactAccess = "PRIVATE" | "PUBLIC";
@@ -123,4 +169,5 @@ export interface MatchDashboardData {
   bounces: DomainRecord[];
   analytics: Analytics | null;
   artifacts: Artifact[];
+  corrections: Correction[];
 }

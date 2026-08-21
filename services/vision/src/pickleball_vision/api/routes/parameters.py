@@ -22,3 +22,12 @@ JobId = Annotated[
         pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
     ),
 ]
+CorrectionId = Annotated[
+    str,
+    Path(
+        alias="correctionId",
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9_.:-]*$",
+    ),
+]

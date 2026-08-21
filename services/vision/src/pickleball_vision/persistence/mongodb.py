@@ -275,12 +275,20 @@ class MongoPersistence:
                 (
                     (
                         ("matchId", ASCENDING),
+                        ("correctionType", ASCENDING),
                         ("targetCollection", ASCENDING),
                         ("targetRecordId", ASCENDING),
                     ),
+                    True,
+                    False,
+                    "uq_corrections_active_target",
+                    {"active": True},
+                ),
+                (
+                    (("matchId", ASCENDING), ("correctedAt", DESCENDING)),
                     False,
                     False,
-                    "ix_corrections_target",
+                    "ix_corrections_match_corrected",
                     None,
                 ),
             ),
@@ -483,7 +491,63 @@ class MongoPersistence:
             ) from error
 
     async def save_correction(self, record: CorrectionRecord) -> None:
+        existing = await self.get_correction(record.correction_id)
+        if existing is not None:
+            immutable = (
+                "matchId",
+                "correctionType",
+                "targetCollection",
+                "targetRecordId",
+                "prediction",
+                "predictionConfidence",
+                "predictionVersion",
+                "createdAt",
+            )
+            replacement = record.to_document()
+            changed = [
+                field for field in immutable if existing.get(field) != replacement.get(field)
+            ]
+            if changed:
+                raise PersistenceValidationError(
+                    "correction update attempted to change immutable prediction fields: "
+                    + ", ".join(changed)
+                )
         await self._replace("corrections", record.to_document(), "save_correction")
+
+    async def get_correction(self, correction_id: str) -> Document | None:
+        return await self._find_one(
+            "corrections",
+            {"_id": correction_id},
+            "get_correction",
+        )
+
+    async def list_match_corrections(
+        self,
+        match_id: str,
+        *,
+        active_only: bool = True,
+    ) -> tuple[Document, ...]:
+        filter: Document = {"matchId": match_id}
+        if active_only:
+            filter["active"] = True
+        results: list[Document] = []
+        offset = 0
+        total = 1
+        while offset < total:
+            documents, total = await self._list_documents(
+                "corrections",
+                filter,
+                sort_key="correctedAt",
+                direction=DESCENDING,
+                limit=100,
+                offset=offset,
+                operation="list_match_corrections",
+            )
+            if not documents:
+                break
+            results.extend(documents)
+            offset += len(documents)
+        return tuple(results)
 
     async def save_artifact(self, record: ArtifactRecord) -> None:
         await self._replace("artifacts", record.to_document(), "save_artifact")
@@ -552,6 +616,27 @@ class MongoPersistence:
             operation="list_match_players",
         )
         return documents
+
+    async def get_match_player(self, match_id: str, player_id: str) -> Document | None:
+        return await self._find_one(
+            "players",
+            {"matchId": match_id, "playerId": player_id},
+            "get_match_player",
+        )
+
+    async def get_match_domain_record(
+        self,
+        collection: str,
+        match_id: str,
+        record_id: str,
+    ) -> Document | None:
+        if collection not in {item.value for item in StructuredCollection}:
+            raise PersistenceValidationError("unsupported structured collection")
+        return await self._find_one(
+            collection,
+            {"matchId": match_id, "recordId": record_id},
+            "get_match_domain_record",
+        )
 
     async def list_match_rallies(
         self,

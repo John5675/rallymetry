@@ -17,12 +17,16 @@ interface RallyRow {
   duration: number | null;
   confidence: number | null;
   signalCount: number;
+  rawStart: number | null;
+  rawEnd: number | null;
+  corrected: boolean;
 }
 
 function toRow(rally: DomainRecord): RallyRow {
-  const start = numberValue(rally.payload, "startTimestamp") ?? rally.timestampSeconds;
-  const end = numberValue(rally.payload, "endTimestamp");
-  const signals = rally.payload.supportingSignals;
+  const payload = rally.effectivePayload ?? rally.payload;
+  const start = numberValue(payload, "startTimestamp") ?? rally.timestampSeconds;
+  const end = numberValue(payload, "endTimestamp");
+  const signals = payload.supportingSignals;
   return {
     id: stringValue(rally.payload, "rallyId") ?? rally.recordId,
     start,
@@ -30,6 +34,9 @@ function toRow(rally: DomainRecord): RallyRow {
     duration: start !== null && end !== null ? Math.max(0, end - start) : null,
     confidence: numberValue(rally.payload, "confidence") ?? rally.confidence,
     signalCount: Array.isArray(signals) ? signals.length : 0,
+    rawStart: numberValue(rally.payload, "startTimestamp") ?? rally.timestampSeconds,
+    rawEnd: numberValue(rally.payload, "endTimestamp"),
+    corrected: (rally.verifiedCorrections?.length ?? 0) > 0,
   };
 }
 
@@ -102,8 +109,8 @@ export function RallyTable({ rallies }: RallyTableProps) {
           {rows.map((row) => (
             <tr key={row.id}>
               <td><strong>{row.id}</strong></td>
-              <td>{formatDuration(row.start)}</td>
-              <td>{formatDuration(row.end)}</td>
+              <td>{formatDuration(row.start)}{row.corrected && row.start !== row.rawStart ? <small className="human-correction-note">AI: {formatDuration(row.rawStart)}</small> : null}</td>
+              <td>{formatDuration(row.end)}{row.corrected && row.end !== row.rawEnd ? <small className="human-correction-note">AI: {formatDuration(row.rawEnd)}</small> : null}</td>
               <td>{formatDuration(row.duration)}</td>
               <td>{formatConfidence(row.confidence)}</td>
               <td>{row.signalCount}</td>

@@ -2,6 +2,8 @@ import type {
   Analytics,
   ApiErrorEnvelope,
   Artifact,
+  Correction,
+  CorrectionInput,
   DomainRecord,
   Match,
   MatchDashboardData,
@@ -55,6 +57,7 @@ function isApiErrorEnvelope(value: unknown): value is ApiErrorEnvelope {
 }
 
 async function parseResponse<T>(response: Response): Promise<T> {
+  if (response.status === 204) return undefined as T;
   let body: unknown;
   try {
     body = await response.json();
@@ -188,6 +191,41 @@ export class ApiClient {
     return this.listAll<Artifact>(`/api/matches/${encodeURIComponent(matchId)}/artifacts`, signal);
   }
 
+  getCorrections(matchId: string, signal?: AbortSignal): Promise<Correction[]> {
+    return this.request<{ items: Correction[]; total: number }>(
+      `/api/matches/${encodeURIComponent(matchId)}/corrections`,
+      signal,
+    ).then((response) => response.items);
+  }
+
+  createCorrection(matchId: string, input: CorrectionInput): Promise<Correction> {
+    return this.request<Correction>(
+      `/api/matches/${encodeURIComponent(matchId)}/corrections`,
+      undefined,
+      { method: "POST", body: JSON.stringify(input) },
+    );
+  }
+
+  updateCorrection(
+    matchId: string,
+    correctionId: string,
+    input: Omit<CorrectionInput, "correctionType" | "targetRecordId">,
+  ): Promise<Correction> {
+    return this.request<Correction>(
+      `/api/matches/${encodeURIComponent(matchId)}/corrections/${encodeURIComponent(correctionId)}`,
+      undefined,
+      { method: "PATCH", body: JSON.stringify(input) },
+    );
+  }
+
+  removeCorrection(matchId: string, correctionId: string): Promise<void> {
+    return this.request<void>(
+      `/api/matches/${encodeURIComponent(matchId)}/corrections/${encodeURIComponent(correctionId)}`,
+      undefined,
+      { method: "DELETE" },
+    );
+  }
+
   async getAnalytics(matchId: string, signal?: AbortSignal): Promise<Analytics | null> {
     try {
       return await this.request<Analytics>(
@@ -203,7 +241,7 @@ export class ApiClient {
   }
 
   async getMatchDashboard(matchId: string, signal?: AbortSignal): Promise<MatchDashboardData> {
-    const [match, players, rallies, shots, contacts, bounces, analytics, artifacts] =
+    const [match, players, rallies, shots, contacts, bounces, analytics, artifacts, corrections] =
       await Promise.all([
         this.getMatch(matchId, signal),
         this.getPlayers(matchId, signal),
@@ -213,8 +251,9 @@ export class ApiClient {
         this.getBounces(matchId, signal),
         this.getAnalytics(matchId, signal),
         this.getArtifacts(matchId, signal),
+        this.getCorrections(matchId, signal),
       ]);
-    return { match, players, rallies, shots, contacts, bounces, analytics, artifacts };
+    return { match, players, rallies, shots, contacts, bounces, analytics, artifacts, corrections };
   }
 }
 

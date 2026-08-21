@@ -4,6 +4,7 @@ import {
   Clock3,
   Film,
   Map,
+  ShieldCheck,
   Target,
   Trophy,
   UsersRound,
@@ -15,6 +16,7 @@ import { useApi } from "../api/context";
 import type { ProcessingJob } from "../api/types";
 import { AsyncState } from "../components/AsyncState";
 import { CourtMap } from "../components/CourtMap";
+import { CorrectionWorkspace } from "../components/CorrectionWorkspace";
 import { EventTimeline } from "../components/EventTimeline";
 import { MetricCard } from "../components/MetricCard";
 import { PlayerPanel } from "../components/PlayerPanel";
@@ -142,6 +144,7 @@ export function MatchPage() {
               <a href="#rallies"><Clock3 aria-hidden="true" /> Rallies</a>
               <a href="#shots"><Target aria-hidden="true" /> Shots</a>
               <a href="#court-maps"><Map aria-hidden="true" /> Court maps</a>
+              <a href="#corrections"><ShieldCheck aria-hidden="true" /> Corrections</a>
             </nav>
 
             <section id="overview" className="content-section">
@@ -269,6 +272,14 @@ export function MatchPage() {
                   ) : null}
                 </div>
               </div>
+            </section>
+
+            <section id="corrections" className="content-section">
+              <SectionHeading
+                title="Human corrections"
+                description="Compare the immutable AI prediction with a separate verified correction used by analytics."
+              />
+              <CorrectionWorkspace data={data} onChanged={reload} />
             </section>
           </>
         )}
