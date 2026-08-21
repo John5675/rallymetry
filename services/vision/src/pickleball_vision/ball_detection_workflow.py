@@ -25,6 +25,7 @@ from pickleball_vision.calibration import CourtCalibration, load_calibration
 from pickleball_vision.detectors import UltralyticsBallDetector
 from pickleball_vision.errors import DetectionInputError, OutputWriteError
 from pickleball_vision.video import Image, VideoMetadata, inspect_video, iter_video_frames
+from pickleball_vision.video_output import CompressedVideoWriter
 
 DETECTIONS_NAME = "detections.json"
 ANNOTATED_VIDEO_NAME = "annotated.mp4"
@@ -67,17 +68,12 @@ def _prepare_output_dir(path: Path) -> Path:
     return output
 
 
-def _open_writer(path: Path, metadata: VideoMetadata) -> cv2.VideoWriter:
-    writer = cv2.VideoWriter(
-        str(path),
-        cv2.VideoWriter.fourcc(*"mp4v"),
-        metadata.fps,
-        (metadata.width, metadata.height),
+def _open_writer(path: Path, metadata: VideoMetadata) -> CompressedVideoWriter:
+    return CompressedVideoWriter(
+        path,
+        fps=metadata.fps,
+        dimensions=(metadata.width, metadata.height),
     )
-    if not writer.isOpened():
-        writer.release()
-        raise OutputWriteError(str(path), reason="OpenCV MP4 writer could not be opened")
-    return writer
 
 
 def render_ball_detections(image: Image, detections: tuple[BallDetection, ...]) -> Image:
@@ -190,7 +186,7 @@ def detect_balls_in_video(
                     },
                 )
     except Exception:
-        writer.release()
+        writer.abort()
         temporary_video.unlink(missing_ok=True)
         raise
     else:

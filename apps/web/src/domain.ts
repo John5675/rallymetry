@@ -258,7 +258,7 @@ export function shotCourtPoints(shots: DomainRecord[]): CourtPoint[] {
 
 export function formatDuration(seconds: number | null): string {
   if (seconds === null || !Number.isFinite(seconds)) {
-    return "—";
+    return "N/A";
   }
   if (seconds < 60) {
     return `${seconds.toFixed(1)}s`;
@@ -269,9 +269,9 @@ export function formatDuration(seconds: number | null): string {
 }
 
 export function formatPercent(value: number | null): string {
-  return value === null ? "—" : `${(value * 100).toFixed(0)}%`;
+  return value === null ? "N/A" : `${(value * 100).toFixed(0)}%`;
 }
 
 export function formatConfidence(value: number | null): string {
-  return value === null ? "—" : `${Math.round(value * 100)}%`;
+  return value === null ? "N/A" : `${Math.round(value * 100)}%`;
 }

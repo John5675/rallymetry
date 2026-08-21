@@ -13,8 +13,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
-import cv2
-
 from pickleball_vision.ball_detection import BALL_DETECTION_SCHEMA_VERSION
 from pickleball_vision.ball_tracking import (
     BALL_TRACKING_SCHEMA_VERSION,
@@ -32,11 +30,11 @@ from pickleball_vision.config import BallTrackingSettings
 from pickleball_vision.errors import BallTrackingInputError, OutputWriteError
 from pickleball_vision.person_detection import BoundingBox
 from pickleball_vision.video import VideoMetadata, inspect_video, iter_video_frames
+from pickleball_vision.video_output import CompressedVideoWriter
 
 BALL_TRACKS_NAME = "ball_tracks.json"
 BALL_DEBUG_VIDEO_NAME = "ball-debug.mp4"
 BALL_TRACKING_SUMMARY_NAME = "ball-tracking-summary.json"
-DEBUG_VIDEO_CODEC = "mp4v"
 
 
 @dataclass(frozen=True, slots=True)
@@ -328,20 +326,12 @@ def _sha256(path: Path) -> str:
     return digest.hexdigest()
 
 
-def _open_writer(path: Path, source: VideoMetadata) -> cv2.VideoWriter:
-    try:
-        writer = cv2.VideoWriter(
-            str(path),
-            cv2.VideoWriter.fourcc(*DEBUG_VIDEO_CODEC),
-            source.fps,
-            (source.width, source.height),
-        )
-    except cv2.error as error:
-        raise OutputWriteError(str(path), reason=str(error)) from error
-    if not writer.isOpened():
-        writer.release()
-        raise OutputWriteError(str(path), reason="OpenCV MP4 writer could not be opened")
-    return writer
+def _open_writer(path: Path, source: VideoMetadata) -> CompressedVideoWriter:
+    return CompressedVideoWriter(
+        path,
+        fps=source.fps,
+        dimensions=(source.width, source.height),
+    )
 
 
 def _write_debug_video(
@@ -376,7 +366,7 @@ def _write_debug_video(
                     extra={"context": {"processed_frames": processed}},
                 )
     except Exception:
-        writer.release()
+        writer.abort()
         temporary.unlink(missing_ok=True)
         raise
     writer.release()

@@ -150,12 +150,33 @@ def load_pipeline_plan(path: Path) -> PipelinePlan:
             raise AnalysisConfigurationError(
                 "BALL_PROCESSING permits `ball detect` inference but not training commands"
             )
-        stages.append(PipelineStagePlan(stage=stage, progress=progress, argv=argv))
+        raw_cleanup_paths = item.get("cleanupPaths", [])
+        if not isinstance(raw_cleanup_paths, list):
+            raise AnalysisConfigurationError(f"stages[{index}].cleanupPaths must be an array")
+        cleanup_paths = tuple(
+            _relative_path(value, f"stages[{index}].cleanupPaths") for value in raw_cleanup_paths
+        )
+        stages.append(
+            PipelineStagePlan(
+                stage=stage,
+                progress=progress,
+                argv=argv,
+                cleanup_paths=cleanup_paths,
+            )
+        )
         previous_order = order
         previous_progress = progress
 
     structured_results = _load_structured_result_plans(root.get("structuredResults", []))
     artifacts = _load_artifact_result_plans(root.get("artifacts", []))
+    retained_paths = {plan.path for plan in structured_results} | {plan.path for plan in artifacts}
+    for stage_plan in stages:
+        overlap = retained_paths.intersection(stage_plan.cleanup_paths)
+        if overlap:
+            conflict = sorted(str(path) for path in overlap)[0]
+            raise AnalysisConfigurationError(
+                f"cleanup path {conflict!r} is also configured as a retained result"
+            )
     return PipelinePlan(
         plan_version=plan_version,
         pipeline_version=pipeline_version,
@@ -304,7 +325,26 @@ class PlannedCliPipelineRunner(PipelineRunner):
                     f"local CLI command {argv[0]} exited with status {return_code}{suffix}",
                     stage=stage_plan.stage.value,
                 )
+            self._cleanup_stage_outputs(workspace, stage_plan.cleanup_paths)
         return self._load_results(job, workspace)
+
+    @staticmethod
+    def _cleanup_stage_outputs(workspace: Path, paths: tuple[Path, ...]) -> None:
+        resolved_workspace = workspace.resolve()
+        for relative_path in paths:
+            target = (resolved_workspace / relative_path).resolve()
+            if target.parent != resolved_workspace and resolved_workspace not in target.parents:
+                raise AnalysisPipelineError("cleanup path escaped the analysis workspace")
+            if target.is_dir():
+                raise AnalysisPipelineError(
+                    f"cleanup path must identify a file, not a directory: {relative_path}"
+                )
+            try:
+                target.unlink(missing_ok=True)
+            except OSError as error:
+                raise AnalysisPipelineError(
+                    f"unable to discard intermediate artifact {relative_path}: {error}"
+                ) from error
 
     @staticmethod
     def _failure_detail(*paths: Path) -> str:

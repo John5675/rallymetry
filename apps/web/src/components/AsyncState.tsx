@@ -1,4 +1,4 @@
-import { AlertCircle, LoaderCircle } from "lucide-react";
+import { AlertCircle } from "lucide-react";
 import type { PropsWithChildren, ReactNode } from "react";
 
 interface AsyncStateProps extends PropsWithChildren {
@@ -23,9 +23,11 @@ export function AsyncState({
 }: AsyncStateProps) {
   if (loading) {
     return (
-      <div className="state-panel" role="status">
-        <LoaderCircle className="spin" aria-hidden="true" />
-        <p>{loadingMessage}</p>
+      <div className="state-panel state-panel--loading" role="status">
+        <span className="sr-only">{loadingMessage}</span>
+        <span className="state-skeleton state-skeleton--wide" aria-hidden="true" />
+        <span className="state-skeleton state-skeleton--medium" aria-hidden="true" />
+        <span className="state-skeleton state-skeleton--short" aria-hidden="true" />
       </div>
     );
   }

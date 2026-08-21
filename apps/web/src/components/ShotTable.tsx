@@ -44,13 +44,13 @@ export function ShotTable({ shots, players }: ShotTableProps) {
             const confidence = numberValue(shot.payload, "confidence") ?? shot.confidence;
             return (
               <tr key={shot.recordId}>
-                <td><strong>#{numberValue(shot.payload, "shotIndex") ?? "—"}</strong></td>
-                <td>{stringValue(shot.payload, "rallyId") ?? "—"}</td>
+                <td><strong>#{numberValue(shot.payload, "shotIndex") ?? "N/A"}</strong></td>
+                <td>{stringValue(shot.payload, "rallyId") ?? "N/A"}</td>
                 <td>{playerNameById(players, stringValue(shot.payload, "hitterId"))}</td>
                 <td><span className="shot-type">{stringValue(shot.payload, "shotType") ?? "UNKNOWN"}</span></td>
                 <td>{formatDuration(timestamp)}</td>
                 <td>{formatConfidence(confidence)}</td>
-                <td>{x === null || y === null ? "—" : `${x.toFixed(2)}, ${y.toFixed(2)}`}</td>
+                <td>{x === null || y === null ? "N/A" : `${x.toFixed(2)}, ${y.toFixed(2)}`}</td>
               </tr>
             );
           })}

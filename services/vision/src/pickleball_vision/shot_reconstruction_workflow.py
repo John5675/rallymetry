@@ -12,8 +12,6 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import cast
 
-import cv2
-
 from pickleball_vision.bounce_detection_workflow import load_bounce_rallies
 from pickleball_vision.config import ShotClassificationSettings
 from pickleball_vision.contact_detection_workflow import load_contact_player_tracks
@@ -55,11 +53,11 @@ from pickleball_vision.shot_reconstruction import (
 )
 from pickleball_vision.shot_reconstruction_render import render_shot_frame
 from pickleball_vision.video import VideoMetadata, iter_video_frames
+from pickleball_vision.video_output import CompressedVideoWriter
 
 SHOTS_NAME = "shots.json"
 SHOT_DEBUG_NAME = "shot-debug.mp4"
 SHOT_EVALUATION_NAME = "shot-evaluation.json"
-DEBUG_VIDEO_CODEC = "mp4v"
 
 
 @dataclass(frozen=True, slots=True)
@@ -485,20 +483,12 @@ def _write_json(path: Path, payload: object) -> None:
         raise OutputWriteError(str(path), reason=str(error)) from error
 
 
-def _open_writer(path: Path, source: VideoMetadata) -> cv2.VideoWriter:
-    try:
-        writer = cv2.VideoWriter(
-            str(path),
-            cv2.VideoWriter.fourcc(*DEBUG_VIDEO_CODEC),
-            source.fps,
-            (source.width, source.height),
-        )
-    except cv2.error as error:
-        raise OutputWriteError(str(path), reason=str(error)) from error
-    if not writer.isOpened():
-        writer.release()
-        raise OutputWriteError(str(path), reason="OpenCV MP4 writer could not be opened")
-    return writer
+def _open_writer(path: Path, source: VideoMetadata) -> CompressedVideoWriter:
+    return CompressedVideoWriter(
+        path,
+        fps=source.fps,
+        dimensions=(source.width, source.height),
+    )
 
 
 def _write_debug_video(
@@ -548,7 +538,7 @@ def _write_debug_video(
                     extra={"context": {"processed_frames": processed}},
                 )
     except Exception:
-        writer.release()
+        writer.abort()
         temporary.unlink(missing_ok=True)
         raise
     writer.release()

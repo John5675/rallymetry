@@ -24,11 +24,11 @@ from pickleball_vision.person_detection import (
     PersonDetector,
 )
 from pickleball_vision.video import Image, VideoMetadata, inspect_video, iter_video_frames
+from pickleball_vision.video_output import CompressedVideoWriter
 
 ANNOTATED_VIDEO_NAME = "annotated.mp4"
 DETECTIONS_NAME = "detections.json"
 SUMMARY_NAME = "summary.json"
-ANNOTATED_CODEC = "mp4v"
 
 
 @dataclass(frozen=True, slots=True)
@@ -62,20 +62,12 @@ def _prepare_output_dir(path: Path) -> Path:
     return output_dir
 
 
-def _open_annotated_writer(path: Path, metadata: VideoMetadata) -> cv2.VideoWriter:
-    try:
-        writer = cv2.VideoWriter(
-            str(path),
-            cv2.VideoWriter.fourcc(*ANNOTATED_CODEC),
-            metadata.fps,
-            (metadata.width, metadata.height),
-        )
-    except cv2.error as error:
-        raise OutputWriteError(str(path), reason=str(error)) from error
-    if not writer.isOpened():
-        writer.release()
-        raise OutputWriteError(str(path), reason="OpenCV MP4 writer could not be opened")
-    return writer
+def _open_annotated_writer(path: Path, metadata: VideoMetadata) -> CompressedVideoWriter:
+    return CompressedVideoWriter(
+        path,
+        fps=metadata.fps,
+        dimensions=(metadata.width, metadata.height),
+    )
 
 
 def render_person_detections(
@@ -232,10 +224,7 @@ def detect_people_in_video(
             detections.extend(frame_detections)
             per_frame_counts.append(len(frame_detections))
             annotated = render_person_detections(decoded.image, frame_detections)
-            try:
-                writer.write(annotated)
-            except cv2.error as error:
-                raise OutputWriteError(str(annotated_path), reason=str(error)) from error
+            writer.write(annotated)
             if (decoded.frame_index + 1) % 300 == 0:
                 logger.info(
                     "person_detection_progress",
@@ -248,7 +237,7 @@ def detect_people_in_video(
                     },
                 )
     except Exception:
-        writer.release()
+        writer.abort()
         with suppress(OSError):
             temporary_annotated_path.unlink(missing_ok=True)
         raise

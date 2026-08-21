@@ -1,6 +1,6 @@
 {
   "planVersion": "1",
-  "pipelineVersion": "release-0.1-render-workflow-v1",
+  "pipelineVersion": "release-0.1-render-workflow-v2",
   "stages": [
     {
       "stage": "PLAYER_PROCESSING",
@@ -12,7 +12,8 @@
         "{input}/calibration.json",
         "--output-dir",
         "{workspace}/person-detection"
-      ]
+      ],
+      "cleanupPaths": ["person-detection/annotated.mp4"]
     },
     {
       "stage": "PLAYER_PROCESSING",
@@ -43,7 +44,8 @@
         "{workspace}/player-tracking/tracks.json",
         "--output-dir",
         "{workspace}/player-analysis"
-      ]
+      ],
+      "cleanupPaths": ["player-analysis/annotated.mp4"]
     },
     {
       "stage": "BALL_PROCESSING",
@@ -64,7 +66,8 @@
         "{input}/calibration.json",
         "--output-dir",
         "{workspace}/ball-detection"
-      ]
+      ],
+      "cleanupPaths": ["ball-detection/annotated.mp4"]
     },
     {
       "stage": "BALL_PROCESSING",
@@ -122,7 +125,8 @@
         "{workspace}/audio-analysis/audio-events.json",
         "--output-dir",
         "{workspace}/bounces"
-      ]
+      ],
+      "cleanupPaths": ["bounces/bounce-debug.mp4"]
     },
     {
       "stage": "CONTACT_PROCESSING",
@@ -142,7 +146,8 @@
         "{workspace}/audio-analysis/audio-events.json",
         "--output-dir",
         "{workspace}/contacts"
-      ]
+      ],
+      "cleanupPaths": ["contacts/contact-debug.mp4"]
     },
     {
       "stage": "HITTER_PROCESSING",
@@ -156,7 +161,8 @@
         "{workspace}/player-tracking/tracks.json",
         "--output-dir",
         "{workspace}/hitters"
-      ]
+      ],
+      "cleanupPaths": ["hitters/hitter-debug.mp4"]
     },
     {
       "stage": "SHOT_PROCESSING",

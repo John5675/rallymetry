@@ -84,7 +84,6 @@ export function AnalysisPage() {
 
                 <section className="content-section">
                   <SectionHeading
-                    eyebrow="Player comparison"
                     title="Four-player analysis"
                     description="Position and shot-selection metrics preserve unknown and excluded samples."
                   />
@@ -110,15 +109,15 @@ export function AnalysisPage() {
                                 <strong>{playerName(player)}</strong>
                                 <small>{identity.replaceAll("_", " ")}</small>
                               </td>
-                              <td>{metricNumber(data.analytics, ["players", identity, "totalHits"]) ?? "—"}</td>
+                              <td>{metricNumber(data.analytics, ["players", identity, "totalHits"]) ?? "N/A"}</td>
                               <td>
-                                {metricNumber(data.analytics, ["players", identity, "positions", "distanceTraveled"])?.toFixed(1) ?? "—"} m
+                                {metricNumber(data.analytics, ["players", identity, "positions", "distanceTraveled"])?.toFixed(1) ?? "N/A"} m
                               </td>
                               <td>{formatPercent(analyticsNumber(data.analytics, ["players", identity, "positions", "courtOccupancy", "kitchen", "shareOfInCourtFrames"]))}</td>
                               <td>{formatPercent(analyticsNumber(data.analytics, ["players", identity, "positions", "courtOccupancy", "transitionZone", "shareOfInCourtFrames"]))}</td>
                               <td>{formatPercent(analyticsNumber(data.analytics, ["players", identity, "positions", "courtOccupancy", "backcourt", "shareOfInCourtFrames"]))}</td>
                               <td>
-                                {metricNumber(data.analytics, ["players", identity, "positions", "averagePartnerSpacing"])?.toFixed(1) ?? "—"} m
+                                {metricNumber(data.analytics, ["players", identity, "positions", "averagePartnerSpacing"])?.toFixed(1) ?? "N/A"} m
                               </td>
                             </tr>
                           );
@@ -131,7 +130,6 @@ export function AnalysisPage() {
                 <section className="content-section analysis-split">
                   <div>
                     <SectionHeading
-                      eyebrow="Shot selection"
                       title="Distribution by player"
                       description="Rates use classified hits only."
                     />
@@ -142,7 +140,7 @@ export function AnalysisPage() {
                           <article key={player.playerId} className="analysis-player-row">
                             <header>
                               <strong>{playerName(player)}</strong>
-                              <span>{metricNumber(data.analytics, ["players", identity, "totalHits"]) ?? "—"} hits</span>
+                              <span>{metricNumber(data.analytics, ["players", identity, "totalHits"]) ?? "N/A"} hits</span>
                             </header>
                             <div>
                               {SHOT_TYPES.map((type) => (
@@ -159,7 +157,6 @@ export function AnalysisPage() {
                   </div>
                   <div>
                     <SectionHeading
-                      eyebrow="Quality"
                       title="Analysis provenance"
                       description="Version and input context retained by the API."
                     />
@@ -180,7 +177,6 @@ export function AnalysisPage() {
 
                 <section className="content-section">
                   <SectionHeading
-                    eyebrow="Court view"
                     title="Shot landing map"
                     description="Landing points are accepted court-plane observations from structured shots."
                   />

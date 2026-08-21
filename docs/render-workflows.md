@@ -84,6 +84,13 @@ limits YouTube duration/size with `YOUTUBE_MAX_DURATION_SECONDS` and
 `YOUTUBE_MAX_BYTES`, never accepts playlists/channels, and removes the downloaded
 copy during normal job cleanup. The original recording remains unchanged.
 
+Generated MP4 artifacts use browser-compatible H.264 through bundled FFmpeg. A
+trusted pipeline plan may declare file-only `cleanupPaths` for stage intermediates
+that are neither downstream inputs nor publication results. Those files are removed
+after their stage succeeds so multiple full-resolution debug videos do not exhaust
+the workflow's temporary disk. Local CLI commands still produce every documented
+artifact by default.
+
 ## Job state and duplicate protection
 
 Application states are `CREATED`, `QUEUED`, `STARTING`, `DOWNLOADING_MEDIA`,

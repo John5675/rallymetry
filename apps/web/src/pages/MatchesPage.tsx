@@ -22,6 +22,7 @@ import type {
 } from "../api/types";
 import { useApi } from "../api/context";
 import { AsyncState } from "../components/AsyncState";
+import { ProcessingProgress } from "../components/ProcessingProgress";
 import { StatusBadge } from "../components/StatusBadge";
 import { findThumbnail, matchStatus, playerName } from "../domain";
 import { useAsyncData } from "../hooks/useAsyncData";
@@ -134,14 +135,15 @@ export function MatchesPage() {
           </p>
         </div>
         <div className="hero-stat">
-          <strong>{data?.length ?? "—"}</strong>
+          <strong className={loading ? "hero-stat-loading" : undefined}>
+            {loading ? <span className="sr-only">Loading match count</span> : data?.length ?? "N/A"}
+          </strong>
           <span>matches available</span>
         </div>
       </section>
 
       <section className="submission-panel" aria-labelledby="submit-match-title">
         <div className="submission-copy">
-          <span className="eyebrow">New analysis</span>
           <h2 id="submit-match-title">Paste a match link.</h2>
           <p>
             Add an unlisted YouTube recording and Rallymetry will queue the configured
@@ -185,7 +187,11 @@ export function MatchesPage() {
                 <CheckCircle2 aria-hidden="true" />
                 <div>
                   <strong>{submission.job.stage?.replaceAll("_", " ") ?? submission.job.status}</strong>
-                  <span>{Math.round(submission.job.progress * 100)}% · Analysis runs in the background.</span>
+                  <span>{Math.round(submission.job.progress * 100)}% - Analysis runs in the background.</span>
+                  <ProcessingProgress
+                    value={submission.job.progress}
+                    label={`${submission.job.stage?.replaceAll("_", " ") ?? submission.job.status} progress`}
+                  />
                   <Link to={`/matches/${submission.match.matchId}`}>Open match</Link>
                 </div>
               </div>
@@ -242,7 +248,7 @@ export function MatchesPage() {
                   <p className="match-players">
                     <Users aria-hidden="true" />
                     {players.length > 0
-                      ? players.map(playerName).join(" · ")
+                      ? players.map(playerName).join(", ")
                       : "Players pending"}
                   </p>
                   <span className="match-card-link">

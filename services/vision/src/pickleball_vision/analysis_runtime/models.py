@@ -22,6 +22,7 @@ class PipelineStagePlan:
     stage: ProcessingJobStatus
     progress: float
     argv: tuple[str, ...]
+    cleanup_paths: tuple[Path, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)

@@ -39,12 +39,12 @@ from pickleball_vision.player_isolation import (
 )
 from pickleball_vision.player_tracking import LogicalTrackingState
 from pickleball_vision.video import Image, VideoMetadata, inspect_video, iter_video_frames
+from pickleball_vision.video_output import CompressedVideoWriter
 
 POSITIONS_NAME = "player_positions.json"
 SUMMARY_NAME = "summary.json"
 ANNOTATED_VIDEO_NAME = "annotated.mp4"
 TOPDOWN_VIDEO_NAME = "topdown.mp4"
-VIDEO_CODEC = "mp4v"
 POSITION_CORRECTIONS_NAME = "player-position-corrections.json"
 MAXIMUM_MANUAL_CORRECTION_M = 0.50
 HEATMAP_NAMES = {
@@ -356,23 +356,11 @@ def _write_json(path: Path, value: object) -> None:
         raise OutputWriteError(str(path), reason=str(error)) from error
 
 
-def _open_writer(path: Path, *, fps: float, dimensions: tuple[int, int]) -> cv2.VideoWriter:
-    try:
-        writer = cv2.VideoWriter(
-            str(path),
-            cv2.VideoWriter.fourcc(*VIDEO_CODEC),
-            fps,
-            dimensions,
-        )
-    except cv2.error as error:
-        raise OutputWriteError(str(path), reason=str(error)) from error
-    if not writer.isOpened():
-        writer.release()
-        raise OutputWriteError(str(path), reason="OpenCV MP4 writer could not be opened")
-    return writer
+def _open_writer(path: Path, *, fps: float, dimensions: tuple[int, int]) -> CompressedVideoWriter:
+    return CompressedVideoWriter(path, fps=fps, dimensions=dimensions)
 
 
-def _finish_video(writer: cv2.VideoWriter, temporary: Path, output: Path) -> None:
+def _finish_video(writer: CompressedVideoWriter, temporary: Path, output: Path) -> None:
     writer.release()
     if not temporary.is_file() or temporary.stat().st_size == 0:
         raise OutputWriteError(str(output), reason="OpenCV wrote an empty video")
@@ -443,8 +431,8 @@ def _write_analysis_videos(
                     extra={"context": {"processed_frames": decoded.frame_index + 1}},
                 )
     except Exception:
-        annotated_writer.release()
-        topdown_writer.release()
+        annotated_writer.abort()
+        topdown_writer.abort()
         with suppress(OSError):
             annotated_temporary.unlink(missing_ok=True)
         with suppress(OSError):

@@ -55,17 +55,17 @@ export function PlayerPanel({ player, analytics, artifacts }: PlayerPanelProps) 
         <div>
           <Target aria-hidden="true" />
           <span>Hits</span>
-          <strong>{totalHits ?? "—"}</strong>
+          <strong>{totalHits ?? "N/A"}</strong>
         </div>
         <div>
           <Footprints aria-hidden="true" />
           <span>Distance</span>
-          <strong>{distance === null ? "—" : `${distance.toFixed(0)}m`}</strong>
+          <strong>{distance === null ? "N/A" : `${distance.toFixed(0)}m`}</strong>
         </div>
         <div>
           <UsersRound aria-hidden="true" />
           <span>Avg. spacing</span>
-          <strong>{spacing === null ? "—" : `${spacing.toFixed(1)}m`}</strong>
+          <strong>{spacing === null ? "N/A" : `${spacing.toFixed(1)}m`}</strong>
         </div>
       </div>
       <div className="shot-distribution">

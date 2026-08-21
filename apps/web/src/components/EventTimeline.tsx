@@ -80,7 +80,7 @@ export function EventTimeline({ events, durationSeconds, onSeek }: EventTimeline
             type="button"
             className={`timeline-marker timeline-marker--${event.kind}`}
             style={{ left: `${Math.min(100, (event.timestampSeconds / duration) * 100)}%` }}
-            title={`${event.label} · ${formatDuration(event.timestampSeconds)} · ${formatConfidence(event.confidence)}`}
+            title={`${event.label} | ${formatDuration(event.timestampSeconds)} | ${formatConfidence(event.confidence)}`}
             aria-label={`Seek to ${event.label} at ${formatDuration(event.timestampSeconds)}`}
             onClick={() => onSeek(event.timestampSeconds)}
           />

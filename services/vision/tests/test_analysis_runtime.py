@@ -28,6 +28,7 @@ def _write_plan(path: Path, *, command: str = "detect-people") -> None:
                         "stage": "PLAYER_PROCESSING",
                         "progress": 0.2,
                         "argv": [command, "{source}", "--output-dir", "{workspace}/people"],
+                        "cleanupPaths": ["people/intermediate.mp4"],
                     }
                 ],
                 "structuredResults": [
@@ -61,6 +62,8 @@ def test_planned_runner_loads_structured_results_and_artifacts(tmp_path: Path) -
     source = tmp_path / "source.mp4"
     source.write_bytes(b"source")
     workspace = tmp_path / "workspace"
+    (workspace / "people").mkdir(parents=True)
+    (workspace / "people" / "intermediate.mp4").write_bytes(b"discard")
     (workspace / "rallies").mkdir(parents=True)
     (workspace / "rallies" / "rallies.json").write_text(
         json.dumps(
@@ -97,6 +100,7 @@ def test_planned_runner_loads_structured_results_and_artifacts(tmp_path: Path) -
     assert result.artifacts[0].source_path.name == "annotated.mp4"
     assert result.artifacts[0].access is not None
     assert result.artifacts[0].access.value == "PUBLIC"
+    assert not (workspace / "people" / "intermediate.mp4").exists()
 
 
 def test_pipeline_plan_rejects_arbitrary_commands(tmp_path: Path) -> None:
@@ -115,6 +119,17 @@ def test_pipeline_plan_rejects_public_internal_artifact(tmp_path: Path) -> None:
     plan_path.write_text(json.dumps(payload), encoding="utf-8")
 
     with pytest.raises(AnalysisConfigurationError, match="PUBLIC access"):
+        load_pipeline_plan(plan_path)
+
+
+def test_pipeline_plan_rejects_cleanup_of_retained_artifact(tmp_path: Path) -> None:
+    plan_path = tmp_path / "plan.json"
+    _write_plan(plan_path)
+    payload = json.loads(plan_path.read_text(encoding="utf-8"))
+    payload["stages"][0]["cleanupPaths"] = ["review/annotated.mp4"]
+    plan_path.write_text(json.dumps(payload), encoding="utf-8")
+
+    with pytest.raises(AnalysisConfigurationError, match="retained result"):
         load_pipeline_plan(plan_path)
 
 

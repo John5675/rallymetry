@@ -10,8 +10,6 @@ from contextlib import suppress
 from dataclasses import dataclass, replace
 from pathlib import Path
 
-import cv2
-
 from pickleball_vision.calibration import load_calibration
 from pickleball_vision.config import PlayerIsolationSettings, PlayerTrackingSettings
 from pickleball_vision.errors import OutputWriteError, PlayerTrackingInputError
@@ -40,11 +38,11 @@ from pickleball_vision.player_tracking import (
 from pickleball_vision.player_tracking_render import render_player_tracking_frame
 from pickleball_vision.trackers import UltralyticsByteTracker
 from pickleball_vision.video import VideoMetadata, inspect_video, iter_video_frames
+from pickleball_vision.video_output import CompressedVideoWriter
 
 TRACKS_NAME = "tracks.json"
 ANNOTATED_VIDEO_NAME = "annotated.mp4"
 SUMMARY_NAME = "tracking-summary.json"
-ANNOTATED_CODEC = "mp4v"
 
 
 @dataclass(frozen=True, slots=True)
@@ -329,20 +327,12 @@ def _run_raw_tracker(
     return tuple(observations)
 
 
-def _open_writer(path: Path, source: VideoMetadata) -> cv2.VideoWriter:
-    try:
-        writer = cv2.VideoWriter(
-            str(path),
-            cv2.VideoWriter.fourcc(*ANNOTATED_CODEC),
-            source.fps,
-            (source.width, source.height),
-        )
-    except cv2.error as error:
-        raise OutputWriteError(str(path), reason=str(error)) from error
-    if not writer.isOpened():
-        writer.release()
-        raise OutputWriteError(str(path), reason="OpenCV MP4 writer could not be opened")
-    return writer
+def _open_writer(path: Path, source: VideoMetadata) -> CompressedVideoWriter:
+    return CompressedVideoWriter(
+        path,
+        fps=source.fps,
+        dimensions=(source.width, source.height),
+    )
 
 
 def _write_annotated_video(
@@ -380,7 +370,7 @@ def _write_annotated_video(
                     extra={"context": {"processed_frames": decoded.frame_index + 1}},
                 )
     except Exception:
-        writer.release()
+        writer.abort()
         with suppress(OSError):
             temporary_path.unlink(missing_ok=True)
         raise

@@ -18,6 +18,7 @@ import { CourtMap } from "../components/CourtMap";
 import { EventTimeline } from "../components/EventTimeline";
 import { MetricCard } from "../components/MetricCard";
 import { PlayerPanel } from "../components/PlayerPanel";
+import { ProcessingProgress } from "../components/ProcessingProgress";
 import { RallyTable } from "../components/RallyTable";
 import { SectionHeading } from "../components/SectionHeading";
 import { ShotTable } from "../components/ShotTable";
@@ -102,7 +103,7 @@ export function MatchPage() {
                 <h1>{data.match.title ?? "Untitled match"}</h1>
                 <p>
                   {data.players.length > 0
-                    ? data.players.map(playerName).join(" · ")
+                    ? data.players.map(playerName).join(", ")
                     : "Player assignments pending"}
                 </p>
               </div>
@@ -116,7 +117,7 @@ export function MatchPage() {
 
             {job !== null && job.status !== "COMPLETE" ? (
               <section className={`processing-banner processing-banner--${job.status === "FAILED" ? "failed" : "active"}`} aria-live="polite">
-                <div>
+                <div className="processing-banner__copy">
                   <strong>{job.stage?.replaceAll("_", " ") ?? job.status}</strong>
                   <span>
                     {job.status === "FAILED"
@@ -124,7 +125,13 @@ export function MatchPage() {
                       : "Analysis is running in the background. You can safely leave this page."}
                   </span>
                 </div>
-                <span>{Math.round(job.progress * 100)}%</span>
+                <div className="processing-banner__meter">
+                  <span>{Math.round(job.progress * 100)}%</span>
+                  <ProcessingProgress
+                    value={job.progress}
+                    label={`${job.stage?.replaceAll("_", " ") ?? job.status} progress`}
+                  />
+                </div>
               </section>
             ) : null}
 
@@ -139,26 +146,25 @@ export function MatchPage() {
 
             <section id="overview" className="content-section">
               <SectionHeading
-                eyebrow="Overview"
                 title="Match at a glance"
                 description="Deterministic metrics produced by the analysis pipeline. Missing values stay unknown."
               />
               <div className="metric-grid">
                 <MetricCard
                   label="Rallies"
-                  value={metricNumber(data.analytics, ["match", "rallyCount"]) ?? "—"}
+                  value={metricNumber(data.analytics, ["match", "rallyCount"]) ?? "N/A"}
                   detail="Structured rally records"
                 />
                 <MetricCard
                   label="Shots"
-                  value={metricNumber(data.analytics, ["match", "shotCount"]) ?? "—"}
+                  value={metricNumber(data.analytics, ["match", "shotCount"]) ?? "N/A"}
                   detail="Reconstructed shots"
                 />
                 <MetricCard
                   label="Avg. rally length"
                   value={
                     metricNumber(data.analytics, ["match", "averageRallyLength"])?.toFixed(1) ??
-                    "—"
+                    "N/A"
                   }
                   detail="Shots per rally"
                 />
@@ -174,7 +180,6 @@ export function MatchPage() {
 
             <section id="video" className="content-section">
               <SectionHeading
-                eyebrow="Video"
                 title="Review the match in context"
                 description="Use the structured timeline to jump to visible match events."
               />
@@ -195,7 +200,6 @@ export function MatchPage() {
 
             <section id="players" className="content-section">
               <SectionHeading
-                eyebrow="Players"
                 title="Movement and shot profiles"
                 description="Logical identities remain separate from detector and tracker IDs."
               />
@@ -214,7 +218,6 @@ export function MatchPage() {
 
             <section id="rallies" className="content-section">
               <SectionHeading
-                eyebrow="Rallies"
                 title="Rally-by-rally review"
                 description="Filter predictions by confidence and sort without changing the source analysis."
               />
@@ -223,7 +226,6 @@ export function MatchPage() {
 
             <section id="shots" className="content-section">
               <SectionHeading
-                eyebrow="Shots"
                 title="Reconstructed shot sequence"
                 description="Unknown hitters, classes, and landing locations remain explicitly unavailable."
               />
@@ -232,7 +234,6 @@ export function MatchPage() {
 
             <section id="court-maps" className="content-section">
               <SectionHeading
-                eyebrow="Court maps"
                 title="Where the ball landed"
                 description="Only structured, court-plane landing coordinates are shown."
               />
