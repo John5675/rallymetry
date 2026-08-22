@@ -48,7 +48,13 @@ class YtDlpYouTubeDownloader:
         if self._pot_provider_url is not None:
             common_options["extractor_args"] = {
                 "youtube": {
-                    "player_client": ["mweb", "visionos"],
+                    # Hosted data-center IPs can be rejected while fetching the
+                    # public watch webpage, before a PO token is requested. In
+                    # provider mode, go directly through the token-capable mweb
+                    # player API instead. Local downloads keep yt-dlp defaults.
+                    "fetch_pot": ["always"],
+                    "player_client": ["mweb"],
+                    "player_skip": ["webpage"],
                 },
                 "youtubepot-bgutilhttp": {
                     "base_url": [self._pot_provider_url],

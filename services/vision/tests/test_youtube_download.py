@@ -73,7 +73,9 @@ def test_youtube_downloader_configures_server_side_challenge_provider(
         extractor_args = options["extractor_args"]
         assert isinstance(extractor_args, dict)
         assert extractor_args["youtube"] == {
-            "player_client": ["mweb", "visionos"],
+            "fetch_pot": ["always"],
+            "player_client": ["mweb"],
+            "player_skip": ["webpage"],
         }
         assert extractor_args["youtubepot-bgutilhttp"] == {
             "base_url": ["http://youtube-pot-provider:4416"],
