@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping, Sequence
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import pytest
 from pymongo.errors import DuplicateKeyError
@@ -20,6 +20,7 @@ from pickleball_vision.persistence.models import (
     MatchRecord,
     PlayerRecord,
     ProcessingJobRecord,
+    ProcessingJobStatus,
     StructuredDomainRecord,
 )
 from pickleball_vision.persistence.mongodb import (
@@ -118,7 +119,7 @@ class FakeCollection:
 
     async def find_one(self, filter: Mapping[str, object]) -> Document | None:
         for document in self.documents.values():
-            if all(document.get(key) == value for key, value in filter.items()):
+            if self._matches(document, filter):
                 return document.copy()
         return None
 
@@ -128,23 +129,31 @@ class FakeCollection:
         update: Mapping[str, object],
         *,
         return_document: object,
+        sort: Sequence[tuple[str, int]] | None = None,
     ) -> Document | None:
         del return_document
+        candidates = list(self.documents.values())
+        if sort:
+            for key, direction in reversed(sort):
+                candidates.sort(key=lambda item: str(item.get(key, "")), reverse=direction < 0)
         document = next(
-            (
-                item
-                for item in self.documents.values()
-                if all(item.get(key) == value for key, value in filter.items())
-            ),
+            (item for item in candidates if self._matches(item, filter)),
             None,
         )
         if document is None:
             return None
         set_values = update.get("$set", {})
         unset_values = update.get("$unset", {})
+        increment_values = update.get("$inc", {})
         assert isinstance(set_values, Mapping)
         assert isinstance(unset_values, Mapping)
+        assert isinstance(increment_values, Mapping)
         document.update(set_values)
+        for key, value in increment_values.items():
+            assert isinstance(key, str) and isinstance(value, int)
+            current = document.get(key, 0)
+            assert isinstance(current, int)
+            document[key] = current + value
         for key in unset_values:
             assert isinstance(key, str)
             document.pop(key, None)
@@ -160,9 +169,43 @@ class FakeCollection:
         documents = [
             document.copy()
             for document in self.documents.values()
-            if all(document.get(key) == value for key, value in filter.items())
+            if self._matches(document, filter)
         ]
         return FakeCursor(documents)
+
+    @classmethod
+    def _matches(cls, document: Mapping[str, object], filter: Mapping[str, object]) -> bool:
+        for key, expected in filter.items():
+            if key == "$or":
+                if not isinstance(expected, list) or not any(
+                    isinstance(item, Mapping) and cls._matches(document, item) for item in expected
+                ):
+                    return False
+                continue
+            actual = document.get(key)
+            if isinstance(expected, Mapping):
+                for operator, operand in expected.items():
+                    if operator == "$exists":
+                        if (key in document) is not bool(operand):
+                            return False
+                    elif operator == "$in":
+                        if not isinstance(operand, list) or actual not in operand:
+                            return False
+                    elif operator == "$lt":
+                        if actual is None or not actual < operand:
+                            return False
+                    elif operator == "$lte":
+                        if actual is None or not actual <= operand:
+                            return False
+                    elif operator == "$gte":
+                        if actual is None or not actual >= operand:
+                            return False
+                    else:
+                        raise AssertionError(f"unsupported fake query operator {operator}")
+                continue
+            if actual != expected:
+                return False
+        return True
 
 
 class FakeDatabase:
@@ -188,6 +231,9 @@ def test_mongodb_adapter_initializes_indexes_and_separate_collections() -> None:
         index["name"] == "ix_jobs_status_updated" for index in database["processing_jobs"].indexes
     )
     assert any(
+        index["name"] == "ix_jobs_worker_claim" for index in database["processing_jobs"].indexes
+    )
+    assert any(
         index["name"] == "uq_jobs_one_active_match"
         and index["unique"] is True
         and index["partialFilterExpression"] == {"active": True}
@@ -203,6 +249,155 @@ def test_mongodb_adapter_initializes_indexes_and_separate_collections() -> None:
         and index["partialFilterExpression"] == {"active": True}
         for index in database["corrections"].indexes
     )
+
+
+def test_worker_claim_is_atomic_heartbeats_and_recovers_after_expired_lease() -> None:
+    database = FakeDatabase()
+    persistence = MongoPersistence(database)
+    job = ProcessingJobRecord(
+        job_id="job_claim",
+        match_id="match_claim",
+        job_type="analyze_match",
+        status=ProcessingJobStatus.QUEUED,
+        stage=ProcessingJobStatus.QUEUED.value,
+        created_at=NOW,
+        updated_at=NOW,
+    )
+    asyncio.run(persistence.save_processing_job(job))
+
+    first = asyncio.run(
+        persistence.claim_next_processing_job(
+            worker_id="worker-one",
+            now=NOW,
+            lease_seconds=60,
+            max_attempts=2,
+        )
+    )
+    duplicate = asyncio.run(
+        persistence.claim_next_processing_job(
+            worker_id="worker-two",
+            now=NOW + timedelta(seconds=10),
+            lease_seconds=60,
+            max_attempts=2,
+        )
+    )
+    retained = asyncio.run(
+        persistence.heartbeat_processing_job(
+            "job_claim",
+            worker_id="worker-one",
+            now=NOW + timedelta(seconds=30),
+            lease_seconds=60,
+        )
+    )
+    recovered = asyncio.run(
+        persistence.claim_next_processing_job(
+            worker_id="worker-two",
+            now=NOW + timedelta(seconds=91),
+            lease_seconds=60,
+            max_attempts=2,
+        )
+    )
+
+    assert first is not None
+    assert first["workerId"] == "worker-one"
+    assert first["attemptCount"] == 1
+    assert duplicate is None
+    assert retained is True
+    assert recovered is not None
+    assert recovered["workerId"] == "worker-two"
+    assert recovered["attemptCount"] == 2
+
+
+def test_worker_exhausted_stale_job_is_failed_instead_of_stranded() -> None:
+    database = FakeDatabase()
+    persistence = MongoPersistence(database)
+    stale = ProcessingJobRecord(
+        job_id="job_stale",
+        match_id="match_stale",
+        job_type="analyze_match",
+        status=ProcessingJobStatus.PLAYER_PROCESSING,
+        stage=ProcessingJobStatus.PLAYER_PROCESSING.value,
+        claimed_at=NOW,
+        heartbeat_at=NOW,
+        lease_expires_at=NOW + timedelta(seconds=30),
+        worker_id="worker-gone",
+        attempt_count=2,
+        created_at=NOW,
+        updated_at=NOW,
+    )
+    asyncio.run(persistence.save_processing_job(stale))
+
+    failed = asyncio.run(
+        persistence.fail_exhausted_stale_processing_job(
+            now=NOW + timedelta(seconds=31),
+            max_attempts=2,
+        )
+    )
+
+    assert failed is not None
+    assert failed["status"] == "FAILED"
+    assert failed["active"] is False
+    assert failed["errorCode"] == "WORKER_ATTEMPTS_EXHAUSTED"
+    assert "workerId" not in failed
+
+
+def test_worker_failure_requeues_before_bounded_terminal_attempt() -> None:
+    database = FakeDatabase()
+    persistence = MongoPersistence(database)
+    job = ProcessingJobRecord(
+        job_id="job_retry",
+        match_id="match_retry",
+        job_type="analyze_match",
+        status=ProcessingJobStatus.QUEUED,
+        stage=ProcessingJobStatus.QUEUED.value,
+        claimed_at=NOW,
+        heartbeat_at=NOW,
+        lease_expires_at=NOW + timedelta(seconds=60),
+        worker_id="worker-one",
+        attempt_count=1,
+        created_at=NOW,
+        updated_at=NOW,
+    )
+    asyncio.run(persistence.save_processing_job(job))
+
+    requeued = asyncio.run(
+        persistence.release_or_fail_processing_job(
+            "job_retry",
+            worker_id="worker-one",
+            now=NOW + timedelta(seconds=1),
+            max_attempts=2,
+            error_code="WORKER_EXECUTION_FAILED",
+            error_message="safe failure",
+        )
+    )
+    assert requeued is not None
+    assert requeued["status"] == "QUEUED"
+    assert requeued["active"] is True
+    assert "workerId" not in requeued
+
+    claimed = asyncio.run(
+        persistence.claim_next_processing_job(
+            worker_id="worker-two",
+            now=NOW + timedelta(seconds=2),
+            lease_seconds=60,
+            max_attempts=2,
+        )
+    )
+    assert claimed is not None and claimed["attemptCount"] == 2
+    failed = asyncio.run(
+        persistence.release_or_fail_processing_job(
+            "job_retry",
+            worker_id="worker-two",
+            now=NOW + timedelta(seconds=3),
+            max_attempts=2,
+            error_code="WORKER_EXECUTION_FAILED",
+            error_message="safe failure",
+        )
+    )
+    assert failed is not None
+    assert failed["status"] == "FAILED"
+    assert failed["active"] is False
+    assert failed["failedAt"] == NOW + timedelta(seconds=3)
 
 
 def test_mongodb_adapter_persists_compact_records_without_one_huge_match_document() -> None:

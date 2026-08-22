@@ -1,5 +1,9 @@
 # On-demand match analysis with Render Workflows
 
+> Render Workflows remains a supported optional execution adapter. The active
+> no-proxy deployment uses `ANALYSIS_EXECUTION_MODE=mongodb_worker` and the macOS
+> worker documented in [`deployment.md`](deployment.md#macos-worker-installation).
+
 ## Why this execution model
 
 FastAPI must return quickly and must not run a multi-stage video pipeline inside an

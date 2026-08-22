@@ -24,9 +24,10 @@ from pickleball_vision.api.schemas.common import ErrorDetail, ErrorResponse, Jso
 from pickleball_vision.api.services.persistence import ApplicationPersistence
 from pickleball_vision.api.services.render_workflows import (
     AnalysisWorkflowClient,
+    MongoWorkerQueueClient,
     RenderWorkflowClient,
 )
-from pickleball_vision.api.settings import ApiSettings
+from pickleball_vision.api.settings import AnalysisExecutionMode, ApiSettings
 from pickleball_vision.errors import PickleballVisionError
 from pickleball_vision.persistence.mongodb import MongoPersistence
 
@@ -161,6 +162,8 @@ def _lifespan(
         owned_persistence: MongoPersistence | None = None
         if injected_workflow_client is not None:
             app.state.workflow_client = injected_workflow_client
+        elif settings.analysis_execution_mode is AnalysisExecutionMode.MONGODB_WORKER:
+            app.state.workflow_client = MongoWorkerQueueClient()
         elif settings.render_api_key is not None and settings.render_workflow_task is not None:
             app.state.workflow_client = RenderWorkflowClient(
                 api_key=settings.render_api_key,

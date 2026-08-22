@@ -608,21 +608,27 @@ class MatchApplicationService:
                 details={"exceptionType": type(error).__name__},
             ) from error
         triggered_at = datetime.now(UTC)
+        queue_fields: dict[str, object] = {
+            "status": ProcessingJobStatus.QUEUED.value,
+            "stage": ProcessingJobStatus.QUEUED.value,
+        }
+        if workflow_run.run_id is not None:
+            queue_fields.update(
+                {
+                    "renderTriggeredAt": triggered_at,
+                    "renderTaskRunId": workflow_run.run_id,
+                }
+            )
         queued = await self._persistence.update_processing_job(
             record.job_id,
-            {
-                "status": ProcessingJobStatus.QUEUED.value,
-                "stage": ProcessingJobStatus.QUEUED.value,
-                "renderTriggeredAt": triggered_at,
-                "renderTaskRunId": workflow_run.run_id,
-            },
+            queue_fields,
             updated_at=triggered_at,
         )
         if queued is None:
             raise ApiError(
                 status_code=503,
                 code="workflow_job_update_failed",
-                message="Analysis was queued but its task-run ID could not be persisted",
+                message="Analysis was queued but its job state could not be persisted",
             )
         return _record(JobResponse, queued)
 

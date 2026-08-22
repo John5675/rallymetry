@@ -5,18 +5,18 @@
 ```text
 Friends -> Vercel React/Vite -> persistent FastAPI -> MongoDB Atlas
                                       |
-                                      +-> Render Workflows queue
-                                             |
-                                      on-demand analyze_match
-                                             |
-                                      MongoDB + Vercel Blob
-                                             |
-                                      existing website refreshes data
+                                      +-> QUEUED processing job
+
+Developer Mac -> single local worker -> authorized source retrieval + CV/audio
+                                      -> MongoDB + Vercel Blob
+                                      -> existing website refreshes data
 ```
 
 Vercel hosts only the static React/Vite application. FastAPI runs on a small
-persistent Python host. Heavy analysis runs only in an on-demand Render Workflow
-task, never in FastAPI, Vercel Functions, or an always-on polling process.
+persistent Python host. Heavy analysis runs on the developer's Mac through a
+single-concurrency MongoDB worker, never in FastAPI, Vercel Functions, or an HTTP
+request. This avoids cloud YouTube egress blocks and requires no inbound connection
+to the Mac. Jobs remain queued while the Mac is offline.
 
 ## Environment boundaries
 
@@ -34,15 +34,14 @@ No MongoDB, Blob, or Render credential is browser-visible.
 MONGODB_URL=mongodb+srv://...
 MONGODB_DATABASE=rallymetry
 CORS_ORIGINS=http://localhost:5173,https://rallymetry.vercel.app
-RENDER_API_KEY=...
-RENDER_WORKFLOW_TASK=rallymetry-analysis/analyze_match
+ANALYSIS_EXECUTION_MODE=mongodb_worker
 DEFAULT_ANALYSIS_PROFILE_MATCH_ID=match_...
 ```
 
-FastAPI needs the Render key only to call the async task-start API. It does not need
-model files and does not wait for task completion.
+FastAPI creates the durable job but does not need model files, Blob credentials, or
+Render workflow credentials and does not wait for task completion.
 
-### Render Workflow
+### Developer-machine worker
 
 ```text
 MONGODB_URL=mongodb+srv://...
@@ -53,28 +52,33 @@ PUBLIC_BLOB_READ_WRITE_TOKEN=...
 PIPELINE_CONFIG=<absolute path to render-workflow-pipeline-plan.json>
 MODEL_DEVICE=cpu
 WORKFLOW_TEMP_DIR=/tmp/rallymetry
-RENDER_WORKFLOW_PLAN=pro
-RENDER_WORKFLOW_TIMEOUT_SECONDS=21600
 YOUTUBE_MAX_DURATION_SECONDS=7200
 YOUTUBE_MAX_BYTES=4000000000
+WORKER_ID=johns-mac
+WORKER_POLL_SECONDS=10
+WORKER_HEARTBEAT_SECONDS=30
+WORKER_LEASE_SECONDS=180
+WORKER_MAX_ATTEMPTS=2
 ```
 
-The workflow does not need `RENDER_API_KEY`. Secrets belong in deployment secret
-stores and must never be committed.
+The worker does not need `RENDER_API_KEY`, a residential proxy, or inbound network
+access. It needs outbound access to YouTube, MongoDB Atlas, and Vercel Blob. Only
+process recordings the submitter owns or is authorized to analyze. Secrets live in
+the ignored `.env.worker` file with mode `0600` and must never be committed.
 
 ## MongoDB Atlas
 
 1. Use a dedicated `rallymetry` database inside the Atlas cluster. Do not reuse or
    modify unrelated application collections.
 2. Create a least-privilege database user for Rallymetry and store the connection
-   string as `MONGODB_URL` on FastAPI and the workflow service.
+   string as `MONGODB_URL` on FastAPI and the local worker.
 3. Permit outbound connections from the selected hosts according to the Atlas
    network policy.
 4. Start FastAPI once so `initialize_indexes()` creates Rallymetry's indexes,
    including the partial unique active-job index.
 5. MongoDB stores compact match, job, rally, contact, bounce, shot, analytics, and
-   artifact metadata. It does not store videos, weights, waveforms, frame dumps, or
-   large raw detections, and it is not polled as a task queue.
+   artifact metadata. It coordinates this small single-worker queue but does not
+   store videos, weights, waveforms, frame dumps, or large raw detections.
 
 ## Vercel Blob
 
@@ -85,11 +89,11 @@ Use two stores:
 - a public store only for friend-viewable `VIEWABLE_MEDIA`.
 
 Set the private token as `BLOB_READ_WRITE_TOKEN` and public token as
-`PUBLIC_BLOB_READ_WRITE_TOKEN` on the workflow. Never put either in `VITE_*`.
+`PUBLIC_BLOB_READ_WRITE_TOKEN` on the worker. Never put either in `VITE_*`.
 Artifact paths are randomized. Source recordings remain private. An unlisted YouTube
-ID remains the normal browser playback source and may also be downloaded directly by
-the on-demand Render task for one-click submissions. That copy is bounded, temporary,
-and never made public.
+ID remains the normal browser playback source and may also be retrieved temporarily
+by the local worker for an authorized one-click submission. That copy is bounded,
+cleaned after processing, and never made public.
 
 Before analysis, each match must reference either one private source artifact or one
 validated YouTube video ID, plus four private setup artifacts in `analysisSetup`; see
@@ -128,26 +132,35 @@ The root `vercel.json` owns the monorepo SPA contract:
 Set `VITE_API_BASE_URL` to the public FastAPI origin and deploy. Add the exact Vercel
 domain (and optional custom domain) to FastAPI's comma-separated `CORS_ORIGINS`.
 
-## Render Workflow deployment
+## macOS worker installation
 
-Render Workflows are configured separately in the Render Dashboard rather than as a
-Background Worker:
+From the repository root:
 
-1. Choose **New > Workflow** and connect this repository.
-2. Root directory: `services/vision`.
-3. Build command: `uv sync --locked`.
-4. Start command: `uv run python -m pickleball_vision.workflows.app`.
-5. Add the workflow environment above.
-6. Confirm `analyze_match` registers with plan `pro`, timeout `21600`, and one retry.
-7. Copy the task identifier `{workflow-slug}/analyze_match` into FastAPI's
-   `RENDER_WORKFLOW_TASK`.
-8. Put a least-privilege Render API key in FastAPI's `RENDER_API_KEY`, redeploy the
-   API once, and verify the key is absent from frontend environment output.
+```bash
+cp .env.worker.example .env.worker
+chmod 600 .env.worker
+```
 
-The workflow queues work and provisions/deprovisions task compute. There is no
-Rallymetry polling command to keep running. Full local and hosted workflow commands,
-retry behavior, status semantics, and debugging are in
-[`render-workflows.md`](render-workflows.md).
+Fill `MONGODB_URL` and, if they are not already supplied by the ignored Vercel CLI
+`.env.local`, the two Blob tokens. Validate one queue poll in the foreground:
+
+```bash
+./scripts/run-local-worker.sh --once
+```
+
+Install the persistent per-user LaunchAgent:
+
+```bash
+./scripts/install-macos-worker.sh
+launchctl print gui/$UID/com.rallymetry.worker
+tail -f ~/Library/Logs/rallymetry-worker.log
+```
+
+The worker atomically claims one job, heartbeats while processing, and permits a
+bounded stale-lease recovery. Direct private MP4 source artifacts remain the
+fallback when an authorized YouTube recording cannot be retrieved. Render Workflow
+support remains available as the explicit `render_workflow` execution mode, but it
+is not the active no-proxy deployment path.
 
 ## Smoke test
 
@@ -156,16 +169,16 @@ retry behavior, status semantics, and debugging are in
 3. `DEFAULT_ANALYSIS_PROFILE_MATCH_ID` points to a match with the required setup.
 4. Paste a YouTube link in the match library, or call
    `POST /api/matches/import-youtube`; verify `202` quickly with `jobId`,
-   `processingRunId`, and `renderTaskRunId`.
-5. A duplicate request returns that active job and creates no second Render run.
-6. Render Dashboard shows one `analyze_match` run. `GET /api/jobs/<jobId>` advances
-   through domain stages.
+   `processingRunId`, `status=QUEUED`, and no `renderTaskRunId`.
+5. A duplicate request returns that active job and creates no second queue entry.
+6. The Mac worker log shows one atomic claim. `GET /api/jobs/<jobId>` advances
+   through domain stages and exposes heartbeat/lease timestamps.
 7. On completion, structured endpoints return rallies/shots/analytics and the
    artifact endpoint exposes only intended public viewable URLs.
 8. Refresh the already deployed website. The completed match appears without a new
    Vercel deployment.
-9. Confirm `/tmp/rallymetry/<jobId>` no longer exists after both success and a forced
-   failure.
+9. Confirm `output/worker-tmp/<jobId>` no longer exists after both success and a
+   forced failure.
 
 The production plan also runs the bundled eight-video AI visual-review overlay
 after shot reconstruction. The overlay is source-hash gated, never changes machine
@@ -176,8 +189,8 @@ visual-review best guess. Unrelated uploads cannot inherit those labels.
 
 ## Rollback and failure diagnosis
 
-Disabling `RENDER_WORKFLOW_TASK`/`RENDER_API_KEY` makes `/process` return a controlled
-`workflow_unavailable` error while read-only match pages remain available. A failed
-task records `FAILED`, `failedStage`, `errorCode`, and a safe message in MongoDB.
-Use `renderTaskRunId` to inspect full Render logs. Never copy provider credentials
-into error fields or browser logs.
+Set `ANALYSIS_EXECUTION_MODE=mongodb_worker` for the local-worker path. A stopped Mac
+leaves jobs queued; an interrupted claimed job becomes reclaimable after its lease
+expires. Bounded failures retain `FAILED`, `failedStage`, `errorCode`, and a safe
+message in MongoDB. Inspect local logs without copying credentials into error fields
+or browser logs.

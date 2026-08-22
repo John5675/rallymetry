@@ -41,10 +41,11 @@ through the official PyMongo Async API and large artifacts through interchangeab
 local-filesystem or Vercel Blob adapters without making cloud access a CLI
 prerequisite. A separate FastAPI control plane now exposes JSON match/result records
 and creates durable processing-job status without running analysis in HTTP requests.
-FastAPI triggers one on-demand Render Workflow task for each accepted match. Render
-stages private Blob media and setup, invokes an explicit operator-controlled plan of
-existing CLI stages, persists compact structured results, publishes an allow-list of
-viewable artifacts, cleans temporary storage, and then deprovisions its compute.
+In the active hybrid mode, FastAPI queues each accepted match in MongoDB and a
+single-concurrency worker on the developer's Mac atomically claims it. The worker
+stages private Blob or authorized YouTube media and setup, invokes an explicit
+operator-controlled plan of existing CLI stages, persists compact structured results,
+publishes an allow-list of viewable artifacts, and cleans temporary storage.
 The strict TypeScript browser application presents match status, public review
 media, structured timelines, rallies, shots, player metrics, deterministic analytics,
 heatmaps, and defensible court-plane landing maps through the FastAPI contract.
@@ -55,18 +56,18 @@ heatmaps, and defensible court-plane landing maps through the FastAPI contract.
 - `apps/web/`: strict TypeScript React/Vite match dashboard
 - `docs/`: architecture, coordinate, annotation, and analytics contracts
 - `ml/`: local datasets plus versioned training, evaluation, and experiment workspaces
-- `scripts/`: future repository-level utilities
+- `scripts/`: thin local-worker launch and repository-level utilities
 - `sample-data/`: local-only media and small documented examples
 - `output/`: generated local artifacts; never source-controlled
 - `PLANS.md`: ordered milestones and the single current milestone
 - `AGENTS.md`: durable rules for humans and coding agents
 
 The locked product stack is a React/Vite/TypeScript frontend, a FastAPI product API,
-MongoDB Atlas for hosted structured data and durable job status, Vercel Blob for
-hosted media/artifacts, and on-demand Render Workflows that invoke the existing
-pipeline. Heavy analysis does not run in Vercel Functions, inside FastAPI requests,
-or in an always-on polling worker. The persistence adapters, FastAPI control plane,
-workflow task, and browser dashboard are implemented. Milestone 23 adds the Vercel
+MongoDB Atlas for hosted structured data and the small worker queue, Vercel Blob for
+hosted media/artifacts, and a developer-machine worker that invokes the existing
+pipeline. Heavy analysis does not run in Vercel Functions or inside FastAPI requests.
+The persistence adapters, FastAPI control plane, optional Render Workflow adapter,
+local worker, and browser dashboard are implemented. Milestone 23 adds the Vercel
 SPA build contract, a vendor-neutral persistent FastAPI container, exact
 environment-driven CORS, and separate private/public Blob routing. See
 the

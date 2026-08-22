@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>com.rallymetry.worker</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/zsh</string>
+    <string>__REPO_ROOT__/scripts/run-local-worker.sh</string>
+  </array>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>RALLYMETRY_WORKER_ENV</key>
+    <string>__REPO_ROOT__/.env.worker</string>
+  </dict>
+  <key>RunAtLoad</key>
+  <true/>
+  <key>KeepAlive</key>
+  <true/>
+  <key>ProcessType</key>
+  <string>Background</string>
+  <key>ThrottleInterval</key>
+  <integer>10</integer>
+  <key>StandardOutPath</key>
+  <string>__HOME__/Library/Logs/rallymetry-worker.log</string>
+  <key>StandardErrorPath</key>
+  <string>__HOME__/Library/Logs/rallymetry-worker-error.log</string>
+</dict>
+</plist>

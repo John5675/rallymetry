@@ -928,6 +928,34 @@ Exit criteria:
   pass.
 - No AI coaching is implemented and no claim of zero authoritative unknowns is made.
 
+## 24B. Hybrid local analysis worker — complete
+
+Keep friend-facing YouTube submission and durable hosted results while moving source
+retrieval and heavy analysis to an explicitly configured worker on the developer's
+Mac. MongoDB is the small-scale queue for this execution mode; Render remains the
+FastAPI host and no residential proxy is required.
+
+Exit criteria:
+
+- FastAPI supports an environment-selected `mongodb_worker` execution mode that
+  atomically creates a `QUEUED` job and returns `202 Accepted` without starting a
+  Render Workflow or performing analysis in the request.
+- A standalone `pickleball-vision worker` process atomically claims one MongoDB job
+  at a time, retains worker ownership, heartbeat, lease, and attempt metadata, and
+  cannot double-process a job claimed by another worker.
+- Expired leases are recoverable with bounded attempts; exhausted or failed jobs
+  retain a safe stage, code, and message rather than remaining stranded forever.
+- The worker reuses the existing source stager, local YouTube downloader, pipeline
+  runner, MongoDB persistence, and Vercel Blob publication path without duplicating
+  CV, audio, or analytics logic.
+- A macOS launcher and environment template make the worker restartable without
+  committing MongoDB or Blob credentials. The worker needs outbound access only.
+- Direct private source-media artifacts remain supported as the reliable fallback
+  for recordings that cannot be retrieved from an authorized YouTube source.
+- Tests cover queue-only API dispatch, atomic claiming, double-claim prevention,
+  heartbeat, stale recovery, bounded failures, and one successful worker execution.
+- Python tests, Ruff checks/formatting, mypy, and the CLI doctor pass.
+
 ## Future milestones — not current
 
 25. AI coaching

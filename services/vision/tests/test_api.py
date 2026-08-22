@@ -9,7 +9,7 @@ from fastapi.testclient import TestClient
 
 from pickleball_vision.api.main import create_app
 from pickleball_vision.api.services.render_workflows import WorkflowRun
-from pickleball_vision.api.settings import ApiSettings
+from pickleball_vision.api.settings import AnalysisExecutionMode, ApiSettings
 from pickleball_vision.config import PersistenceSettings
 from pickleball_vision.persistence.models import (
     AnalyticsRecord,
@@ -606,6 +606,26 @@ def test_process_endpoint_only_persists_queued_job_and_returns_202() -> None:
     assert workflow.starts == [(payload["jobId"], "match_seed")]
     assert fetched.status_code == 200
     assert fetched.json() == payload
+
+
+def test_process_endpoint_can_queue_for_local_mongodb_worker_without_render() -> None:
+    persistence = seed_persistence()
+    app = create_app(
+        settings=ApiSettings(
+            analysis_execution_mode=AnalysisExecutionMode.MONGODB_WORKER,
+        ),
+        persistence=persistence,
+    )
+
+    with TestClient(app) as client:
+        queued = client.post("/api/matches/match_seed/process")
+
+    assert queued.status_code == 202
+    payload = queued.json()
+    assert payload["status"] == "QUEUED"
+    assert payload["renderTaskRunId"] is None
+    assert payload["renderTriggeredAt"] is None
+    assert payload["processingRunId"].startswith("run_")
 
 
 def test_duplicate_process_request_returns_active_job_without_second_render_run() -> None:

@@ -231,7 +231,10 @@ class OnDemandAnalysisOrchestrator:
             raise AnalysisPipelineError("workflow identifiers refer to different matches")
         if job.processing_run_id is None:
             raise AnalysisPipelineError("processing job has no stable processingRunId")
-        attempt = job.attempt_count + 1
+        # MongoDB workers consume an attempt when they atomically claim the job.
+        # Render Workflow runs have no worker lease and retain the original
+        # start-time increment behavior.
+        attempt = job.attempt_count if job.worker_id is not None else job.attempt_count + 1
         now = datetime.now(UTC)
         updated = await self._persistence.update_processing_job(
             job_id,

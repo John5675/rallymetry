@@ -12,7 +12,7 @@ from render_sdk import RenderAsync  # type: ignore[import-untyped]
 class WorkflowRun:
     """Initial infrastructure state returned without waiting for task completion."""
 
-    run_id: str
+    run_id: str | None
     status: str
 
 
@@ -46,3 +46,15 @@ class RenderWorkflowClient:
         details = await self._client.workflows.get_task_run(run_id)
         status = getattr(details, "status", "unknown")
         return WorkflowRun(run_id=cast(str, details.id), status=str(status))
+
+
+class MongoWorkerQueueClient:
+    """Acknowledge a durable MongoDB job for a separately polling worker."""
+
+    async def start_analysis(self, *, job_id: str, match_id: str) -> WorkflowRun:
+        del job_id, match_id
+        return WorkflowRun(run_id=None, status="QUEUED")
+
+    async def get_run(self, run_id: str) -> WorkflowRun:
+        del run_id
+        return WorkflowRun(run_id=None, status="QUEUED")

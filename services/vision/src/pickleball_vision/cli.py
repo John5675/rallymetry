@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import asyncio
 import json
 import logging
 import sys
@@ -39,6 +40,7 @@ from pickleball_vision.dataset_workflow import (
 )
 from pickleball_vision.errors import ErrorCode, PickleballVisionError
 from pickleball_vision.hitter_identification_workflow import identify_hitters_in_video
+from pickleball_vision.local_worker import run_local_worker
 from pickleball_vision.logging import configure_logging
 from pickleball_vision.match_analytics_workflow import analyze_match
 from pickleball_vision.match_annotation_ui import serve_match_annotation
@@ -76,6 +78,15 @@ def build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser(
         "doctor",
         help="validate Foundation configuration and report service metadata",
+    )
+    worker_parser = subparsers.add_parser(
+        "worker",
+        help="poll MongoDB and process queued matches on this computer",
+    )
+    worker_parser.add_argument(
+        "--once",
+        action="store_true",
+        help="claim at most one queued job and then exit",
     )
 
     inspect_parser = subparsers.add_parser(
@@ -1720,6 +1731,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         logger = configure_logging(level=settings.log_level, log_format=settings.log_format)
         if args.command == "doctor":
             return _run_doctor(settings)
+        if args.command == "worker":
+            return asyncio.run(run_local_worker(once=cast(bool, args.once)))
         if args.command == "inspect":
             return _run_inspect(cast(Path, args.video), settings=settings)
         if args.command == "extract-frame":

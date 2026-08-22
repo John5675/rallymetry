@@ -381,7 +381,7 @@ class AnalyticsRecord:
 
 @dataclass(frozen=True, slots=True)
 class ProcessingJobRecord:
-    """Durable status record for one on-demand Render Workflow run."""
+    """Durable status record for one on-demand analysis run."""
 
     job_id: str
     match_id: str
@@ -390,6 +390,10 @@ class ProcessingJobRecord:
     progress: float = 0.0
     stage: str | None = None
     render_triggered_at: datetime | None = None
+    claimed_at: datetime | None = None
+    heartbeat_at: datetime | None = None
+    lease_expires_at: datetime | None = None
+    worker_id: str | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
     failed_at: datetime | None = None
@@ -418,6 +422,9 @@ class ProcessingJobRecord:
         object.__setattr__(self, "stage", _optional_text(self.stage, "stage"))
         for field_name in (
             "render_triggered_at",
+            "claimed_at",
+            "heartbeat_at",
+            "lease_expires_at",
             "started_at",
             "completed_at",
             "failed_at",
@@ -425,6 +432,11 @@ class ProcessingJobRecord:
             value = getattr(self, field_name)
             if value is not None:
                 object.__setattr__(self, field_name, _utc_datetime(value, field_name))
+        object.__setattr__(
+            self,
+            "worker_id",
+            _optional_text(self.worker_id, "worker_id"),
+        )
         object.__setattr__(
             self,
             "failed_stage",
@@ -522,6 +534,10 @@ class ProcessingJobRecord:
         optional: dict[str, object | None] = {
             "stage": self.stage,
             "renderTriggeredAt": self.render_triggered_at,
+            "claimedAt": self.claimed_at,
+            "heartbeatAt": self.heartbeat_at,
+            "leaseExpiresAt": self.lease_expires_at,
+            "workerId": self.worker_id,
             "startedAt": self.started_at,
             "completedAt": self.completed_at,
             "failedAt": self.failed_at,
@@ -882,6 +898,10 @@ def processing_job_from_document(document: Mapping[str, object]) -> ProcessingJo
         progress=float(progress),
         stage=_document_string(document, "stage"),
         render_triggered_at=_document_datetime(document, "renderTriggeredAt"),
+        claimed_at=_document_datetime(document, "claimedAt"),
+        heartbeat_at=_document_datetime(document, "heartbeatAt"),
+        lease_expires_at=_document_datetime(document, "leaseExpiresAt"),
+        worker_id=_document_string(document, "workerId"),
         started_at=_document_datetime(document, "startedAt"),
         completed_at=_document_datetime(document, "completedAt"),
         failed_at=_document_datetime(document, "failedAt"),

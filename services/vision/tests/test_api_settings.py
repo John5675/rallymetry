@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import pytest
 
-from pickleball_vision.api.settings import ApiSettings
+from pickleball_vision.api.settings import AnalysisExecutionMode, ApiSettings
 from pickleball_vision.config import ArtifactBackend
 from pickleball_vision.errors import ConfigurationError
 
@@ -74,3 +74,17 @@ def test_api_settings_require_render_trigger_values_together() -> None:
 def test_api_settings_validate_render_task_slug() -> None:
     with pytest.raises(ConfigurationError):
         ApiSettings.from_env({"RENDER_API_KEY": "secret", "RENDER_WORKFLOW_TASK": "analyze_match"})
+
+
+def test_api_settings_select_mongodb_worker_without_render_credentials() -> None:
+    settings = ApiSettings.from_env({"ANALYSIS_EXECUTION_MODE": "mongodb_worker"})
+
+    assert settings.analysis_execution_mode is AnalysisExecutionMode.MONGODB_WORKER
+    assert settings.public_values()["analysisExecutionMode"] == "mongodb_worker"
+
+
+def test_api_settings_reject_unknown_analysis_execution_mode() -> None:
+    with pytest.raises(ConfigurationError) as raised:
+        ApiSettings.from_env({"ANALYSIS_EXECUTION_MODE": "free-cloud-magic"})
+
+    assert raised.value.details["setting"] == "ANALYSIS_EXECUTION_MODE"

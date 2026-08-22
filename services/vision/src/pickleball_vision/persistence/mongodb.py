@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import math
 from collections.abc import AsyncIterator, Mapping, Sequence
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Protocol, cast
 
 from bson import BSON
@@ -92,6 +92,7 @@ class _AsyncCollection(Protocol):
         update: Mapping[str, object],
         *,
         return_document: object,
+        sort: Sequence[tuple[str, int]] | None = None,
     ) -> Document | None: ...
 
     async def count_documents(self, filter: Mapping[str, object]) -> int: ...
@@ -261,6 +262,17 @@ class MongoPersistence:
                     False,
                     False,
                     "ix_jobs_status_updated",
+                    None,
+                ),
+                (
+                    (
+                        ("active", ASCENDING),
+                        ("leaseExpiresAt", ASCENDING),
+                        ("createdAt", ASCENDING),
+                    ),
+                    False,
+                    False,
+                    "ix_jobs_worker_claim",
                     None,
                 ),
                 (
@@ -487,6 +499,197 @@ class MongoPersistence:
         except PyMongoError as error:
             raise PersistenceOperationError(
                 "update_processing_job",
+                reason=_driver_reason(error),
+            ) from error
+
+    async def claim_next_processing_job(
+        self,
+        *,
+        worker_id: str,
+        now: datetime,
+        lease_seconds: int,
+        max_attempts: int,
+    ) -> Document | None:
+        """Atomically claim the oldest queued or stale active job for one worker."""
+
+        if not worker_id.strip():
+            raise PersistenceValidationError("worker_id must not be empty")
+        if lease_seconds < 1 or max_attempts < 1:
+            raise PersistenceValidationError("worker lease and attempts must be positive")
+        lease_expires_at = now + timedelta(seconds=lease_seconds)
+        claimable_statuses = [
+            status.value
+            for status in ProcessingJobStatus
+            if status
+            not in {
+                ProcessingJobStatus.COMPLETE,
+                ProcessingJobStatus.FAILED,
+                ProcessingJobStatus.CANCELED,
+                ProcessingJobStatus.CANCEL_REQUESTED,
+            }
+        ]
+        query: Document = {
+            "active": True,
+            "status": {"$in": claimable_statuses},
+            "attemptCount": {"$lt": max_attempts},
+            "$or": [
+                {
+                    "status": ProcessingJobStatus.QUEUED.value,
+                    "workerId": {"$exists": False},
+                },
+                {"leaseExpiresAt": {"$lte": now}},
+            ],
+        }
+        update: Document = {
+            "$set": {
+                "workerId": worker_id,
+                "claimedAt": now,
+                "heartbeatAt": now,
+                "leaseExpiresAt": lease_expires_at,
+                "updatedAt": now,
+            },
+            "$inc": {"attemptCount": 1},
+        }
+        try:
+            return await self._database["processing_jobs"].find_one_and_update(
+                query,
+                update,
+                sort=[("createdAt", ASCENDING)],
+                return_document=ReturnDocument.AFTER,
+            )
+        except PyMongoError as error:
+            raise PersistenceOperationError(
+                "claim_next_processing_job",
+                reason=_driver_reason(error),
+            ) from error
+
+    async def heartbeat_processing_job(
+        self,
+        job_id: str,
+        *,
+        worker_id: str,
+        now: datetime,
+        lease_seconds: int,
+    ) -> bool:
+        """Extend a lease only while the same worker still owns an active job."""
+
+        if lease_seconds < 1:
+            raise PersistenceValidationError("worker lease must be positive")
+        try:
+            updated = await self._database["processing_jobs"].find_one_and_update(
+                {"_id": job_id, "workerId": worker_id, "active": True},
+                {
+                    "$set": {
+                        "heartbeatAt": now,
+                        "leaseExpiresAt": now + timedelta(seconds=lease_seconds),
+                        "updatedAt": now,
+                    }
+                },
+                return_document=ReturnDocument.AFTER,
+            )
+            return updated is not None
+        except PyMongoError as error:
+            raise PersistenceOperationError(
+                "heartbeat_processing_job",
+                reason=_driver_reason(error),
+            ) from error
+
+    async def release_or_fail_processing_job(
+        self,
+        job_id: str,
+        *,
+        worker_id: str,
+        now: datetime,
+        max_attempts: int,
+        error_code: str,
+        error_message: str,
+    ) -> Document | None:
+        """Return a failed claim to the queue, or fail it after bounded attempts."""
+
+        document = await self.get_processing_job(job_id)
+        if document is None or document.get("workerId") != worker_id:
+            return None
+        attempt_count = document.get("attemptCount", 0)
+        if not isinstance(attempt_count, int):
+            raise PersistenceValidationError("persisted attemptCount must be an integer")
+        terminal = attempt_count >= max_attempts
+        set_values: Document = {
+            "status": (
+                ProcessingJobStatus.FAILED.value if terminal else ProcessingJobStatus.QUEUED.value
+            ),
+            "stage": (
+                ProcessingJobStatus.FAILED.value if terminal else ProcessingJobStatus.QUEUED.value
+            ),
+            "active": not terminal,
+            "errorCode": error_code,
+            "errorMessage": error_message[:512],
+            "updatedAt": now,
+        }
+        if terminal:
+            set_values["failedAt"] = now
+            failed_stage = document.get("stage")
+            if isinstance(failed_stage, str):
+                set_values["failedStage"] = failed_stage
+        update: Document = {
+            "$set": set_values,
+            "$unset": {
+                "claimedAt": "",
+                "heartbeatAt": "",
+                "leaseExpiresAt": "",
+                "workerId": "",
+            },
+        }
+        try:
+            return await self._database["processing_jobs"].find_one_and_update(
+                {"_id": job_id, "workerId": worker_id, "active": True},
+                update,
+                return_document=ReturnDocument.AFTER,
+            )
+        except PyMongoError as error:
+            raise PersistenceOperationError(
+                "release_or_fail_processing_job",
+                reason=_driver_reason(error),
+            ) from error
+
+    async def fail_exhausted_stale_processing_job(
+        self,
+        *,
+        now: datetime,
+        max_attempts: int,
+    ) -> Document | None:
+        """Terminate one expired job that has consumed every allowed attempt."""
+
+        try:
+            return await self._database["processing_jobs"].find_one_and_update(
+                {
+                    "active": True,
+                    "leaseExpiresAt": {"$lte": now},
+                    "attemptCount": {"$gte": max_attempts},
+                },
+                {
+                    "$set": {
+                        "status": ProcessingJobStatus.FAILED.value,
+                        "stage": ProcessingJobStatus.FAILED.value,
+                        "active": False,
+                        "failedAt": now,
+                        "failedStage": "WORKER_LEASE_EXPIRED",
+                        "errorCode": "WORKER_ATTEMPTS_EXHAUSTED",
+                        "errorMessage": "Local analysis worker stopped before completing the job",
+                        "updatedAt": now,
+                    },
+                    "$unset": {
+                        "claimedAt": "",
+                        "heartbeatAt": "",
+                        "leaseExpiresAt": "",
+                        "workerId": "",
+                    },
+                },
+                sort=[("createdAt", ASCENDING)],
+                return_document=ReturnDocument.AFTER,
+            )
+        except PyMongoError as error:
+            raise PersistenceOperationError(
+                "fail_exhausted_stale_processing_job",
                 reason=_driver_reason(error),
             ) from error
 

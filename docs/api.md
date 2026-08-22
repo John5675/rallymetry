@@ -22,8 +22,9 @@ depend on `ApplicationPersistence`; the production lifespan supplies
 | `PICKLEBALL_VISION_ARTIFACT_BACKEND` | No | `local` | Artifact backend reported by health/config |
 | `PICKLEBALL_VISION_LOCAL_ARTIFACT_ROOT` | No | `output/artifacts` | Local artifact root |
 | `BLOB_READ_WRITE_TOKEN` | Not needed by FastAPI trigger | unset | Workflow-side Blob credential |
-| `RENDER_API_KEY` | For `/process` | unset | Server-side Render task-start credential |
-| `RENDER_WORKFLOW_TASK` | With Render key | unset | `{workflow-slug}/analyze_match` identifier |
+| `ANALYSIS_EXECUTION_MODE` | No | `render_workflow` | `mongodb_worker` queues without starting Render compute |
+| `RENDER_API_KEY` | Render mode only | unset | Server-side Render task-start credential |
+| `RENDER_WORKFLOW_TASK` | Render mode only | unset | `{workflow-slug}/analyze_match` identifier |
 
 `CORS_ORIGINS` values must be complete HTTP or HTTPS origins without paths, queries,
 or fragments. A wildcard may be used only by itself. CORS credentials are disabled
@@ -41,8 +42,7 @@ From `services/vision`:
 export MONGODB_URL='mongodb+srv://<user>:<password>@<cluster>/'
 export MONGODB_DATABASE='pickleball_vision'
 export CORS_ORIGINS='http://localhost:5173'
-export RENDER_API_KEY='<server-side-key>'
-export RENDER_WORKFLOW_TASK='rallymetry-analysis/analyze_match'
+export ANALYSIS_EXECUTION_MODE='mongodb_worker'
 
 uv run uvicorn pickleball_vision.api.main:app \
   --host 127.0.0.1 \
@@ -104,8 +104,8 @@ Optional `visualEvidence` and `audioEvidence` are compact structured references 
 summaries only. Video, images, waveforms, and other binaries remain artifacts.
 
 `youtubeVideoId`, when provided, is the exact 11-character YouTube video ID using
-letters, numbers, `_`, or `-`. It is metadata for browser embedding; the API does
-not download the video.
+letters, numbers, `_`, or `-`. It is metadata for browser embedding and a worker
+source reference; the API does not download the video.
 
 ## Process submission
 
@@ -125,18 +125,17 @@ source/setup artifacts, atomically creates at most one active
   "sourceType": "BLOB",
   "sourceArtifactId": "artifact_<id>",
   "processingRunId": "run_<id>",
-  "renderTaskRunId": "trn-...",
   "resultArtifactIds": []
 }
 ```
 
-The API uses the official async Render SDK to start the configured `analyze_match`
-task and stores its initial task-run ID; it does not await task completion. Missing
-source/setup returns `409`, and a trigger failure records `FAILED` and returns a safe
-`503`. A duplicate request returns the existing active job without a second Render
-run. The response is `202 Accepted` with a `Location` header. The task writes domain
-progress; `GET /api/jobs/{jobId}` exposes safe stage/timestamp/attempt/error fields.
-See [`render-workflows.md`](render-workflows.md).
+In `mongodb_worker` mode, the API leaves the job queued for an atomic worker claim;
+it does not call Render or await task completion. Missing source/setup returns `409`.
+A duplicate request returns the existing active job without a second queue entry.
+The response is `202 Accepted` with a `Location` header. The worker writes ownership,
+heartbeat, lease, and domain progress; `GET /api/jobs/{jobId}` exposes safe
+stage/timestamp/attempt/error fields. In optional `render_workflow` mode, the response
+also retains `renderTaskRunId`; see [`render-workflows.md`](render-workflows.md).
 
 ## Errors and request logging
 

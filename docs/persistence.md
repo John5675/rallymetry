@@ -84,15 +84,17 @@ a match does not become one unbounded document.
 | `bounces` | Structured bounce records | unique match/record; match/time |
 | `shots` | Structured shot records | unique match/record; match/time |
 | `analytics` | Deterministic metrics, calculation version, input references | unique match/analytics ID |
-| `processing_jobs` | Workflow status, progress, attempts, Render/run IDs, errors, source/result references | match/create time; status/update time; unique active match |
+| `processing_jobs` | Worker ownership/lease, status, progress, attempts, optional Render/run IDs, errors, source/result references | match/create time; status/update time; worker claim; unique active match |
 | `corrections` | Immutable prediction snapshots plus revisioned human semantic corrections | unique active match/type/target; match/corrected time |
 | `artifacts` | Provider-neutral artifact manifests | unique pathname; match/time; match/category |
 
-Render Workflows owns task queuing/execution; MongoDB is not polled as a queue. The
-Milestone 21 [on-demand workflow](render-workflows.md) writes application domain
-stages and final status. A partial unique active-match index prevents accidental
-duplicate submissions. Job documents retain only compact status/provenance and
-artifact references; outputs use separate collections or artifact storage.
+In `mongodb_worker` mode, MongoDB coordinates the intentionally small
+single-concurrency queue. Atomic claim updates retain `workerId`, `claimedAt`,
+`heartbeatAt`, and `leaseExpiresAt`; bounded attempts recover a crashed worker without
+allowing two live workers to own the same job. A partial unique active-match index
+prevents accidental duplicate submissions. Job documents retain only compact
+status/provenance and artifact references; outputs use separate collections or
+artifact storage. Render Workflow execution remains an optional adapter.
 
 Before a write, the adapter validates BSON-safe values, rejects byte arrays and
 known inline binary fields, rejects unsafe MongoDB keys, rejects non-finite numbers,

@@ -18,10 +18,10 @@ React + Vite + TypeScript (browser; eventually deployed to Vercel)
 FastAPI product API
         |
         +-- official PyMongo Async API --> MongoDB Atlas (records + job status)
-        +-- Render async client --------> Render Workflows queue
 
-On-demand Render Workflow task
+Single-concurrency worker on developer Mac
         |
+        +-- atomically claims jobs -----> MongoDB Atlas
         +-- updates domain status ------> MongoDB Atlas
         +-- reads/writes binaries ------> Vercel Blob
         +-- invokes --------------------> existing CV + audio pipeline
@@ -35,8 +35,9 @@ binary or large frame-level artifacts use Vercel Blob.
 FastAPI request handling is a control-plane boundary. It may validate requests,
 read or update compact structured records, issue safe artifact operations, and
 enqueue analysis work. It must not run the heavy CV/audio pipeline inside an HTTP
-request. Heavy analysis also must not run in Vercel Functions. Render provisions a
-temporary task instance only when FastAPI starts `analyze_match`, then deprovisions it.
+request. Heavy analysis also must not run in Vercel Functions. In the active hybrid
+mode, a developer-machine worker polls MongoDB over outbound connections and handles
+one match at a time. Render Workflow remains an optional execution adapter.
 
 ## Monorepo boundaries
 
@@ -54,14 +55,16 @@ Application areas are introduced only as their milestones become current:
 | --- | --- | --- |
 | `apps/web` React/Vite application | Browser presentation and later human workflows | Hosted credentials, CV execution, domain truth |
 | `services/vision/src/pickleball_vision/api` | FastAPI HTTP contracts, validation, compact records, artifact manifests, job submission/status | Heavy analysis inside requests |
-| Render Workflow task | Stage media/setup, invoke existing pipeline, persist results, clean scratch space | Polling MongoDB, browser presentation, or synchronous request handling |
+| Local analysis worker | Claim one MongoDB job, stage media/setup, invoke the pipeline, persist results, clean scratch space | Browser presentation or synchronous request handling |
+| Render Workflow task (optional) | Provisioned alternative execution adapter | Browser presentation or synchronous request handling |
 | Hosted persistence adapters | PyMongo Async and Vercel Blob integration behind project interfaces | CV/audio domain algorithms |
 
 Milestone 19 implements the provider-neutral persistence records and optional
 MongoDB/Vercel Blob adapters; see [`persistence.md`](persistence.md). Milestone 20
 adds the FastAPI control plane under the vision service; see [`api.md`](api.md).
-Milestone 21 adds on-demand Render execution without moving analysis into HTTP; see
-[`render-workflows.md`](render-workflows.md).
+Milestone 21 added on-demand Render execution without moving analysis into HTTP; see
+[`render-workflows.md`](render-workflows.md). Milestone 24B adds the no-proxy local
+worker execution mode documented in [`deployment.md`](deployment.md).
 Milestone 22 adds the strict TypeScript dashboard under `apps/web`; see
 [`web.md`](web.md). Milestone 23 adds the Vercel SPA deployment contract, persistent
 FastAPI container boundary, and dual-access Blob delivery; see
@@ -87,18 +90,20 @@ system. The design should remain proportionate to approximately six users.
 FastAPI is the product control plane. Its responsibilities are bounded request
 validation, structured application reads/writes, hosted-artifact coordination, job
 creation, and job-status reporting. Request completion cannot depend on finishing a
-video analysis. It creates an application job, asks Render to start the configured
-task, stores the returned task-run ID, and exposes status/results as the task updates them.
+video analysis. It creates a queued application job and exposes status/results as the
+configured worker updates them.
 
-### On-demand analysis workflow
+### Local analysis worker
 
-`analyze_match` is a Render Workflow task and separate execution unit. It retrieves
-private source/setup artifacts or one explicitly submitted YouTube recording, runs the existing CV/audio pipeline, uploads an
+`pickleball-vision worker` is a separate execution unit on the developer's Mac. It
+atomically claims a MongoDB job, retrieves private source/setup artifacts or one
+explicitly submitted authorized YouTube recording, runs the existing CV/audio pipeline, uploads an
 explicit allow-list of generated media, writes compact status/results, and cleans its
-job-scoped `/tmp/rallymetry/<job-id>` directory. It preserves raw-observation/
+job-scoped temporary directory. Heartbeats and bounded leases permit recovery without
+double-claiming an active job. It preserves raw-observation/
 derived-event boundaries and never turns infrastructure state into match evidence.
 
-The workflow may call stable Python interfaces or the preserved CLI boundary. Hosted
+The worker may call stable Python interfaces or the preserved CLI boundary. Hosted
 concerns must not be spread through detector, calibration, tracking, audio, or
 analytics modules. The human-correction layer is append/revision oriented: machine
 records remain unchanged, MongoDB stores a separate target-specific correction, and
@@ -112,10 +117,11 @@ artifact manifests, compact summaries, job records, and references to
 structured analysis outputs. Python application code uses the official PyMongo Async
 API. Motor is not part of the architecture.
 
-MongoDB is not a task queue. Render Workflows owns queuing and execution. The
-`processing_jobs` collection is Rallymetry's durable source of truth for domain stage,
-progress, results, and errors. A partial unique index prevents two active application
-jobs for the same match; no process polls job documents.
+MongoDB is the intentionally small queue for the single local worker. The
+`processing_jobs` collection is Rallymetry's durable source of truth for ownership,
+lease, heartbeat, attempt, domain stage, progress, results, and errors. Atomic claim
+updates and a partial unique index prevent duplicate processing and two active jobs
+for the same match. Redis and Celery remain unnecessary for this scale.
 
 Large source videos, annotated videos, extracted audio, model weights, datasets, and
 large frame-level CV/audio artifacts do not belong directly in MongoDB documents.
@@ -126,7 +132,7 @@ MongoDB stores their metadata, provenance, status, and blob references.
 Vercel Blob stores hosted source video and binary/generated artifacts. A private
 store owns source/internal objects; a separate public store owns only deliberately
 public `VIEWABLE_MEDIA` such as friend-viewable review videos and heatmaps. Only
-FastAPI and the Render Workflow receive only the credentials needed by their
+FastAPI and the local worker receive only the credentials needed by their
 project-owned adapters. The browser receives public object URLs, never provider
 credentials. Storage details cannot become CV/audio domain dependencies.
 
@@ -157,7 +163,7 @@ blob adapters.
 | Hosted source videos and large generated artifacts | Vercel Blob |
 | Match metadata, job state, compact summaries, artifact manifests | MongoDB Atlas |
 | Raw and derived pipeline contracts | Existing versioned artifact schemas, stored locally or by blob reference |
-| Secrets | API/workflow environment or deployment secret store; never browser data |
+| Secrets | API/worker environment or deployment secret store; never browser data |
 
 MongoDB documents should reference immutable or versioned artifact identities and
 retain provenance. Moving an artifact from the local filesystem to hosted blob
@@ -329,10 +335,10 @@ Configuration is loaded there, structured logging is initialized there, and type
 application errors are translated to stable exit codes there. Library imports must
 not configure global logging or perform I/O.
 
-During hosted execution, FastAPI accepts short control-plane requests and starts one
-Render task. Render Workflows queues and runs long analysis; MongoDB records domain
-status without acting as that queue. The React/Vite application consumes API contracts
-only; it never calls the workflow or
+During hosted execution, FastAPI accepts short control-plane requests and creates a
+MongoDB job. The developer-machine worker claims and runs long analysis while
+retaining a heartbeat and lease. The React/Vite application consumes API contracts
+only; it never calls the worker or
 database directly.
 
 Each future pipeline stage should have declared inputs, outputs, schema versions,
@@ -351,13 +357,14 @@ the domain model.
 
 The React/Vite frontend deploys to Vercel. FastAPI runs in the vendor-neutral
 container under `services/vision` on a persistent Python-capable host. Analysis runs
-on temporary on-demand Render Workflow compute.
+on the developer's Mac in the active no-proxy deployment mode.
 Heavy analysis cannot execute in Vercel Functions or in the API request process.
 
 MongoDB Atlas and Vercel Blob remain optional hosted adapters, not prerequisites for
 local pipeline use. Milestone 20 provides the FastAPI control plane and creates
-durable job records. Milestone 21 provides async Render triggering, duplicate-submit
-protection, private source/setup staging, idempotent publication, progress updates,
-and cleanup. Milestone 22 provides the browser, and Milestone
+durable job records. Milestone 21 provides the reusable orchestration, private
+source/setup staging, idempotent publication, progress updates, and cleanup.
+Milestone 24B adds MongoDB claiming and developer-machine execution. Milestone 22
+provides the browser, and Milestone
 23 provides hosted delivery. Milestone 23A adds the bounded YouTube-link submission
-UI while keeping retrieval in Render. Authentication and corrections remain later work.
+UI while keeping retrieval outside HTTP. Authentication remains later work.

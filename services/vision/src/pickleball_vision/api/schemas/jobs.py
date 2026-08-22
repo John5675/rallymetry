@@ -17,6 +17,10 @@ class JobResponse(ApiOutputModel):
     progress: float = Field(ge=0, le=1)
     stage: str | None = None
     render_triggered_at: datetime | None = None
+    claimed_at: datetime | None = None
+    heartbeat_at: datetime | None = None
+    lease_expires_at: datetime | None = None
+    worker_id: str | None = None
     started_at: datetime | None = None
     completed_at: datetime | None = None
     failed_at: datetime | None = None
