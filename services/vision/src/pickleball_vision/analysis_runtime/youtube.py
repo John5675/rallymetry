@@ -20,9 +20,16 @@ class YouTubeDownloader(Protocol):
 class YtDlpYouTubeDownloader:
     """Download one accessible YouTube video with audio and bounded resource use."""
 
-    def __init__(self, *, max_duration_seconds: int, max_bytes: int) -> None:
+    def __init__(
+        self,
+        *,
+        max_duration_seconds: int,
+        max_bytes: int,
+        pot_provider_url: str | None = None,
+    ) -> None:
         self._max_duration_seconds = max_duration_seconds
         self._max_bytes = max_bytes
+        self._pot_provider_url = pot_provider_url
 
     async def download(self, video_id: str, *, destination_dir: Path) -> Path:
         return await asyncio.to_thread(self._download, video_id, destination_dir)
@@ -38,6 +45,15 @@ class YtDlpYouTubeDownloader:
             "quiet": True,
             "socket_timeout": 30,
         }
+        if self._pot_provider_url is not None:
+            common_options["extractor_args"] = {
+                "youtube": {
+                    "player_client": ["mweb", "visionos"],
+                },
+                "youtubepot-bgutilhttp": {
+                    "base_url": [self._pot_provider_url],
+                },
+            }
         try:
             with YoutubeDL({**common_options, "skip_download": True}) as inspector:
                 metadata = inspector.extract_info(url, download=False)
@@ -66,6 +82,11 @@ class YtDlpYouTubeDownloader:
         except AnalysisSourceError:
             raise
         except DownloadError as error:
+            if "confirm you" in str(error).lower() and "not a bot" in str(error).lower():
+                raise AnalysisSourceError(
+                    "YouTube rejected the hosted downloader; its challenge provider "
+                    "was unavailable or could not validate this request"
+                ) from error
             raise AnalysisSourceError(
                 "YouTube recording could not be downloaded; verify it is accessible"
             ) from error

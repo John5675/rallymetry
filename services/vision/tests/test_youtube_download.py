@@ -54,6 +54,32 @@ def test_youtube_downloader_preserves_one_media_file_with_bounded_options(
     assert "bestaudio" in str(download_options["format"])
 
 
+def test_youtube_downloader_configures_server_side_challenge_provider(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    FakeYoutubeDL.duration_seconds = 60.0
+    FakeYoutubeDL.options_seen = []
+    monkeypatch.setattr(youtube_module, "YoutubeDL", FakeYoutubeDL)
+    downloader = YtDlpYouTubeDownloader(
+        max_duration_seconds=120,
+        max_bytes=10_000,
+        pot_provider_url="http://youtube-pot-provider:4416",
+    )
+
+    asyncio.run(downloader.download("_cPF1fTnk0Y", destination_dir=tmp_path / "input"))
+
+    for options in FakeYoutubeDL.options_seen:
+        extractor_args = options["extractor_args"]
+        assert isinstance(extractor_args, dict)
+        assert extractor_args["youtube"] == {
+            "player_client": ["mweb", "visionos"],
+        }
+        assert extractor_args["youtubepot-bgutilhttp"] == {
+            "base_url": ["http://youtube-pot-provider:4416"],
+        }
+
+
 def test_youtube_downloader_rejects_overlong_media_before_download(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

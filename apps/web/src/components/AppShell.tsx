@@ -1,7 +1,26 @@
-import { Activity, ChevronRight, CircleDot, Code2 } from "lucide-react";
+import { Activity, ChevronRight, CircleDot, Code2, Moon, Sun } from "lucide-react";
+import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet } from "react-router";
 
+type Theme = "dark" | "light";
+
+function initialTheme(): Theme {
+  const stored = window.localStorage.getItem("pickleball-vision-theme");
+  if (stored === "dark" || stored === "light") return stored;
+  return typeof window.matchMedia === "function" &&
+    window.matchMedia("(prefers-color-scheme: light)").matches
+    ? "light"
+    : "dark";
+}
+
 export function AppShell() {
+  const [theme, setTheme] = useState<Theme>(initialTheme);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    window.localStorage.setItem("pickleball-vision-theme", theme);
+  }, [theme]);
+
   return (
     <div className="app-shell">
       <header className="site-header">
@@ -19,6 +38,15 @@ export function AppShell() {
             <Activity aria-hidden="true" />
             Matches
           </NavLink>
+          <button
+            type="button"
+            className="theme-toggle"
+            aria-label={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+            title={`Switch to ${theme === "dark" ? "light" : "dark"} theme`}
+            onClick={() => setTheme((current) => (current === "dark" ? "light" : "dark"))}
+          >
+            {theme === "dark" ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
+          </button>
         </nav>
       </header>
       <main>

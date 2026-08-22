@@ -6,6 +6,7 @@ import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 from pickleball_vision.errors import AnalysisConfigurationError
 
@@ -29,6 +30,18 @@ def _positive_int(source: Mapping[str, str], key: str, default: int) -> int:
     return value
 
 
+def _optional_service_url(source: Mapping[str, str], key: str) -> str | None:
+    value = source.get(key, "").strip().rstrip("/")
+    if not value:
+        return None
+    parsed = urlparse(value)
+    if parsed.scheme not in {"http", "https"} or parsed.hostname is None:
+        raise AnalysisConfigurationError(f"{key} must be an HTTP(S) service URL")
+    if parsed.username is not None or parsed.password is not None:
+        raise AnalysisConfigurationError(f"{key} must not contain credentials")
+    return value
+
+
 @dataclass(frozen=True, slots=True)
 class WorkflowSettings:
     """Trusted workflow configuration; task inputs contain identifiers only."""
@@ -38,6 +51,7 @@ class WorkflowSettings:
     model_device: str = "cpu"
     youtube_max_duration_seconds: int = DEFAULT_YOUTUBE_MAX_DURATION_SECONDS
     youtube_max_bytes: int = DEFAULT_YOUTUBE_MAX_BYTES
+    youtube_pot_provider_url: str | None = None
 
     def __post_init__(self) -> None:
         if not self.model_device.strip():
@@ -65,6 +79,10 @@ class WorkflowSettings:
                 source,
                 "YOUTUBE_MAX_BYTES",
                 DEFAULT_YOUTUBE_MAX_BYTES,
+            ),
+            youtube_pot_provider_url=_optional_service_url(
+                source,
+                "YOUTUBE_POT_PROVIDER_URL",
             ),
         )
 

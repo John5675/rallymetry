@@ -184,7 +184,15 @@ RENDER_WORKFLOW_PLAN=pro
 RENDER_WORKFLOW_TIMEOUT_SECONDS=21600
 YOUTUBE_MAX_DURATION_SECONDS=7200
 YOUTUBE_MAX_BYTES=4000000000
+YOUTUBE_POT_PROVIDER_URL=http://<private-provider-host>:4416
 ```
+
+`YOUTUBE_POT_PROVIDER_URL` points to a private, pinned
+`bgutil-ytdlp-pot-provider` service. The workflow supplies its generated proof-of-origin
+tokens to yt-dlp so public and unlisted link submissions do not depend on an end user's
+YouTube cookies. Keep the provider private: it is workflow infrastructure, not a browser
+API. A provider can improve cloud-IP acceptance but cannot override a video's actual
+privacy, geographic, age, or account restrictions.
 
 `RENDER_API_KEY` is a FastAPI trigger credential. The task does not need it unless a
 future task calls Render APIs itself. No Render, MongoDB, or Blob credential belongs
