@@ -185,6 +185,7 @@ RENDER_WORKFLOW_TIMEOUT_SECONDS=21600
 YOUTUBE_MAX_DURATION_SECONDS=7200
 YOUTUBE_MAX_BYTES=4000000000
 YOUTUBE_POT_PROVIDER_URL=http://<private-provider-host>:4416
+YOUTUBE_PROXY_URL=
 ```
 
 `YOUTUBE_POT_PROVIDER_URL` points to a private, pinned
@@ -193,6 +194,13 @@ tokens to yt-dlp so public and unlisted link submissions do not depend on an end
 YouTube cookies. Keep the provider private: it is workflow infrastructure, not a browser
 API. A provider can improve cloud-IP acceptance but cannot override a video's actual
 privacy, geographic, age, or account restrictions.
+
+If YouTube rejects the entire Render egress range before attestation,
+`YOUTUBE_PROXY_URL` may point to an authenticated residential HTTP(S) or SOCKS proxy.
+The workflow sends only YouTube retrieval traffic through it, treats the URL as a
+server-side secret, and never returns it through the API. Configure this only with a
+provider whose terms and sourcing are appropriate for recordings the submitter owns
+or is authorized to analyze.
 
 `RENDER_API_KEY` is a FastAPI trigger credential. The task does not need it unless a
 future task calls Render APIs itself. No Render, MongoDB, or Blob credential belongs

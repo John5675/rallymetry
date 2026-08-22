@@ -82,6 +82,28 @@ def test_youtube_downloader_configures_server_side_challenge_provider(
         }
 
 
+def test_youtube_downloader_prefers_configured_proxy_over_challenge_provider(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    FakeYoutubeDL.duration_seconds = 60.0
+    FakeYoutubeDL.options_seen = []
+    monkeypatch.setattr(youtube_module, "YoutubeDL", FakeYoutubeDL)
+    downloader = YtDlpYouTubeDownloader(
+        max_duration_seconds=120,
+        max_bytes=10_000,
+        pot_provider_url="http://youtube-pot-provider:4416",
+        proxy_url="http://user:password@residential-proxy.example:1234",
+    )
+
+    asyncio.run(downloader.download("_cPF1fTnk0Y", destination_dir=tmp_path / "input"))
+
+    for options in FakeYoutubeDL.options_seen:
+        assert options["js_runtimes"] == {"node": {}}
+        assert options["proxy"] == "http://user:password@residential-proxy.example:1234"
+        assert "extractor_args" not in options
+
+
 def test_youtube_downloader_rejects_overlong_media_before_download(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,

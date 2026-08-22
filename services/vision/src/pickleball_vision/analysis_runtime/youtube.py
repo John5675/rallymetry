@@ -26,10 +26,12 @@ class YtDlpYouTubeDownloader:
         max_duration_seconds: int,
         max_bytes: int,
         pot_provider_url: str | None = None,
+        proxy_url: str | None = None,
     ) -> None:
         self._max_duration_seconds = max_duration_seconds
         self._max_bytes = max_bytes
         self._pot_provider_url = pot_provider_url
+        self._proxy_url = proxy_url
 
     async def download(self, video_id: str, *, destination_dir: Path) -> Path:
         return await asyncio.to_thread(self._download, video_id, destination_dir)
@@ -45,7 +47,12 @@ class YtDlpYouTubeDownloader:
             "quiet": True,
             "socket_timeout": 30,
         }
-        if self._pot_provider_url is not None:
+        if self._proxy_url is not None:
+            # A residential proxy is the reliable fallback when YouTube blocks
+            # an entire cloud-provider egress range before client attestation.
+            common_options["js_runtimes"] = {"node": {}}
+            common_options["proxy"] = self._proxy_url
+        elif self._pot_provider_url is not None:
             # yt-dlp's current YouTube extractor requires an external runtime
             # for signature/challenge solving. Render's native runtime includes
             # Node; the matching yt-dlp-ejs scripts are installed with the app.

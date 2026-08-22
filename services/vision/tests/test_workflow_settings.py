@@ -21,6 +21,7 @@ def test_workflow_settings_default_to_cpu_and_scoped_temp_root() -> None:
     assert settings.youtube_max_duration_seconds == 7_200
     assert settings.youtube_max_bytes == 4_000_000_000
     assert settings.youtube_pot_provider_url is None
+    assert settings.youtube_proxy_url is None
     assert workflow_task_plan({}) == "pro"
     assert workflow_timeout_seconds({}) == 21_600
 
@@ -34,6 +35,18 @@ def test_workflow_settings_accept_private_youtube_challenge_provider() -> None:
     )
 
     assert settings.youtube_pot_provider_url == "http://youtube-pot-provider:4416"
+
+
+def test_workflow_settings_accepts_credentialed_youtube_proxy() -> None:
+    settings = WorkflowSettings.from_env(
+        {
+            "PIPELINE_CONFIG": "plan.json",
+            "YOUTUBE_PROXY_URL": "http://proxy-user:proxy-password@proxy.example:1234/",
+        }
+    )
+
+    assert settings.youtube_proxy_url == ("http://proxy-user:proxy-password@proxy.example:1234")
+    assert "proxy-password" not in repr(settings)
 
 
 @pytest.mark.parametrize(
@@ -54,6 +67,12 @@ def test_workflow_settings_reject_invalid_youtube_challenge_provider(
                 "YOUTUBE_POT_PROVIDER_URL": provider_url,
             }
         )
+
+
+@pytest.mark.parametrize("proxy_url", ["proxy.example:1234", "file:///tmp/proxy"])
+def test_workflow_settings_rejects_invalid_youtube_proxy(proxy_url: str) -> None:
+    with pytest.raises(AnalysisConfigurationError):
+        WorkflowSettings.from_env({"PIPELINE_CONFIG": "plan.json", "YOUTUBE_PROXY_URL": proxy_url})
 
 
 @pytest.mark.parametrize(

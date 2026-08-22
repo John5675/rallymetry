@@ -60,6 +60,7 @@ async def run_configured_analysis(*, job_id: str, match_id: str) -> dict[str, st
                     max_duration_seconds=workflow_settings.youtube_max_duration_seconds,
                     max_bytes=workflow_settings.youtube_max_bytes,
                     pot_provider_url=workflow_settings.youtube_pot_provider_url,
+                    proxy_url=workflow_settings.youtube_proxy_url,
                 ),
             ),
             setup_stager=MatchSetupStager(persistence, artifact_store),
