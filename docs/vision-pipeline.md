@@ -236,6 +236,14 @@ Missing or weak hitter, player-position, or trajectory evidence produces `UNKNOW
 Human shot labels are isolated to post-inference evaluation. Exact reconstruction,
 rules, configuration, and metrics are defined in `shot-reconstruction.md`.
 
+Milestone 24A adds a separate temporal-model foundation described in
+`shot-model.md`. It treats rally phase, contact mechanics, stroke side, and tactical
+intent as independent axes; retains the legacy field as a conservative projection;
+and never turns an external racket-sport representation dataset into pickleball
+semantic ground truth. A `bestGuess` can be populated below threshold, but analytics
+continues to use the authoritative value, which remains `UNKNOWN` when evidence is
+insufficient.
+
 ## Deterministic match analytics contract
 
 `analyze-match` consumes source-compatible `rallies.json`, `shots.json`, and

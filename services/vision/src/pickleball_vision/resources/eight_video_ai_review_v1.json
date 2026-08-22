@@ -1,0 +1,2954 @@
+{
+  "schemaVersion": 1,
+  "recordType": "ai_reviewed_shot_label_index",
+  "reviewVersion": "eight-video-ai-visual-review-v1",
+  "provenance": {
+    "reviewerType": "AI",
+    "humanAccepted": false,
+    "groundTruth": false,
+    "trainingEligibility": "PSEUDO_LABEL_ONLY",
+    "usage": "exact-source hosted review overlay; never a human correction"
+  },
+  "videos": [
+    {
+      "videoId": "vid1",
+      "sourceSha256": "485179d22b2f0ee25b1c3262f650aae0d27c98a810a43df17b8f16bca1302115",
+      "fps": 30.0,
+      "frameCount": 23629,
+      "reviews": [
+        {
+          "sourceContactId": "vid1-contact-0001",
+          "sourceFrame": 633,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 633,
+            "timestampSeconds": 21.1,
+            "playerId": "JOHN",
+            "logicalRole": "ME",
+            "rallyId": "vid1-rally-0001",
+            "shotIndex": 1,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.98,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.99,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.91,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Visible ball release, underhand forehand serve contact, and immediate departure.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid1-contact-0002",
+          "sourceFrame": 2520,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "frame",
+              "playerId",
+              "logicalRole",
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CORRECTED_FRAME_AND_PLAYER",
+            "frame": 2537,
+            "timestampSeconds": 84.56666666666666,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.72,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.72,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "GROUNDSTROKE",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.94,
+                "threshold": 0.75,
+                "abstained": false
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.82,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DINK",
+                "confidence": 0.72,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "The source frame 2520 is incoming flight, not contact. The ball bounces around 2529 and Denny contacts it at 2537-2538.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid1-contact-0003",
+          "sourceFrame": 5115,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 5115,
+            "timestampSeconds": 170.5,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.86,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.88,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.84,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Denny visibly holds/releases the ball and makes an underhand forehand launch; active-rally boundary remains unlinked.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid1-contact-0004",
+          "sourceFrame": 6540,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 6540,
+            "timestampSeconds": 218.0,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.7,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.66,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "GROUNDSTROKE",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.83,
+                "threshold": 0.75,
+                "abstained": false
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.81,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DINK",
+                "confidence": 0.7,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Low bounced ball and compact Denny forehand near the kitchen; soft intent is plausible but not trajectory-confirmed.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid1-contact-0005",
+          "sourceFrame": 8080,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 8080,
+            "timestampSeconds": 269.3333333333333,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.64,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.64,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.72,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.79,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DINK",
+                "confidence": 0.64,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Low compact Denny stroke near the kitchen; bounce/contact mode is not fully resolved.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid1-contact-0006",
+          "sourceFrame": 8675,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 8675,
+            "timestampSeconds": 289.1666666666667,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "VOLLEY",
+            "legacyBestGuessConfidence": 0.55,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.58,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "VOLLEY",
+                "confidence": 0.58,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.68,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Denny meets a low ball with a compact upward stroke; the temporal window does not prove whether it bounced.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid1-contact-0007",
+          "sourceFrame": 8998,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 8998,
+            "timestampSeconds": 299.93333333333334,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "VOLLEY",
+            "legacyBestGuessConfidence": 0.53,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.58,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "VOLLEY",
+                "confidence": 0.56,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.7,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Near-kitchen compact Denny contact; volley is the best visual guess but remains below the confidence gate.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid1-contact-0008",
+          "sourceFrame": 9307,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 9307,
+            "timestampSeconds": 310.23333333333335,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": "vid1-rally-0002",
+            "shotIndex": 1,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.97,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.98,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.9,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Visible Denny drop/underhand serve and outgoing ball.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid1-contact-0009",
+          "sourceFrame": 10372,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 10372,
+            "timestampSeconds": 345.73333333333335,
+            "playerId": "JOHN",
+            "logicalRole": "ME",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.75,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.69,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "GROUNDSTROKE",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.84,
+                "threshold": 0.75,
+                "abstained": false
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.84,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "DINK",
+                "bestGuess": "DINK",
+                "confidence": 0.75,
+                "threshold": 0.75,
+                "abstained": false
+              }
+            },
+            "evidenceNote": "John contacts a low ball after a visible bounce with a compact kitchen stroke.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid1-contact-0010",
+          "sourceFrame": 16378,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 16378,
+            "timestampSeconds": 545.9333333333333,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.8,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.7,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "GROUNDSTROKE",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.8,
+                "threshold": 0.75,
+                "abstained": false
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.82,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "DINK",
+                "bestGuess": "DINK",
+                "confidence": 0.8,
+                "threshold": 0.75,
+                "abstained": false
+              }
+            },
+            "evidenceNote": "Low Denny kitchen contact with controlled upward departure; original dink label is visually supported.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid1-contact-0011",
+          "sourceFrame": 17992,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 17992,
+            "timestampSeconds": 599.7333333333333,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.79,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.69,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "GROUNDSTROKE",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.78,
+                "threshold": 0.75,
+                "abstained": false
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.8,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "DINK",
+                "bestGuess": "DINK",
+                "confidence": 0.79,
+                "threshold": 0.75,
+                "abstained": false
+              }
+            },
+            "evidenceNote": "Low compact Denny kitchen exchange supports a dink best guess.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid1-contact-0012",
+          "sourceFrame": 19083,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 19083,
+            "timestampSeconds": 636.1,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.8,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.7,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "GROUNDSTROKE",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.8,
+                "threshold": 0.75,
+                "abstained": false
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.81,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "DINK",
+                "bestGuess": "DINK",
+                "confidence": 0.8,
+                "threshold": 0.75,
+                "abstained": false
+              }
+            },
+            "evidenceNote": "Visible low bounce and compact Denny stroke near the kitchen support the original dink label.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid1-contact-0013",
+          "sourceFrame": 19599,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 19599,
+            "timestampSeconds": 653.3,
+            "playerId": "JOHN",
+            "logicalRole": "ME",
+            "rallyId": "vid1-rally-0003",
+            "shotIndex": 1,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.98,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.99,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.91,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "John visibly releases and serves the ball.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid1-contact-0014",
+          "sourceFrame": 20109,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 20109,
+            "timestampSeconds": 670.3,
+            "playerId": "JOHN",
+            "logicalRole": "ME",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.66,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.64,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "GROUNDSTROKE",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.76,
+                "threshold": 0.75,
+                "abstained": false
+              },
+              "strokeSide": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.77,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DINK",
+                "confidence": 0.66,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Compact low John kitchen stroke; dink is plausible but landing/pace evidence is incomplete.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid1-contact-0015",
+          "sourceFrame": 21156,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 21156,
+            "timestampSeconds": 705.2,
+            "playerId": "JOHN",
+            "logicalRole": "ME",
+            "rallyId": "vid1-rally-0004",
+            "shotIndex": 1,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.98,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.99,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.92,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "John visibly holds, releases, and serves the ball.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid1-contact-0016",
+          "sourceFrame": 21683,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 21683,
+            "timestampSeconds": 722.7666666666667,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DRIVE",
+            "legacyBestGuessConfidence": 0.52,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.6,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.71,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.7,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DRIVE",
+                "confidence": 0.52,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Low Denny groundstroke with a larger follow-through; pace and landing do not support an authoritative intent.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid1-contact-0017",
+          "sourceFrame": 23205,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 23205,
+            "timestampSeconds": 773.5,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DRIVE",
+            "legacyBestGuessConfidence": 0.55,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.61,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.72,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.74,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DRIVE",
+                "confidence": 0.55,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Denny takes a low ball with a stronger upward/forward swing; drive remains a low-confidence best guess.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        }
+      ]
+    },
+    {
+      "videoId": "vid2",
+      "sourceSha256": "b82a16ecc96b06f503ad77e6b41c66bcb013e6c4d6fb6479441543ed47469ffc",
+      "fps": 30.0,
+      "frameCount": 12495,
+      "reviews": [
+        {
+          "sourceContactId": "vid2-contact-0001",
+          "sourceFrame": 1025,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 1025,
+            "timestampSeconds": 34.166666666666664,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.71,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.65,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "GROUNDSTROKE",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.76,
+                "threshold": 0.75,
+                "abstained": false
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.8,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DINK",
+                "confidence": 0.71,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Low compact Denny kitchen stroke; trajectory after contact is consistent with a soft exchange.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid2-contact-0002",
+          "sourceFrame": 1142,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 1142,
+            "timestampSeconds": 38.06666666666667,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "VOLLEY",
+            "legacyBestGuessConfidence": 0.6,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.63,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "VOLLEY",
+                "confidence": 0.66,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.75,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Denny makes a compact forward contact followed by a high finish; no bounce is visible in the review window.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid2-contact-0003",
+          "sourceFrame": 1863,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 1863,
+            "timestampSeconds": 62.1,
+            "playerId": "JOHN",
+            "logicalRole": "ME",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.72,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.66,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "GROUNDSTROKE",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.8,
+                "threshold": 0.75,
+                "abstained": false
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.81,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DINK",
+                "confidence": 0.72,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "John reaches a low bounced ball near the kitchen with a compact stroke.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid2-contact-0004",
+          "sourceFrame": 2018,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 2018,
+            "timestampSeconds": 67.26666666666667,
+            "playerId": "JOHN",
+            "logicalRole": "ME",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.71,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.66,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "GROUNDSTROKE",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.8,
+                "threshold": 0.75,
+                "abstained": false
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.8,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DINK",
+                "confidence": 0.71,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Low John kitchen contact after a visible descending/bouncing ball.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid2-contact-0005",
+          "sourceFrame": 3847,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 3847,
+            "timestampSeconds": 128.23333333333332,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": "vid2-rally-0001",
+            "shotIndex": 1,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.99,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.99,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.93,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Clear Denny ball release and underhand serve.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid2-contact-0006",
+          "sourceFrame": 3928,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotIndex",
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 3928,
+            "timestampSeconds": 130.93333333333334,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": "vid2-rally-0001",
+            "shotIndex": 3,
+            "legacyBestGuess": "DROP",
+            "legacyBestGuessConfidence": 0.76,
+            "semantics": {
+              "phase": {
+                "authoritative": "RALLY",
+                "bestGuess": "RALLY",
+                "confidence": 0.94,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "GROUNDSTROKE",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.82,
+                "threshold": 0.75,
+                "abstained": false
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.83,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "DROP",
+                "bestGuess": "DROP",
+                "confidence": 0.76,
+                "threshold": 0.75,
+                "abstained": false
+              }
+            },
+            "evidenceNote": "This is not a dink or shot 2: it follows Denny's serve and the unseen return, making it the third shot; the low-to-high trajectory supports a drop best guess.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid2-contact-0007",
+          "sourceFrame": 6791,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 6791,
+            "timestampSeconds": 226.36666666666667,
+            "playerId": "JOHN",
+            "logicalRole": "ME",
+            "rallyId": "vid2-rally-0002",
+            "shotIndex": 1,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.98,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.99,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.91,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "John serve is visible at the left edge with immediate departure.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid2-contact-0008",
+          "sourceFrame": 7763,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 7763,
+            "timestampSeconds": 258.76666666666665,
+            "playerId": "JOHN",
+            "logicalRole": "ME",
+            "rallyId": "vid2-rally-0003",
+            "shotIndex": 1,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.97,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.98,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.9,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "John serve motion and launch are visible.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid2-contact-0009",
+          "sourceFrame": 8804,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 8804,
+            "timestampSeconds": 293.46666666666664,
+            "playerId": "JOHN",
+            "logicalRole": "ME",
+            "rallyId": "vid2-rally-0004",
+            "shotIndex": 1,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.96,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.98,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.89,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Left-edge John serve launch is visible.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid2-contact-0010",
+          "sourceFrame": 12043,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 12043,
+            "timestampSeconds": 401.43333333333334,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": "vid2-rally-0005",
+            "shotIndex": 1,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.97,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.98,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.91,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Denny low forehand serve and departure are visible.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        }
+      ]
+    },
+    {
+      "videoId": "vid3",
+      "sourceSha256": "f81a31ffea6d4f5f29e916cfca27a052a3248ccf4f173ab37dab0423ff46f68f",
+      "fps": 30.0,
+      "frameCount": 16485,
+      "reviews": [
+        {
+          "sourceContactId": "vid3-contact-0001",
+          "sourceFrame": 10311,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 10311,
+            "timestampSeconds": 343.7,
+            "playerId": "JOHN",
+            "logicalRole": "ME",
+            "rallyId": "vid3-rally-0001",
+            "shotIndex": 1,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.99,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.99,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.93,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Clear John underhand serve contact.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid3-contact-0002",
+          "sourceFrame": 12097,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 12097,
+            "timestampSeconds": 403.23333333333335,
+            "playerId": "JOHN",
+            "logicalRole": "ME",
+            "rallyId": "vid3-rally-0002",
+            "shotIndex": 1,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.99,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.99,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.94,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Clear John underhand serve contact.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        }
+      ]
+    },
+    {
+      "videoId": "vid4",
+      "sourceSha256": "183012cff65084e36717a21acf8fff59feceb77c3bffc2ae012925eeaeeee214",
+      "fps": 30.0,
+      "frameCount": 20496,
+      "reviews": [
+        {
+          "sourceContactId": "vid4-contact-0001",
+          "sourceFrame": 1693,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 1693,
+            "timestampSeconds": 56.43333333333333,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.61,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.62,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.72,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.74,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DINK",
+                "confidence": 0.61,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Low near-kitchen Denny contact; soft dink intent is plausible but not confirmed by landing.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid4-contact-0002",
+          "sourceFrame": 9154,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 9154,
+            "timestampSeconds": 305.1333333333333,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.69,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.65,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "GROUNDSTROKE",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.78,
+                "threshold": 0.75,
+                "abstained": false
+              },
+              "strokeSide": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.79,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DINK",
+                "confidence": 0.69,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Compact low Denny kitchen stroke supports a dink best guess.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid4-contact-0003",
+          "sourceFrame": 12771,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 12771,
+            "timestampSeconds": 425.7,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.91,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.93,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.88,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Denny visibly holds/releases the ball and makes an underhand serve; the source label was UNKNOWN.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid4-contact-0004",
+          "sourceFrame": 18753,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 18753,
+            "timestampSeconds": 625.1,
+            "playerId": "JOHN",
+            "logicalRole": "ME",
+            "rallyId": "vid4-rally-0001",
+            "shotIndex": 1,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.99,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.99,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.94,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Clear John ball drop and underhand serve.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        }
+      ]
+    },
+    {
+      "videoId": "vid5",
+      "sourceSha256": "f91ce455a2c85ff6e630efa94c7b903cf3c0301ee4c59bf8409c254cb0cb9583",
+      "fps": 30,
+      "frameCount": 9941,
+      "reviews": [
+        {
+          "sourceContactId": "vid5-contact-0001",
+          "sourceFrame": 5040,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 5040,
+            "timestampSeconds": 168.0,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DRIVE",
+            "legacyBestGuessConfidence": 0.64,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.63,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "GROUNDSTROKE",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.76,
+                "threshold": 0.75,
+                "abstained": false
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.8,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DRIVE",
+                "confidence": 0.64,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Denny takes a low ball with a longer forward/upward swing; drive is plausible but pace is not measured.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid5-contact-0002",
+          "sourceFrame": 6434,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 6434,
+            "timestampSeconds": 214.46666666666667,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.7,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.65,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "GROUNDSTROKE",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.79,
+                "threshold": 0.75,
+                "abstained": false
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.81,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DINK",
+                "confidence": 0.7,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Primary ball is the right-side low ball at Denny's paddle; the separate left object belongs to a neighboring court.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid5-contact-0003",
+          "sourceFrame": 7349,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 7349,
+            "timestampSeconds": 244.96666666666667,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DRIVE",
+            "legacyBestGuessConfidence": 0.56,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.61,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.72,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.76,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DRIVE",
+                "confidence": 0.56,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Denny's larger low-to-high follow-through favors drive over dink, but trajectory/landing remain incomplete.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid5-contact-0004",
+          "sourceFrame": 9087,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 9087,
+            "timestampSeconds": 302.9,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.68,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.64,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "GROUNDSTROKE",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.77,
+                "threshold": 0.75,
+                "abstained": false
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.8,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DINK",
+                "confidence": 0.68,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Low compact Denny kitchen contact supports a dink best guess.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        }
+      ]
+    },
+    {
+      "videoId": "vid6",
+      "sourceSha256": "31df7441c1aad075ca0372d8cecbdb8580cecc9927c1eb3d1d684da6de751c87",
+      "fps": 30.0,
+      "frameCount": 17961,
+      "reviews": [
+        {
+          "sourceContactId": "vid6-contact-0001",
+          "sourceFrame": 4641,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 4641,
+            "timestampSeconds": 154.7,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DRIVE",
+            "legacyBestGuessConfidence": 0.56,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.61,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.72,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.76,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DRIVE",
+                "confidence": 0.56,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Low Denny contact with a larger forward/upward finish; drive is a non-authoritative best guess.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid6-contact-0002",
+          "sourceFrame": 6938,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 6938,
+            "timestampSeconds": 231.26666666666668,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": "vid6-rally-0001",
+            "shotIndex": 1,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.99,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.99,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.93,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Clear Denny ball release and serve.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid6-contact-0003",
+          "sourceFrame": 9078,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "playerId",
+              "logicalRole",
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CORRECTED_PLAYER",
+            "frame": 9078,
+            "timestampSeconds": 302.6,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.66,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.64,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "GROUNDSTROKE",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.84,
+                "threshold": 0.75,
+                "abstained": false
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.84,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DINK",
+                "confidence": 0.66,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Full-resolution frames 9076-9080 show Denny (black shirt, white socks) contacting the ball; John stands behind him and does not swing.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid6-contact-0004",
+          "sourceFrame": 10819,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 10819,
+            "timestampSeconds": 360.6333333333333,
+            "playerId": "DENNY",
+            "logicalRole": "PARTNER",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.92,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.94,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.89,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Denny visibly holds/releases the ball before an underhand serve; source label was UNKNOWN.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        }
+      ]
+    },
+    {
+      "videoId": "vid7",
+      "sourceSha256": "3d655b7bfc68a35e60f86073e5fcda83291239ecb0c87afe81cb96bf4adf6983",
+      "fps": 30.0,
+      "frameCount": 11874,
+      "reviews": [
+        {
+          "sourceContactId": "vid7-contact-0001",
+          "sourceFrame": 1023,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 1023,
+            "timestampSeconds": 34.1,
+            "playerId": "DIANA",
+            "logicalRole": "OPPONENT_2",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.61,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.6,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.72,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.76,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DINK",
+                "confidence": 0.61,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Diana contacts a low ball with a compact kitchen stroke; dink is plausible but not trajectory-confirmed.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid7-contact-0002",
+          "sourceFrame": 2038,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 2038,
+            "timestampSeconds": 67.93333333333334,
+            "playerId": "DIANA",
+            "logicalRole": "OPPONENT_2",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.66,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.63,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "GROUNDSTROKE",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.76,
+                "threshold": 0.75,
+                "abstained": false
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.8,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DINK",
+                "confidence": 0.66,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Low compact Diana groundstroke near the kitchen.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid7-contact-0003",
+          "sourceFrame": 4186,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "logicalRole",
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 4186,
+            "timestampSeconds": 139.53333333333333,
+            "playerId": "DENNY",
+            "logicalRole": "OPPONENT_1",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.61,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.6,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.71,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.76,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DINK",
+                "confidence": 0.61,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Denny's low compact stroke is visible. Team role is corrected: in Video 7 Denny partners Diana, not John.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid7-contact-0004",
+          "sourceFrame": 2840,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 2840,
+            "timestampSeconds": 94.66666666666667,
+            "playerId": "DIANA",
+            "logicalRole": "OPPONENT_2",
+            "rallyId": "vid7-rally-0001",
+            "shotIndex": 1,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.97,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.98,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.91,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Clear Diana ball drop and underhand serve.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid7-s5937-11873-contact-0001",
+          "sourceFrame": 7360,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 7360,
+            "timestampSeconds": 245.33333333333334,
+            "playerId": "DIANA",
+            "logicalRole": "OPPONENT_2",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.62,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.61,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.72,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.78,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DINK",
+                "confidence": 0.62,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Diana makes a compact low kitchen stroke; the precise intent remains below the confidence gate.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid7-s5937-11873-contact-0002",
+          "sourceFrame": 8690,
+          "aiReview": {
+            "status": "UNRESOLVED",
+            "changedFields": [],
+            "contactValidity": "UNRESOLVED_PLAYER_VISIBILITY",
+            "frame": 8690,
+            "timestampSeconds": 289.6666666666667,
+            "playerId": "JOHN",
+            "logicalRole": "ME",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "UNKNOWN",
+            "legacyBestGuessConfidence": 0.42,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.54,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "The source assigns John on the far side, but the hitter is too small/occluded in this temporal window to independently confirm mechanics or intent.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid7-s5937-11873-contact-0003",
+          "sourceFrame": 9602,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 9602,
+            "timestampSeconds": 320.06666666666666,
+            "playerId": "DIANA",
+            "logicalRole": "OPPONENT_2",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "DINK",
+            "legacyBestGuessConfidence": 0.62,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.61,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "GROUNDSTROKE",
+                "confidence": 0.73,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.78,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "DINK",
+                "confidence": 0.62,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Diana makes a low compact stroke near the kitchen.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid7-s5937-11873-contact-0004",
+          "sourceFrame": 10596,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 10596,
+            "timestampSeconds": 353.2,
+            "playerId": "DIANA",
+            "logicalRole": "OPPONENT_2",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "VOLLEY",
+            "legacyBestGuessConfidence": 0.54,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.59,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "VOLLEY",
+                "confidence": 0.58,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.73,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Diana's compact contact and high finish favor a volley best guess, but bounce evidence is insufficient.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "vid7-s5937-11873-contact-0005",
+          "sourceFrame": 11464,
+          "aiReview": {
+            "status": "CHANGED",
+            "changedFields": [
+              "shotTypeBestGuess"
+            ],
+            "contactValidity": "CONFIRMED",
+            "frame": 11464,
+            "timestampSeconds": 382.1333333333333,
+            "playerId": "DIANA",
+            "logicalRole": "OPPONENT_2",
+            "rallyId": null,
+            "shotIndex": null,
+            "legacyBestGuess": "VOLLEY",
+            "legacyBestGuessConfidence": 0.56,
+            "semantics": {
+              "phase": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "RALLY",
+                "confidence": 0.6,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "VOLLEY",
+                "confidence": 0.61,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.75,
+                "threshold": 0.8,
+                "abstained": true
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Diana meets the ball around waist height with no clearly visible bounce; volley remains non-authoritative.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        }
+      ]
+    },
+    {
+      "videoId": "vid8",
+      "sourceSha256": "5d9cb30f719b9cffcb109c0f51e93e6b08fad886f95a8dea58af8d871c0404c6",
+      "fps": 30.0,
+      "frameCount": 14500,
+      "reviews": [
+        {
+          "sourceContactId": "V8-C0001",
+          "sourceFrame": 186,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 186,
+            "timestampSeconds": 6.2,
+            "playerId": "DIANA",
+            "logicalRole": "OPPONENT_2",
+            "rallyId": "V8-R0001",
+            "shotIndex": 1,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.99,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.99,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.93,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Diana—not Denny—visibly releases and serves the ball. The inherited narrative note is incorrect.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "V8-C0002",
+          "sourceFrame": 1004,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 1004,
+            "timestampSeconds": 33.46666666666667,
+            "playerId": "JOHN",
+            "logicalRole": "ME",
+            "rallyId": "V8-R0002",
+            "shotIndex": 1,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.98,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.99,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.92,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Clear John serve launch.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "V8-C0003",
+          "sourceFrame": 1702,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 1702,
+            "timestampSeconds": 56.733333333333334,
+            "playerId": "JOHN",
+            "logicalRole": "ME",
+            "rallyId": "V8-R0003",
+            "shotIndex": 1,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.98,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.99,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.92,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Clear John bounce/drop serve sequence and launch.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "V8-C0004",
+          "sourceFrame": 3445,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 3445,
+            "timestampSeconds": 114.83333333333333,
+            "playerId": "JOHN",
+            "logicalRole": "ME",
+            "rallyId": "V8-R0004",
+            "shotIndex": 1,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.99,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.99,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.94,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Clear John serve contact and departure.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        },
+        {
+          "sourceContactId": "V8-C0005",
+          "sourceFrame": 13924,
+          "aiReview": {
+            "status": "REVIEWED",
+            "changedFields": [],
+            "contactValidity": "CONFIRMED",
+            "frame": 13924,
+            "timestampSeconds": 464.1333333333333,
+            "playerId": "DIANA",
+            "logicalRole": "OPPONENT_2",
+            "rallyId": "V8-R0005",
+            "shotIndex": 1,
+            "legacyBestGuess": "SERVE",
+            "legacyBestGuessConfidence": 0.99,
+            "semantics": {
+              "phase": {
+                "authoritative": "SERVE",
+                "bestGuess": "SERVE",
+                "confidence": 0.99,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "contactMode": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              },
+              "strokeSide": {
+                "authoritative": "FOREHAND",
+                "bestGuess": "FOREHAND",
+                "confidence": 0.93,
+                "threshold": 0.8,
+                "abstained": false
+              },
+              "intent": {
+                "authoritative": "UNKNOWN",
+                "bestGuess": "UNKNOWN",
+                "confidence": 0.0,
+                "threshold": 0.75,
+                "abstained": true
+              }
+            },
+            "evidenceNote": "Diana visibly serves the ball; player identity and serve label are confirmed.",
+            "provenance": "AI_VISUAL_REVIEW",
+            "humanAccepted": false,
+            "trainingEligibility": "PSEUDO_LABEL_ONLY"
+          }
+        }
+      ]
+    }
+  ]
+}

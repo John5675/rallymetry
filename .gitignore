@@ -59,6 +59,10 @@ secrets/
 ml/datasets/**
 !ml/datasets/README.md
 
+# Licensed third-party corpora are downloaded locally with recorded provenance.
+ml/external/**
+!ml/external/README.md
+
 # Local training and evaluation runs; commit only the directory documentation
 ml/experiments/**
 !ml/experiments/README.md

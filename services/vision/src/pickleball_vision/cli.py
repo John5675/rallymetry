@@ -53,7 +53,10 @@ from pickleball_vision.player_analysis_workflow import analyze_players_in_video
 from pickleball_vision.player_isolation_workflow import isolate_primary_players
 from pickleball_vision.player_tracking_workflow import track_players_in_video
 from pickleball_vision.rally_segmentation_workflow import segment_rallies_in_video
+from pickleball_vision.shot_dataset import build_shot_training_dataset
+from pickleball_vision.shot_pretraining import pretrain_shot_representation
 from pickleball_vision.shot_reconstruction_workflow import reconstruct_shots_in_video
+from pickleball_vision.shot_review_overlay import apply_ai_shot_review_overlay
 from pickleball_vision.video import extract_frame, sample_frames
 
 EXIT_OK = 0
@@ -823,6 +826,68 @@ def build_parser() -> argparse.ArgumentParser:
         required=True,
         help="new match-analytics.json output path",
     )
+
+    shot_model_parser = subparsers.add_parser(
+        "shot-model",
+        help="audit multi-axis shot labels and pretrain temporal representations",
+    )
+    shot_model_subparsers = shot_model_parser.add_subparsers(dest="shot_model_command")
+    shot_dataset_parser = shot_model_subparsers.add_parser(
+        "build-dataset",
+        help="apply auditable corrections and enforce semantic-training gates",
+    )
+    shot_dataset_parser.add_argument(
+        "source_dataset",
+        type=Path,
+        help="AI-adjudicated multievent dataset JSON",
+    )
+    shot_dataset_parser.add_argument(
+        "--corrections",
+        type=Path,
+        help="optional correction layer; the source dataset is never overwritten",
+    )
+    shot_dataset_parser.add_argument("--output-dir", type=Path, required=True)
+    shot_dataset_parser.add_argument(
+        "--minimum-train-per-class",
+        type=int,
+        default=10,
+        help="minimum train support for every claimed semantic-axis class",
+    )
+    shot_dataset_parser.add_argument(
+        "--minimum-held-out-per-class",
+        type=int,
+        default=5,
+        help="minimum validation and test support per claimed class",
+    )
+    shot_pretrain_parser = shot_model_subparsers.add_parser(
+        "pretrain-representation",
+        help="pretrain a temporal encoder on licensed ball/racket annotations only",
+    )
+    shot_pretrain_parser.add_argument("--config", type=Path, required=True)
+    shot_pretrain_parser.add_argument("--output-dir", type=Path, required=True)
+    shot_review_parser = shot_model_subparsers.add_parser(
+        "apply-review",
+        help="attach AI visual review evidence for an exact reviewed source video",
+    )
+    shot_review_parser.add_argument("video", type=Path, help="exact local source video")
+    shot_review_parser.add_argument(
+        "--shots",
+        type=Path,
+        required=True,
+        help="machine-generated shots.json to preserve and enrich",
+    )
+    shot_review_parser.add_argument(
+        "--review-index",
+        type=Path,
+        help="optional reviewed-label index (default: bundled eight-video review)",
+    )
+    shot_review_parser.add_argument("--output", type=Path, required=True)
+    shot_review_parser.add_argument(
+        "--maximum-timing-delta-ms",
+        type=float,
+        default=250.0,
+        help="maximum contact-time difference for one-to-one review matching",
+    )
     return parser
 
 
@@ -1581,6 +1646,66 @@ def _run_analyze_match(
     return EXIT_OK
 
 
+def _run_build_shot_dataset(
+    source_dataset_path: Path,
+    *,
+    corrections_path: Path | None,
+    output_dir: Path,
+    minimum_train_per_class: int,
+    minimum_held_out_per_class: int,
+) -> int:
+    artifacts = build_shot_training_dataset(
+        source_dataset_path,
+        corrections_path=corrections_path,
+        output_dir=output_dir,
+        minimum_train_examples_per_class=minimum_train_per_class,
+        minimum_held_out_examples_per_class=minimum_held_out_per_class,
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "shot_training_dataset_audited",
+        extra={"context": artifacts.as_dict()},
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
+def _run_pretrain_shot_representation(
+    config_path: Path,
+    *,
+    output_dir: Path,
+) -> int:
+    artifacts = pretrain_shot_representation(config_path, output_dir=output_dir)
+    logging.getLogger("pickleball_vision.cli").info(
+        "shot_temporal_representation_pretrained",
+        extra={"context": artifacts.as_dict()},
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
+def _run_apply_shot_review(
+    video_path: Path,
+    *,
+    shots_path: Path,
+    review_index_path: Path | None,
+    output_path: Path,
+    maximum_timing_delta_ms: float,
+) -> int:
+    artifacts = apply_ai_shot_review_overlay(
+        video_path,
+        shots_path=shots_path,
+        output_path=output_path,
+        review_index_path=review_index_path,
+        maximum_timing_delta_ms=maximum_timing_delta_ms,
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "shot_ai_review_overlay_applied",
+        extra={"context": artifacts.as_dict()},
+    )
+    _print_json(artifacts.as_dict())
+    return EXIT_OK
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Run the command and translate failures into stable process exit codes."""
 
@@ -1838,6 +1963,30 @@ def main(argv: Sequence[str] | None = None) -> int:
                 output_path=cast(Path, args.output),
                 settings=settings,
             )
+        if args.command == "shot-model":
+            if args.shot_model_command == "build-dataset":
+                return _run_build_shot_dataset(
+                    cast(Path, args.source_dataset),
+                    corrections_path=cast(Path | None, args.corrections),
+                    output_dir=cast(Path, args.output_dir),
+                    minimum_train_per_class=cast(int, args.minimum_train_per_class),
+                    minimum_held_out_per_class=cast(int, args.minimum_held_out_per_class),
+                )
+            if args.shot_model_command == "pretrain-representation":
+                return _run_pretrain_shot_representation(
+                    cast(Path, args.config),
+                    output_dir=cast(Path, args.output_dir),
+                )
+            if args.shot_model_command == "apply-review":
+                return _run_apply_shot_review(
+                    cast(Path, args.video),
+                    shots_path=cast(Path, args.shots),
+                    review_index_path=cast(Path | None, args.review_index),
+                    output_path=cast(Path, args.output),
+                    maximum_timing_delta_ms=cast(float, args.maximum_timing_delta_ms),
+                )
+            parser.print_help()
+            return EXIT_OK
         parser.error(f"unsupported command: {args.command}")
     except PickleballVisionError as error:
         print(f"error [{error.code}]: {error}", file=sys.stderr)

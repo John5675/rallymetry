@@ -19,6 +19,13 @@ and the relevant design document before changing code.
   positions.
 - Never fabricate long missing ball trajectories.
 - Every uncertain ML-derived event should retain confidence.
+- Keep shot rally phase, contact mechanics, stroke side, and tactical intent as
+  independent semantic axes; one contact may have valid labels on several axes.
+- A non-authoritative shot `bestGuess` must never replace an authoritative
+  `UNKNOWN` below its calibrated confidence threshold.
+- Cross-sport representation data is not pickleball shot-type ground truth.
+- Never load untrusted pickle/pickle-like external dataset artifacts. Prefer
+  validated JSON/CSV and restricted tensor-only weight loading.
 - LLMs must never invent match statistics.
 - Treat a spoken doubles score as `serving-team score`, `receiving-team score`,
   then `server number`; preserve the raw call because players may misspeak or

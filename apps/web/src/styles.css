@@ -1189,6 +1189,15 @@ p {
   line-height: 1.25;
 }
 
+.ai-review-note {
+  display: block;
+  margin-top: 0.25rem;
+  color: #6e5a00;
+  font-size: 0.68rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
 @media (max-width: 900px) {
   .correction-workspace,
   .correction-compare {

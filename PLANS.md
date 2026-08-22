@@ -889,6 +889,45 @@ Exit criteria:
 - No AI coaching, authentication, model retraining, or final quality-audit behavior
   is introduced.
 
+## 24A. Temporal shot-model foundation — complete
+
+Replace the invalid goal of forcing every shot into one mutually exclusive label
+with an inspectable, trainable temporal-model foundation. Preserve the completed
+rule classifier as a baseline and fallback, represent shot semantics on independent
+phase/mechanics/side/intent axes, and keep authoritative abstention separate from a
+non-authoritative best guess.
+
+Exit criteria:
+
+- A versioned multi-axis shot taxonomy separates rally phase, contact mode, stroke
+  side, and tactical intent while retaining a backwards-compatible legacy
+  `shotType` projection.
+- Contact-centered training examples consume structured temporal evidence (player
+  identity/position, ball trajectory, bounce/landing, and optional pose/crop feature
+  references) rather than isolated frames or raw detector tensors.
+- Dataset tooling applies corrections as a separate auditable layer, fixes the
+  known Video 8 Diana/Denny contact-label error, preserves AI provenance, and never
+  represents AI adjudication as human acceptance.
+- Trainability validation enforces whole-video splits, minimum per-class support,
+  human-accepted validation/test labels, and refuses misleading multiclass training
+  or evaluation when those gates fail.
+- A licensed RacketVision adapter downloads only explicitly selected safe static
+  files, records upstream revision/license/checksums, rejects untrusted pickle input,
+  and supports trajectory/racket representation pretraining without treating
+  non-pickleball labels as pickleball shot semantics.
+- A model adapter supports reproducible temporal representation pretraining and a
+  multi-head semantic classifier with calibrated confidence, alternatives,
+  authoritative `UNKNOWN`, and a separate `bestGuess` for product display.
+- Experiment records retain dataset/model versions, video-level splits,
+  configuration, code revision, metrics, weights provenance, and the distinction
+  between representation pretraining and pickleball semantic supervision.
+- The corrected eight-video audit and external pretraining experiment run locally;
+  semantic shot-head training remains blocked unless the documented human-label and
+  held-out-support gates are actually satisfied.
+- Tests, Ruff checks, Ruff formatting, static type checks, and the CLI health check
+  pass.
+- No AI coaching is implemented and no claim of zero authoritative unknowns is made.
+
 ## Future milestones — not current
 
 25. AI coaching

@@ -111,6 +111,48 @@ def test_pipeline_plan_rejects_arbitrary_commands(tmp_path: Path) -> None:
         load_pipeline_plan(plan_path)
 
 
+def test_shot_processing_allows_only_review_overlay_subcommand(tmp_path: Path) -> None:
+    plan_path = tmp_path / "plan.json"
+    plan_path.write_text(
+        json.dumps(
+            {
+                "planVersion": "1",
+                "pipelineVersion": "pipeline-test",
+                "stages": [
+                    {
+                        "stage": "SHOT_PROCESSING",
+                        "progress": 0.8,
+                        "argv": [
+                            "shot-model",
+                            "apply-review",
+                            "{source}",
+                            "--shots",
+                            "{workspace}/shots/shots.json",
+                            "--output",
+                            "{workspace}/shots/reviewed-shots.json",
+                        ],
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    plan = load_pipeline_plan(plan_path)
+    assert plan.stages[0].argv[:2] == ("shot-model", "apply-review")
+
+    payload = json.loads(plan_path.read_text(encoding="utf-8"))
+    payload["stages"][0]["argv"] = [
+        "shot-model",
+        "pretrain-representation",
+        "--config",
+        "experiment.json",
+    ]
+    plan_path.write_text(json.dumps(payload), encoding="utf-8")
+    with pytest.raises(AnalysisConfigurationError, match="not training commands"):
+        load_pipeline_plan(plan_path)
+
+
 def test_pipeline_plan_rejects_public_internal_artifact(tmp_path: Path) -> None:
     plan_path = tmp_path / "plan.json"
     _write_plan(plan_path)

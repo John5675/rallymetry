@@ -167,6 +167,13 @@ retry behavior, status semantics, and debugging are in
 9. Confirm `/tmp/rallymetry/<jobId>` no longer exists after both success and a forced
    failure.
 
+The production plan also runs the bundled eight-video AI visual-review overlay
+after shot reconstruction. The overlay is source-hash gated, never changes machine
+predictions, and is published only as additional shot evidence. Analytics remains
+connected to the original `shots/shots.json`; the dashboard reads
+`shots/reviewed-shots.json` so a matching reviewed source can show the separate AI
+visual-review best guess. Unrelated uploads cannot inherit those labels.
+
 ## Rollback and failure diagnosis
 
 Disabling `RENDER_WORKFLOW_TASK`/`RENDER_API_KEY` makes `/process` return a controlled

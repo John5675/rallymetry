@@ -58,3 +58,21 @@ def test_workflow_publication_plan_contains_only_viewable_artifacts() -> None:
     assert public_artifacts
     assert all(item["category"] == "VIEWABLE_MEDIA" for item in public_artifacts)
     assert all(item["category"] == "VIEWABLE_MEDIA" for item in plan["artifacts"])
+
+
+def test_workflow_publishes_exact_source_ai_review_without_using_it_for_analytics() -> None:
+    plan = json.loads(
+        (REPOSITORY_ROOT / "docs" / "examples" / "render-workflow-pipeline-plan.json").read_text(
+            encoding="utf-8"
+        )
+    )
+
+    review_stage = next(
+        stage for stage in plan["stages"] if stage["argv"][:2] == ["shot-model", "apply-review"]
+    )
+    assert review_stage["stage"] == "SHOT_PROCESSING"
+    shots_result = next(item for item in plan["structuredResults"] if item["collection"] == "shots")
+    assert shots_result["path"] == "shots/reviewed-shots.json"
+    analytics_stage = next(stage for stage in plan["stages"] if stage["stage"] == "ANALYTICS")
+    shots_argument = analytics_stage["argv"][analytics_stage["argv"].index("--shots") + 1]
+    assert shots_argument == "{workspace}/shots/shots.json"

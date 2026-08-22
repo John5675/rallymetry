@@ -1,6 +1,6 @@
 {
   "planVersion": "1",
-  "pipelineVersion": "release-0.1-render-workflow-v2",
+  "pipelineVersion": "release-0.1-render-workflow-v3-ai-review-overlay",
   "stages": [
     {
       "stage": "PLAYER_PROCESSING",
@@ -187,6 +187,19 @@
       ]
     },
     {
+      "stage": "SHOT_PROCESSING",
+      "progress": 0.87,
+      "argv": [
+        "shot-model",
+        "apply-review",
+        "{source}",
+        "--shots",
+        "{workspace}/shots/shots.json",
+        "--output",
+        "{workspace}/shots/reviewed-shots.json"
+      ]
+    },
+    {
       "stage": "ANALYTICS",
       "progress": 0.90,
       "argv": [
@@ -230,7 +243,7 @@
     },
     {
       "collection": "shots",
-      "path": "shots/shots.json",
+      "path": "shots/reviewed-shots.json",
       "recordsKey": "shots",
       "idField": "shotId",
       "timestampField": "contactTimestamp",

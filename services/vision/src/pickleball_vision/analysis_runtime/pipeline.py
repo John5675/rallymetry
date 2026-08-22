@@ -56,7 +56,7 @@ _ALLOWED_COMMANDS = {
     ProcessingJobStatus.BOUNCE_PROCESSING: {"detect-bounces"},
     ProcessingJobStatus.CONTACT_PROCESSING: {"detect-contacts"},
     ProcessingJobStatus.HITTER_PROCESSING: {"identify-hitters"},
-    ProcessingJobStatus.SHOT_PROCESSING: {"reconstruct-shots"},
+    ProcessingJobStatus.SHOT_PROCESSING: {"reconstruct-shots", "shot-model"},
     ProcessingJobStatus.ANALYTICS: {"analyze-match"},
 }
 
@@ -149,6 +149,10 @@ def load_pipeline_plan(path: Path) -> PipelinePlan:
         if argv[0] == "ball" and (len(argv) < 2 or argv[1] != "detect"):
             raise AnalysisConfigurationError(
                 "BALL_PROCESSING permits `ball detect` inference but not training commands"
+            )
+        if argv[0] == "shot-model" and (len(argv) < 2 or argv[1] != "apply-review"):
+            raise AnalysisConfigurationError(
+                "SHOT_PROCESSING permits `shot-model apply-review` but not training commands"
             )
         raw_cleanup_paths = item.get("cleanupPaths", [])
         if not isinstance(raw_cleanup_paths, list):

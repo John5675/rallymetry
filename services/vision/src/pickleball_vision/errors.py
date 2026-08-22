@@ -39,6 +39,8 @@ class ErrorCode(StrEnum):
     CONTACT_DETECTION_INPUT = "contact_detection_input_error"
     HITTER_IDENTIFICATION_INPUT = "hitter_identification_input_error"
     SHOT_RECONSTRUCTION_INPUT = "shot_reconstruction_input_error"
+    SHOT_MODEL_INPUT = "shot_model_input_error"
+    SHOT_MODEL_TRAINING = "shot_model_training_error"
     OUTPUT_WRITE = "output_write_error"
     PLAYER_ASSIGNMENT_IO = "player_assignment_io_error"
     PLAYER_ISOLATION_CANCELLED = "player_isolation_cancelled"
@@ -464,6 +466,28 @@ class BallEvaluationError(PickleballVisionError):
         super().__init__(
             f"Pickleball detector evaluation failed: {reason}",
             code=ErrorCode.BALL_EVALUATION,
+            details={"reason": reason},
+        )
+
+
+class ShotModelInputError(PickleballVisionError):
+    """Raised when shot-model data cannot preserve split or provenance contracts."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Invalid shot-model input: {reason}",
+            code=ErrorCode.SHOT_MODEL_INPUT,
+            details={"reason": reason},
+        )
+
+
+class ShotModelTrainingError(PickleballVisionError):
+    """Raised when a shot-model experiment cannot train or pretrain safely."""
+
+    def __init__(self, reason: str) -> None:
+        super().__init__(
+            f"Shot-model training failed: {reason}",
+            code=ErrorCode.SHOT_MODEL_TRAINING,
             details={"reason": reason},
         )
 

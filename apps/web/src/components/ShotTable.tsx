@@ -46,12 +46,18 @@ export function ShotTable({ shots, players }: ShotTableProps) {
             const confidence = numberValue(payload, "confidence") ?? shot.confidence;
             const hitter = stringValue(payload, "hitterId");
             const shotType = stringValue(payload, "shotType") ?? "UNKNOWN";
+            const aiVisualReview = asObject(shot.payload.aiVisualReview);
+            const aiReview = aiVisualReview === null ? null : asObject(aiVisualReview.review);
+            const reviewedBestGuess =
+              aiReview === null ? null : stringValue(aiReview, "legacyBestGuess");
+            const reviewedConfidence =
+              aiReview === null ? null : numberValue(aiReview, "legacyBestGuessConfidence");
             return (
               <tr key={shot.recordId}>
                 <td><strong>#{numberValue(payload, "shotIndex") ?? "N/A"}</strong></td>
                 <td>{stringValue(payload, "rallyId") ?? "N/A"}</td>
                 <td>{playerNameById(players, hitter)}{corrected && hitter !== stringValue(shot.payload, "hitterId") ? <small className="human-correction-note">AI: {playerNameById(players, stringValue(shot.payload, "hitterId"))}</small> : null}</td>
-                <td><span className="shot-type">{shotType}</span>{corrected && shotType !== stringValue(shot.payload, "shotType") ? <small className="human-correction-note">AI: {stringValue(shot.payload, "shotType") ?? "UNKNOWN"}</small> : null}</td>
+                <td><span className="shot-type">{shotType}</span>{corrected && shotType !== stringValue(shot.payload, "shotType") ? <small className="human-correction-note">AI prediction: {stringValue(shot.payload, "shotType") ?? "UNKNOWN"}</small> : null}{reviewedBestGuess !== null ? <small className="ai-review-note">AI visual review: {reviewedBestGuess}{reviewedConfidence === null ? "" : ` · ${formatConfidence(reviewedConfidence)}`}</small> : null}</td>
                 <td>{formatDuration(timestamp)}</td>
                 <td>{formatConfidence(confidence)}</td>
                 <td>{x === null || y === null ? "N/A" : `${x.toFixed(2)}, ${y.toFixed(2)}`}</td>

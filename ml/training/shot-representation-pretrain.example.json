@@ -1,0 +1,23 @@
+{
+  "recordType": "shot_representation_pretraining_configuration",
+  "schemaVersion": 1,
+  "experimentName": "racketvision-temporal-gru-v1",
+  "modelVersion": "shot-temporal-encoder-v1",
+  "datasetVersion": "racketvision-85157ca-safe-static-v1",
+  "datasetRoot": "../external/RacketVision",
+  "upstreamRevision": "85157ca21faa2abca96d837dd2b963738029bcc8",
+  "training": {
+    "historyFrames": 20,
+    "futureFrames": 5,
+    "hiddenSize": 64,
+    "epochs": 3,
+    "stepsPerEpoch": 250,
+    "validationSteps": 75,
+    "batchSize": 64,
+    "learningRate": 0.001,
+    "seed": 2026,
+    "deterministic": true,
+    "device": "auto",
+    "maximumSequencesPerPartition": null
+  }
+}

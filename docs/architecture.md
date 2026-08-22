@@ -308,6 +308,13 @@ Its initial classifier is an ordered, configured domain rule set with a fixed sm
 vocabulary and explicit `UNKNOWN`; no new neural network is introduced. Human shot
 labels remain post-inference evaluation inputs. See `shot-reconstruction.md`.
 
+The later temporal shot-model foundation does not replace that inspectable rule
+layer. It adds independent phase/contact-mode/stroke-side/intent axes, an auditable
+correction and trainability gate, and licensed cross-racket-sport representation
+pretraining. External data supplies no pickleball semantics. Learned output keeps a
+non-authoritative best guess separate from the thresholded authoritative value, so
+low-confidence axes remain `UNKNOWN`. See `shot-model.md`.
+
 The local annotation-review interface is an adapter over fixed split records,
 human annotation JSON, source images, and optional raw detector suggestions. It binds
 only to loopback and introduces no product backend. Suggestions stay in their raw
