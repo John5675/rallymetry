@@ -46,14 +46,18 @@ class YtDlpYouTubeDownloader:
             "socket_timeout": 30,
         }
         if self._pot_provider_url is not None:
+            # yt-dlp's current YouTube extractor requires an external runtime
+            # for signature/challenge solving. Render's native runtime includes
+            # Node; the matching yt-dlp-ejs scripts are installed with the app.
+            common_options["js_runtimes"] = {"node": {}}
             common_options["extractor_args"] = {
                 "youtube": {
                     # Hosted data-center IPs can be rejected while fetching the
                     # public watch webpage, before a PO token is requested. In
-                    # provider mode, go directly through the token-capable mweb
-                    # player API instead. Local downloads keep yt-dlp defaults.
-                    "fetch_pot": ["always"],
-                    "player_client": ["mweb"],
+                    # provider mode, try the embeddable logged-out client first,
+                    # then the token-capable mweb client. Local downloads keep
+                    # yt-dlp defaults.
+                    "player_client": ["web_embedded", "mweb"],
                     "player_skip": ["webpage"],
                 },
                 "youtubepot-bgutilhttp": {

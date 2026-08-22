@@ -70,11 +70,11 @@ def test_youtube_downloader_configures_server_side_challenge_provider(
     asyncio.run(downloader.download("_cPF1fTnk0Y", destination_dir=tmp_path / "input"))
 
     for options in FakeYoutubeDL.options_seen:
+        assert options["js_runtimes"] == {"node": {}}
         extractor_args = options["extractor_args"]
         assert isinstance(extractor_args, dict)
         assert extractor_args["youtube"] == {
-            "fetch_pot": ["always"],
-            "player_client": ["mweb"],
+            "player_client": ["web_embedded", "mweb"],
             "player_skip": ["webpage"],
         }
         assert extractor_args["youtubepot-bgutilhttp"] == {
