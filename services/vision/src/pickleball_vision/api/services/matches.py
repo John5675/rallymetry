@@ -36,6 +36,7 @@ from pickleball_vision.api.schemas.records import (
 from pickleball_vision.api.services.persistence import ApplicationPersistence
 from pickleball_vision.api.services.render_workflows import AnalysisWorkflowClient
 from pickleball_vision.api.youtube import parse_youtube_video_id
+from pickleball_vision.api.youtube_metadata import YouTubeTitleProvider
 from pickleball_vision.correction_analytics import correction_aware_analytics
 from pickleball_vision.corrections import (
     TARGET_COLLECTION,
@@ -45,6 +46,7 @@ from pickleball_vision.corrections import (
     prediction_version,
     validate_human_correction,
 )
+from pickleball_vision.match_roster import parse_match_roster
 from pickleball_vision.persistence.models import (
     ArtifactAccess,
     ArtifactCategory,
@@ -90,10 +92,12 @@ class MatchApplicationService:
         *,
         workflow_client: AnalysisWorkflowClient | None = None,
         default_analysis_profile_match_id: str | None = None,
+        youtube_title_provider: YouTubeTitleProvider | None = None,
     ) -> None:
         self._persistence = persistence
         self._workflow_client = workflow_client
         self._default_analysis_profile_match_id = default_analysis_profile_match_id
+        self._youtube_title_provider = youtube_title_provider
 
     async def create_match(self, request: MatchCreateRequest) -> MatchResponse:
         now = datetime.now(UTC)
@@ -144,13 +148,21 @@ class MatchApplicationService:
         setup = await self._shared_analysis_setup(
             profile=profile,
         )
+        title = request.title
+        if title is None and self._youtube_title_provider is not None:
+            title = await self._youtube_title_provider.title_for(youtube_video_id)
+        title = title or f"YouTube match {youtube_video_id}"
+        roster = parse_match_roster(title)
+        summary: dict[str, object] = {"status": ProcessingJobStatus.CREATED.value}
+        if roster is not None:
+            summary["roster"] = roster.as_dict()
         record = MatchRecord(
             match_id=match_id,
-            title=request.title or f"YouTube match {youtube_video_id}",
+            title=title,
             youtube_video_id=youtube_video_id,
             analysis_profile_match_id=profile_match_id,
             analysis_setup=setup,
-            summary={"status": ProcessingJobStatus.CREATED.value},
+            summary=summary,
             created_at=now,
             updated_at=now,
         )

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
-import type { Artifact, DomainRecord } from "./api/types";
-import { buildTimelineEvents, findPrimaryVideo, shotCourtPoints } from "./domain";
+import type { Artifact, DomainRecord, Match } from "./api/types";
+import { buildTimelineEvents, findPrimaryVideo, matchRosterNames, shotCourtPoints } from "./domain";
 
 function record(recordId: string, payload: DomainRecord["payload"]): DomainRecord {
   return {
@@ -36,6 +36,27 @@ function artifact(overrides: Partial<Artifact>): Artifact {
 }
 
 describe("dashboard domain projections", () => {
+  it("shows title-derived roster names without treating them as tracked identities", () => {
+    const match: Match = {
+      matchId: "match-1",
+      title: "8/17/26 ChhayDiana vs JohnNana",
+      youtubeVideoId: "6f7M8b6uKi4",
+      sourceArtifactId: null,
+      analysisProfileMatchId: null,
+      analysisSetup: {},
+      pipelineVersion: null,
+      modelVersions: {},
+      summary: {
+        roster: { playerNames: ["Chhay", "Diana", "John", "Nana"] },
+      },
+      artifactIds: [],
+      createdAt: "2026-08-22T00:00:00Z",
+      updatedAt: "2026-08-22T00:00:00Z",
+    };
+
+    expect(matchRosterNames(match)).toEqual(["Chhay", "Diana", "John", "Nana"]);
+  });
+
   it("creates distinct chronological rally, contact, bounce, and shot markers", () => {
     const timeline = buildTimelineEvents(
       [record("r1", { rallyId: "rally-1", startTimestamp: 2, endTimestamp: 8, confidence: 0.9 })],

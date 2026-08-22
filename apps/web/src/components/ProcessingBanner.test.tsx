@@ -84,7 +84,7 @@ describe("ProcessingBanner", () => {
     );
 
     expect(screen.getByText("Recording setup required")).toBeVisible();
-    expect(screen.getByText(/recording-specific court calibration/)).toBeVisible();
+    expect(screen.getByText(/Camera placement may use any court corner/)).toBeVisible();
     expect(screen.queryByText("internal profile details")).not.toBeInTheDocument();
   });
 });

@@ -110,6 +110,18 @@ records remain unchanged, MongoDB stores a separate target-specific correction, 
 API projections resolve only active verified corrections. This gives the dashboard
 an effective semantic view while retaining predictions for audit and evaluation.
 
+Camera geometry is a recording-level input. The canonical court coordinate system
+does not depend on camera orientation, so a valid multi-point homography may be fit
+from a camera behind any court corner. Image-space calibration points and manual
+player anchors cannot be copied between distinct camera views. Reusable detector
+experiments and weights are separate from those recording-specific artifacts.
+
+An accessible YouTube title may provide roster metadata when it unambiguously names
+two teams of two. The roster is useful for immediate display and review, but names
+are not image evidence: title order does not bind a name to a person box and does
+not establish which team is near or far. A separate reviewed role assignment makes
+that binding before named player tracking begins.
+
 ### MongoDB Atlas
 
 MongoDB Atlas stores hosted structured application data such as match metadata,

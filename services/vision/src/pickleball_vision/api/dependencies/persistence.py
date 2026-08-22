@@ -11,6 +11,7 @@ from pickleball_vision.api.services.matches import MatchApplicationService
 from pickleball_vision.api.services.persistence import ApplicationPersistence
 from pickleball_vision.api.services.render_workflows import AnalysisWorkflowClient
 from pickleball_vision.api.settings import ApiSettings
+from pickleball_vision.api.youtube_metadata import YouTubeTitleProvider
 
 
 def get_persistence(request: Request) -> ApplicationPersistence:
@@ -32,10 +33,15 @@ def get_match_service(
         getattr(request.app.state, "workflow_client", None),
     )
     settings = cast(ApiSettings, request.app.state.api_settings)
+    youtube_title_provider = cast(
+        YouTubeTitleProvider | None,
+        getattr(request.app.state, "youtube_title_provider", None),
+    )
     return MatchApplicationService(
         persistence,
         workflow_client=workflow_client,
         default_analysis_profile_match_id=settings.default_analysis_profile_match_id,
+        youtube_title_provider=youtube_title_provider,
     )
 
 

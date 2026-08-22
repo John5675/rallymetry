@@ -999,6 +999,33 @@ Exit criteria:
 - Tests cover successful preflight, incompatible layouts, hosted error mapping, and
   the user-facing setup-required state.
 
+## 24E. Camera-independent recording setup and title roster — current
+
+Separate reusable model artifacts from recording-specific court geometry and
+reviewed player anchors. A camera may observe the calibrated court from any corner;
+each distinct view receives its own multi-point homography rather than inheriting
+pixel coordinates from another recording. Use an accessible YouTube title as
+conservative roster metadata when it unambiguously names two doubles teams.
+
+Exit criteria:
+
+- Court calibration and manual image anchors remain recording-specific and can
+  represent any camera corner supported by the existing multi-point homography.
+- Ball experiment configuration and weights remain reusable artifacts and are not
+  confused with camera geometry.
+- YouTube import resolves the source title when the optional user title is absent
+  and conservatively parses exactly two named two-player teams.
+- Title-derived roster names are visible before tracking completes, but title order
+  never assigns a name to a detector box or asserts near/far court side.
+- Explicitly reviewed role/name bindings are staged separately as
+  `player-names.json`; the title roster alone cannot create those bindings.
+- The current alternate-corner recording receives its own calibration and reviewed
+  four-player anchors before it is requeued.
+- Tests cover title parsing, ambiguity, metadata lookup injection, roster display,
+  explicit role-name staging, and the boundary between roster and visual identity.
+- Python and frontend tests, lint, formatting, type checks, builds, and the CLI
+  doctor pass.
+
 ## Future milestones — not current
 
 25. AI coaching

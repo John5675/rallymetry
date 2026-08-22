@@ -80,7 +80,51 @@ class MatchSetupStager:
                 staged["calibrationArtifactId"],
                 source_path=source_path,
             )
+        names = _player_names_from_match(match_document)
+        if names is not None:
+            names_path = workspace / "input" / "player-names.json"
+            _write_json_atomic(names_path, names)
         return staged
+
+
+def _player_names_from_match(
+    match_document: Mapping[str, object],
+) -> dict[str, str] | None:
+    """Return only explicit reviewed role/name bindings, never title-order guesses."""
+
+    summary = match_document.get("summary")
+    if not isinstance(summary, Mapping):
+        return None
+    raw = summary.get("playerRoleAssignments")
+    if not isinstance(raw, Mapping):
+        return None
+    roles = ("ME", "PARTNER", "OPPONENT_1", "OPPONENT_2")
+    names: dict[str, str] = {}
+    for role in roles:
+        value = raw.get(role)
+        if not isinstance(value, str) or not value.strip():
+            raise AnalysisConfigurationError(
+                "summary.playerRoleAssignments must contain four non-empty reviewed names"
+            )
+        names[role] = value.strip()
+    return names
+
+
+def _write_json_atomic(path: Path, payload: Mapping[str, object]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_name(f".{path.name}.tmp")
+    try:
+        temporary.write_text(
+            json.dumps(payload, indent=2, sort_keys=True, allow_nan=False) + "\n",
+            encoding="utf-8",
+        )
+        temporary.replace(path)
+    except OSError as error:
+        with suppress(OSError):
+            temporary.unlink(missing_ok=True)
+        raise AnalysisConfigurationError(
+            f"unable to stage reviewed player names: {error}"
+        ) from error
 
 
 def _bind_calibration_to_runtime_source(path: Path, *, source_path: Path) -> None:

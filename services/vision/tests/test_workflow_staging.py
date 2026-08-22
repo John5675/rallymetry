@@ -195,6 +195,72 @@ def test_workflow_accepts_explicit_shared_analysis_profile_owner(tmp_path: Path)
     assert len(store.destinations) == 4
 
 
+def test_workflow_stages_only_explicit_reviewed_player_role_names(tmp_path: Path) -> None:
+    setup_records = [
+        _artifact(
+            f"artifact_{field}",
+            category=ArtifactCategory.INTERNAL_ARTIFACT,
+            pathname=f"internal_artifact/match_test/random/{filename}",
+        )
+        for field, filename in SETUP_FILENAMES.items()
+    ]
+    lookup = ArtifactLookup(setup_records)
+    store = DownloadOnlyBlobStore()
+    match_document: Document = {
+        "analysisSetup": {field: f"artifact_{field}" for field in SETUP_FILENAMES},
+        "summary": {
+            "roster": {"playerNames": ["Chhay", "Diana", "John", "Nana"]},
+            "playerRoleAssignments": {
+                "ME": "John",
+                "PARTNER": "Nana",
+                "OPPONENT_1": "Chhay",
+                "OPPONENT_2": "Diana",
+            },
+        },
+    }
+    workspace = tmp_path / "match_test"
+
+    asyncio.run(
+        MatchSetupStager(lookup, store).stage(
+            match_id="match_test",
+            match_document=match_document,
+            workspace=workspace,
+        )
+    )
+
+    assert json.loads((workspace / "input" / "player-names.json").read_text()) == {
+        "ME": "John",
+        "PARTNER": "Nana",
+        "OPPONENT_1": "Chhay",
+        "OPPONENT_2": "Diana",
+    }
+
+
+def test_title_roster_alone_does_not_create_image_role_assignments(tmp_path: Path) -> None:
+    setup_records = [
+        _artifact(
+            f"artifact_{field}",
+            category=ArtifactCategory.INTERNAL_ARTIFACT,
+            pathname=f"internal_artifact/match_test/random/{filename}",
+        )
+        for field, filename in SETUP_FILENAMES.items()
+    ]
+    workspace = tmp_path / "match_test"
+
+    asyncio.run(
+        MatchSetupStager(ArtifactLookup(setup_records), DownloadOnlyBlobStore()).stage(
+            match_id="match_test",
+            match_document={
+                "analysisSetup": {field: f"artifact_{field}" for field in SETUP_FILENAMES},
+                "summary": {"roster": {"playerNames": ["Chhay", "Diana", "John", "Nana"]}},
+            },
+            workspace=workspace,
+        )
+    )
+
+    assert not (workspace / "input" / "player-names.json").exists()
+
+
 def test_runtime_calibration_binding_changes_only_the_staged_copy(tmp_path: Path) -> None:
     staged = tmp_path / "input" / "calibration.json"
     staged.parent.mkdir(parents=True)

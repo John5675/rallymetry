@@ -79,13 +79,20 @@ Every setup reference must belong to the same match and be a private hosted
 configured existing match. The import endpoint creates new match-scoped artifact
 references plus an explicit `analysisProfileMatchId` owner reference to the same
 immutable private setup objects; it never duplicates or modifies the profile match.
-This is appropriate only for recordings compatible with that court, camera,
-player-role, and model profile. Before full-video person inference, the trusted plan
-runs `validate-player-profile` on only the reviewed anchor frames. An incompatible
-camera view or player layout terminates with `ANALYSIS_SETUP_REQUIRED`; the system
-does not weaken the anchor gate or substitute neighboring-court people. A failed
-preflight requires a recording-specific calibration and four reviewed player
-assignments before retrying.
+The ball experiment and weights are reusable. Calibration and image-space player
+anchors are only bootstrap references and are valid only for the recording/camera
+view where they were reviewed. A camera may be placed behind any court corner, but
+each distinct view needs its own court-plane homography and four reviewed player
+anchors. Before full-video person inference, the trusted plan runs
+`validate-player-profile` on only the reviewed anchor frames. An incompatible view
+terminates with `ANALYSIS_SETUP_REQUIRED`; the system does not weaken the anchor
+gate or substitute neighboring-court people. Retry only after replacing the camera
+and anchor references with recording-specific artifacts.
+
+When no title is supplied, FastAPI optionally resolves the accessible YouTube title.
+An unambiguous `PlayerPlayer vs PlayerPlayer` title is stored as roster/team metadata.
+It never assigns a title name to an image detection or infers near/far side. Reviewed
+logical-role names are staged separately from the title roster.
 
 The workflow downloads setup plus either the private Blob source or the YouTube
 source into the current job's temporary `input` directory. It preserves audio,

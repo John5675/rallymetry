@@ -28,6 +28,10 @@ from pickleball_vision.api.services.render_workflows import (
     RenderWorkflowClient,
 )
 from pickleball_vision.api.settings import AnalysisExecutionMode, ApiSettings
+from pickleball_vision.api.youtube_metadata import (
+    OEmbedYouTubeTitleProvider,
+    YouTubeTitleProvider,
+)
 from pickleball_vision.errors import PickleballVisionError
 from pickleball_vision.persistence.mongodb import MongoPersistence
 
@@ -156,10 +160,14 @@ def _lifespan(
     settings: ApiSettings,
     injected_persistence: ApplicationPersistence | None,
     injected_workflow_client: AnalysisWorkflowClient | None,
+    injected_youtube_title_provider: YouTubeTitleProvider | None,
 ) -> Callable[[FastAPI], AbstractAsyncContextManager[None]]:
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         owned_persistence: MongoPersistence | None = None
+        app.state.youtube_title_provider = (
+            injected_youtube_title_provider or OEmbedYouTubeTitleProvider()
+        )
         if injected_workflow_client is not None:
             app.state.workflow_client = injected_workflow_client
         elif settings.analysis_execution_mode is AnalysisExecutionMode.MONGODB_WORKER:
@@ -193,6 +201,7 @@ def _lifespan(
             app.state.persistence = None
             app.state.database_ready = False
             app.state.workflow_client = None
+            app.state.youtube_title_provider = None
             if owned_persistence is not None:
                 try:
                     await owned_persistence.close()
@@ -210,6 +219,7 @@ def create_app(
     settings: ApiSettings | None = None,
     persistence: ApplicationPersistence | None = None,
     workflow_client: AnalysisWorkflowClient | None = None,
+    youtube_title_provider: YouTubeTitleProvider | None = None,
 ) -> FastAPI:
     """Build the control-plane app without opening provider connections."""
 
@@ -217,7 +227,12 @@ def create_app(
     app = FastAPI(
         title="Pickleball Vision API",
         version="0.1.0",
-        lifespan=_lifespan(effective_settings, persistence, workflow_client),
+        lifespan=_lifespan(
+            effective_settings,
+            persistence,
+            workflow_client,
+            youtube_title_provider,
+        ),
         responses={
             404: {"model": ErrorResponse},
             422: {"model": ErrorResponse},
@@ -229,6 +244,7 @@ def create_app(
     app.state.persistence = persistence
     app.state.database_ready = persistence is not None
     app.state.workflow_client = workflow_client
+    app.state.youtube_title_provider = youtube_title_provider
 
     app.add_middleware(
         CORSMiddleware,

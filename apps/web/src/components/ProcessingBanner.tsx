@@ -23,7 +23,7 @@ export function ProcessingBanner({ job }: ProcessingBannerProps) {
     ? "Recording setup required"
     : job.currentStepLabel ?? job.stage?.replaceAll("_", " ") ?? job.status;
   const description = setupRequired
-    ? "This camera view or player lineup does not match the reviewed analysis profile. Add a recording-specific court calibration and four player assignments before retrying."
+    ? "This recording needs its own court calibration and four reviewed player anchors. Camera placement may use any court corner; pixel geometry is never copied between different views."
     : failed
       ? job.errorMessage ?? "Analysis stopped before completion."
     : job.currentStepDescription ??

@@ -24,7 +24,7 @@ import { useApi } from "../api/context";
 import { AsyncState } from "../components/AsyncState";
 import { ProcessingProgress } from "../components/ProcessingProgress";
 import { StatusBadge } from "../components/StatusBadge";
-import { findThumbnail, matchStatus, playerName } from "../domain";
+import { findThumbnail, matchRosterNames, matchStatus, playerName } from "../domain";
 import { useAsyncData } from "../hooks/useAsyncData";
 
 interface MatchListItem {
@@ -257,7 +257,7 @@ export function MatchesPage() {
                     <Users aria-hidden="true" />
                     {players.length > 0
                       ? players.map(playerName).join(", ")
-                      : "Players pending"}
+                      : matchRosterNames(match).join(", ") || "Players pending"}
                   </p>
                   {job !== null && !TERMINAL_JOB_STATUSES.has(job.status) ? (
                     <p className="match-card-progress">

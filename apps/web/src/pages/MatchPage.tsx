@@ -33,6 +33,7 @@ import {
   findPublicArtifact,
   formatDuration,
   matchStatus,
+  matchRosterNames,
   metricNumber,
   numberValue,
   playerName,
@@ -106,7 +107,7 @@ export function MatchPage() {
                 <p>
                   {data.players.length > 0
                     ? data.players.map(playerName).join(", ")
-                    : "Player assignments pending"}
+                    : matchRosterNames(data.match).join(", ") || "Player assignments pending"}
                 </p>
               </div>
               <div className="match-header-actions">

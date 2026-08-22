@@ -28,6 +28,16 @@ from pickleball_vision.persistence.models import (
 NOW = datetime(2026, 8, 20, 12, 0, tzinfo=UTC)
 
 
+class FakeYouTubeTitleProvider:
+    def __init__(self, title: str | None) -> None:
+        self.title = title
+        self.video_ids: list[str] = []
+
+    async def title_for(self, video_id: str) -> str | None:
+        self.video_ids.append(video_id)
+        return self.title
+
+
 class InMemoryApplicationPersistence:
     def __init__(self) -> None:
         self.matches: dict[str, Document] = {}
@@ -719,6 +729,36 @@ def test_youtube_submission_clones_profile_setup_and_queues_workflow() -> None:
         "artifact_assignments",
     }
     assert len(persistence.artifacts) == 6
+
+
+def test_youtube_submission_uses_source_title_as_a_roster_not_player_boxes() -> None:
+    persistence = seed_persistence()
+    workflow = FakeWorkflowClient()
+    titles = FakeYouTubeTitleProvider("8/17/26 ChhayDiana vs JohnNana")
+    app = create_app(
+        settings=ApiSettings(default_analysis_profile_match_id="match_seed"),
+        persistence=persistence,
+        workflow_client=workflow,
+        youtube_title_provider=titles,
+    )
+
+    with TestClient(app) as client:
+        response = client.post(
+            "/api/matches/import-youtube",
+            json={"youtubeUrl": "https://youtu.be/6f7M8b6uKi4"},
+        )
+
+    assert response.status_code == 202
+    match = response.json()["match"]
+    assert match["title"] == "8/17/26 ChhayDiana vs JohnNana"
+    assert match["summary"]["roster"]["playerNames"] == [
+        "Chhay",
+        "Diana",
+        "John",
+        "Nana",
+    ]
+    assert "playerRoleAssignments" not in match["summary"]
+    assert titles.video_ids == ["6f7M8b6uKi4"]
 
 
 def test_youtube_submission_rejects_duplicate_without_starting_paid_run() -> None:

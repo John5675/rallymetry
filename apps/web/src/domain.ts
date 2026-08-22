@@ -95,6 +95,15 @@ export function playerName(player: Player): string {
     : player.displayName ?? player.logicalIdentity ?? player.playerId;
 }
 
+export function matchRosterNames(match: Match): string[] {
+  const roster = asObject(match.summary.roster);
+  const values = roster?.playerNames;
+  if (!Array.isArray(values) || values.length !== 4) return [];
+  return values.every((value): value is string => typeof value === "string" && value.length > 0)
+    ? values
+    : [];
+}
+
 export function playerNameById(players: Player[], playerId: string | null): string {
   if (playerId === null) {
     return "Unknown";
