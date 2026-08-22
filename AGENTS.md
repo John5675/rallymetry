@@ -74,11 +74,17 @@ and the relevant design document before changing code.
 - Use Vercel Blob for hosted binary and generated artifacts.
 - Do not store large videos or frame-level CV artifacts directly in MongoDB.
 - Keep heavy analysis outside the API process and outside HTTP request handling.
-- Use on-demand Render Workflows for hosted CV and audio processing.
-- Do not run a continuously polling or always-on analysis worker.
-- MongoDB stores durable application job status but must not be polled as a job queue.
+- Keep analysis execution behind a configured adapter. The current friend-facing
+  production path queues MongoDB jobs for the developer's outbound-only Mac worker;
+  the existing Render Workflow adapter remains an optional deployment mode.
+- A local analysis worker may poll MongoDB with atomic claims, heartbeat leases,
+  bounded attempts, and concurrency of one match. It must never process inside an
+  HTTP request or permit two workers to own the same job.
+- Render must not run an always-on analysis worker for the current six-user scale.
 - Do not add Redis, Celery, RabbitMQ, Kafka, or a Render Background Worker.
 - Render Workflow task inputs must contain small identifiers, never media or large results.
+- Processing jobs must expose durable stage/progress metadata suitable for a
+  friend-facing status display without exposing raw logs, credentials, or local paths.
 - A workflow processes one match and publishes to MongoDB/Vercel Blob; it must never
   commit generated output or redeploy the website.
 - Treat workflow filesystems as temporary and clean only the current job workspace.

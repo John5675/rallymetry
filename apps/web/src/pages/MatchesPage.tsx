@@ -186,11 +186,19 @@ export function MatchesPage() {
               <div className="submission-result--success">
                 <CheckCircle2 aria-hidden="true" />
                 <div>
-                  <strong>{submission.job.stage?.replaceAll("_", " ") ?? submission.job.status}</strong>
-                  <span>{Math.round(submission.job.progress * 100)}% - Analysis runs in the background.</span>
+                  <strong>
+                    {submission.job.currentStepLabel ??
+                      submission.job.stage?.replaceAll("_", " ") ??
+                      submission.job.status}
+                  </strong>
+                  <span>
+                    {Math.round(submission.job.progress * 100)}% -{" "}
+                    {submission.job.currentStepDescription ??
+                      "Analysis runs in the background."}
+                  </span>
                   <ProcessingProgress
                     value={submission.job.progress}
-                    label={`${submission.job.stage?.replaceAll("_", " ") ?? submission.job.status} progress`}
+                    label={`${submission.job.currentStepLabel ?? submission.job.stage?.replaceAll("_", " ") ?? submission.job.status} progress`}
                   />
                   <Link to={`/matches/${submission.match.matchId}`}>Open match</Link>
                 </div>
@@ -251,6 +259,12 @@ export function MatchesPage() {
                       ? players.map(playerName).join(", ")
                       : "Players pending"}
                   </p>
+                  {job !== null && !TERMINAL_JOB_STATUSES.has(job.status) ? (
+                    <p className="match-card-progress">
+                      <span>{job.currentStepLabel ?? job.stage?.replaceAll("_", " ") ?? job.status}</span>
+                      <strong>{Math.round(job.progress * 100)}%</strong>
+                    </p>
+                  ) : null}
                   <span className="match-card-link">
                     Open match <ArrowUpRight aria-hidden="true" />
                   </span>

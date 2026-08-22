@@ -20,7 +20,7 @@ import { CorrectionWorkspace } from "../components/CorrectionWorkspace";
 import { EventTimeline } from "../components/EventTimeline";
 import { MetricCard } from "../components/MetricCard";
 import { PlayerPanel } from "../components/PlayerPanel";
-import { ProcessingProgress } from "../components/ProcessingProgress";
+import { ProcessingBanner } from "../components/ProcessingBanner";
 import { RallyTable } from "../components/RallyTable";
 import { SectionHeading } from "../components/SectionHeading";
 import { ShotTable } from "../components/ShotTable";
@@ -118,23 +118,7 @@ export function MatchPage() {
             </header>
 
             {job !== null && job.status !== "COMPLETE" ? (
-              <section className={`processing-banner processing-banner--${job.status === "FAILED" ? "failed" : "active"}`} aria-live="polite">
-                <div className="processing-banner__copy">
-                  <strong>{job.stage?.replaceAll("_", " ") ?? job.status}</strong>
-                  <span>
-                    {job.status === "FAILED"
-                      ? job.errorMessage ?? "Analysis stopped before completion."
-                      : "Analysis is running in the background. You can safely leave this page."}
-                  </span>
-                </div>
-                <div className="processing-banner__meter">
-                  <span>{Math.round(job.progress * 100)}%</span>
-                  <ProcessingProgress
-                    value={job.progress}
-                    label={`${job.stage?.replaceAll("_", " ") ?? job.status} progress`}
-                  />
-                </div>
-              </section>
+              <ProcessingBanner job={job} />
             ) : null}
 
             <nav className="section-nav" aria-label="Match sections">

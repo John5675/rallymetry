@@ -30,7 +30,16 @@ export interface ProcessingJob {
   status: string;
   progress: number;
   stage: string | null;
+  currentStep?: string | null;
+  currentStepLabel?: string | null;
+  currentStepDescription?: string | null;
+  currentStepIndex?: number | null;
+  totalSteps?: number | null;
   renderTriggeredAt: string | null;
+  claimedAt?: string | null;
+  heartbeatAt?: string | null;
+  leaseExpiresAt?: string | null;
+  workerId?: string | null;
   startedAt: string | null;
   completedAt: string | null;
   failedAt: string | null;

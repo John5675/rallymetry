@@ -956,6 +956,29 @@ Exit criteria:
   heartbeat, stale recovery, bounded failures, and one successful worker execution.
 - Python tests, Ruff checks/formatting, mypy, and the CLI doctor pass.
 
+## 24C. Inspectable live processing progress — complete
+
+Translate the worker's durable stage and monotonic progress values into a stable,
+friend-facing description of the exact pipeline command currently running. Keep
+raw worker logs and private local paths out of browser responses.
+
+Exit criteria:
+
+- Processing-job API responses expose a stable current-step key, friendly label,
+  short description, and analysis step index/count when the job is inside the
+  configured 13-command CV/audio pipeline.
+- Existing jobs created before this contract receive deterministic detail from
+  their persisted stage/progress values; no active job must be restarted.
+- The match page polls and displays the current operation, analysis step count,
+  overall progress, and latest worker heartbeat while preserving clear failure
+  messages.
+- Active match cards and the immediate submission result show the friendly current
+  operation rather than only a coarse status enum.
+- API and component tests cover current-step projection, progress accessibility,
+  heartbeat visibility, and failure precedence.
+- Python and frontend tests, lint, formatting, type checks, builds, and the CLI
+  doctor pass.
+
 ## Future milestones — not current
 
 25. AI coaching

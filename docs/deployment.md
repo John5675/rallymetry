@@ -167,6 +167,11 @@ fallback when an authorized YouTube recording cannot be retrieved. Render Workfl
 support remains available as the explicit `render_workflow` execution mode, but it
 is not the active no-proxy deployment path.
 
+FastAPI translates each persisted worker stage/progress pair into a stable current
+step key, friendly description, and analysis step index. The dashboard polls this
+contract every five seconds, shows the most recent worker heartbeat, and never sends
+raw worker logs, credentials, local paths, or command arguments to the browser.
+
 ## Smoke test
 
 1. `GET https://<fastapi-host>/health` returns `200` with database ready.

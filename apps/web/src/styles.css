@@ -623,6 +623,25 @@ p {
   align-self: flex-start;
 }
 
+.match-card-progress {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin: -0.45rem 0 1rem;
+  padding: 0.65rem 0.75rem;
+  color: var(--info-ink);
+  font-size: 0.72rem;
+  background: var(--info-soft);
+  border-radius: var(--radius-small);
+}
+
+.match-card-progress span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .match-card-link {
   color: var(--accent-strong);
   font-size: 0.78rem;
@@ -817,6 +836,17 @@ p {
 .processing-banner__copy {
   display: grid;
   gap: 0.2rem;
+}
+
+.processing-banner__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 0.9rem;
+  margin-top: 0.35rem;
+}
+
+.processing-banner__meta span {
+  font-weight: 750;
 }
 
 .processing-banner span {

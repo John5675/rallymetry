@@ -628,6 +628,38 @@ def test_process_endpoint_can_queue_for_local_mongodb_worker_without_render() ->
     assert payload["processingRunId"].startswith("run_")
 
 
+def test_job_response_explains_the_current_pipeline_step() -> None:
+    persistence = seed_persistence()
+    app = create_app(
+        settings=ApiSettings(
+            analysis_execution_mode=AnalysisExecutionMode.MONGODB_WORKER,
+        ),
+        persistence=persistence,
+    )
+
+    with TestClient(app) as client:
+        queued = client.post("/api/matches/match_seed/process").json()
+        document = persistence.jobs[queued["jobId"]]
+        document.update(
+            {
+                "status": "PLAYER_PROCESSING",
+                "stage": "PLAYER_PROCESSING",
+                "progress": 0.17,
+                "workerId": "johns-mac",
+                "heartbeatAt": NOW,
+            }
+        )
+        response = client.get(f"/api/jobs/{queued['jobId']}")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["currentStep"] == "track-players"
+    assert payload["currentStepLabel"] == "Tracking the four match players"
+    assert payload["currentStepIndex"] == 2
+    assert payload["totalSteps"] == 13
+    assert payload["heartbeatAt"] == NOW.isoformat().replace("+00:00", "Z")
+
+
 def test_duplicate_process_request_returns_active_job_without_second_render_run() -> None:
     persistence = seed_persistence()
     workflow = FakeWorkflowClient()
