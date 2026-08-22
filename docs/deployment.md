@@ -156,6 +156,11 @@ launchctl print gui/$UID/com.rallymetry.worker
 tail -f ~/Library/Logs/rallymetry-worker.log
 ```
 
+The installer creates an isolated `uv tool` and copies the pipeline plan plus the
+ignored worker environment into `~/Library/Application Support/Rallymetry`. This is
+intentional: macOS background agents cannot reliably read repositories located under
+the protected `Documents` directory.
+
 The worker atomically claims one job, heartbeats while processing, and permits a
 bounded stale-lease recovery. Direct private MP4 source artifacts remain the
 fallback when an authorized YouTube recording cannot be retrieved. Render Workflow
