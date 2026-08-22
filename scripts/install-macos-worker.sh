@@ -24,7 +24,10 @@ mkdir -p "${launch_agents}" "${log_dir}" "${support_dir}/tmp"
 # launchd cannot reliably read repositories under macOS-protected Documents.
 # Install a self-contained user tool and copy only credential-free runtime files
 # plus the already-ignored worker environment into Application Support.
-uv tool install --force "${repo_root}/services/vision"
+# The project version intentionally remains stable during local development. Refresh
+# and reinstall explicitly so uv cannot reuse a cached wheel after source changes.
+uv tool install --force --reinstall --refresh-package pickleball-vision \
+  "${repo_root}/services/vision"
 install -m 700 "${script_dir}/run-installed-worker.sh" "${installed_runner}"
 install -m 600 "${worker_env}" "${installed_env}"
 install -m 600 \

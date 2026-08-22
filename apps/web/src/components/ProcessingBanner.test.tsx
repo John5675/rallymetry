@@ -71,4 +71,20 @@ describe("ProcessingBanner", () => {
     expect(screen.getByText("Unable to decode source media")).toBeVisible();
     expect(screen.queryByText("Analysis step 1 of 13")).not.toBeInTheDocument();
   });
+
+  it("explains when this recording needs its own reviewed setup", () => {
+    render(
+      <ProcessingBanner
+        job={processingJob({
+          status: "FAILED",
+          errorCode: "ANALYSIS_SETUP_REQUIRED",
+          errorMessage: "internal profile details",
+        })}
+      />,
+    );
+
+    expect(screen.getByText("Recording setup required")).toBeVisible();
+    expect(screen.getByText(/recording-specific court calibration/)).toBeVisible();
+    expect(screen.queryByText("internal profile details")).not.toBeInTheDocument();
+  });
 });

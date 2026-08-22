@@ -11,7 +11,11 @@ from pickleball_vision.analysis_runtime.pipeline import (
     PlannedCliPipelineRunner,
     load_pipeline_plan,
 )
-from pickleball_vision.errors import AnalysisConfigurationError, AnalysisPipelineError
+from pickleball_vision.errors import (
+    AnalysisConfigurationError,
+    AnalysisPipelineError,
+    AnalysisSetupRequiredError,
+)
 from pickleball_vision.persistence.models import ProcessingJobRecord, ProcessingJobStatus
 
 NOW = datetime(2026, 8, 19, 12, 0, tzinfo=UTC)
@@ -208,3 +212,40 @@ def test_planned_runner_surfaces_cli_stderr_tail(tmp_path: Path) -> None:
                 on_stage=on_stage,
             )
         )
+
+
+def test_planned_runner_maps_profile_mismatch_to_setup_required(tmp_path: Path) -> None:
+    plan_path = tmp_path / "plan.json"
+    _write_plan(plan_path, command="validate-player-profile")
+    executable = tmp_path / "failing-command"
+    executable.write_text(
+        "#!/bin/sh\necho 'error [player_profile_mismatch]: wrong recording' >&2\nexit 2\n",
+        encoding="utf-8",
+    )
+    executable.chmod(0o755)
+    source = tmp_path / "source.mp4"
+    source.write_bytes(b"source")
+
+    async def on_stage(stage: ProcessingJobStatus, progress: float) -> None:
+        del stage, progress
+
+    with pytest.raises(AnalysisSetupRequiredError) as caught:
+        asyncio.run(
+            PlannedCliPipelineRunner(
+                load_pipeline_plan(plan_path),
+                executable=str(executable),
+            ).run(
+                ProcessingJobRecord(
+                    job_id="job-setup",
+                    match_id="match-setup",
+                    job_type="analyze_match",
+                    created_at=NOW,
+                    updated_at=NOW,
+                ),
+                source_path=source,
+                workspace=tmp_path / "workspace",
+                on_stage=on_stage,
+            )
+        )
+
+    assert caught.value.job_error_code == "ANALYSIS_SETUP_REQUIRED"

@@ -47,6 +47,7 @@ class ErrorCode(StrEnum):
     PLAYER_ISOLATION_INPUT = "player_isolation_input_error"
     PLAYER_ANALYSIS_INPUT = "player_analysis_input_error"
     PLAYER_TRACKING_INPUT = "player_tracking_input_error"
+    PLAYER_PROFILE_MISMATCH = "player_profile_mismatch"
     PERSISTENCE = "persistence_error"
     PERSISTENCE_VALIDATION = "persistence_validation_error"
     ARTIFACT_STORAGE = "artifact_storage_error"
@@ -164,6 +165,21 @@ class AnalysisPipelineError(AnalysisExecutionError):
             f"Analysis pipeline failed: {reason}",
             code=ErrorCode.ANALYSIS_PIPELINE,
             job_error_code="ANALYSIS_PIPELINE",
+            details=details,
+        )
+
+
+class AnalysisSetupRequiredError(AnalysisExecutionError):
+    """The staged recording does not match its reviewed court/player setup."""
+
+    def __init__(self, reason: str, *, stage: str | None = None) -> None:
+        details: dict[str, object] = {"reason": reason}
+        if stage is not None:
+            details["stage"] = stage
+        super().__init__(
+            "Recording-specific court and player setup is required before analysis can run",
+            code=ErrorCode.ANALYSIS_CONFIGURATION,
+            job_error_code="ANALYSIS_SETUP_REQUIRED",
             details=details,
         )
 

@@ -722,6 +722,12 @@ select:focus-visible {
   background: var(--surface-soft);
 }
 
+.processing-banner--setup {
+  color: #fff1ad;
+  background: color-mix(in srgb, #f0c74a 12%, var(--surface));
+  border-color: color-mix(in srgb, #f0c74a 42%, transparent);
+}
+
 .back-link {
   gap: 0.5rem;
   margin-bottom: 2.2rem;

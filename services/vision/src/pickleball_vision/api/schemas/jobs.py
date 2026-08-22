@@ -21,7 +21,7 @@ class _ProgressDetail(NamedTuple):
     total_steps: int | None = None
 
 
-_ANALYSIS_STEP_COUNT = 13
+_ANALYSIS_STEP_COUNT = 14
 _PROGRESS_DETAILS = (
     _ProgressDetail(
         "CREATED",
@@ -60,11 +60,20 @@ _PROGRESS_DETAILS = (
     ),
     _ProgressDetail(
         "PLAYER_PROCESSING",
+        0.12,
+        "validate-player-profile",
+        "Checking recording setup",
+        "Confirming that the reviewed court view and player anchors match this recording.",
+        1,
+        _ANALYSIS_STEP_COUNT,
+    ),
+    _ProgressDetail(
+        "PLAYER_PROCESSING",
         0.15,
         "detect-people",
         "Detecting people",
         "Scanning every video frame for visible people before selecting match players.",
-        1,
+        2,
         _ANALYSIS_STEP_COUNT,
     ),
     _ProgressDetail(
@@ -73,7 +82,7 @@ _PROGRESS_DETAILS = (
         "track-players",
         "Tracking the four match players",
         "Linking the four assigned player identities across frames and short occlusions.",
-        2,
+        3,
         _ANALYSIS_STEP_COUNT,
     ),
     _ProgressDetail(
@@ -82,7 +91,7 @@ _PROGRESS_DETAILS = (
         "analyze-players",
         "Mapping player movement",
         "Transforming ground-contact positions into court movement and occupancy data.",
-        3,
+        4,
         _ANALYSIS_STEP_COUNT,
     ),
     _ProgressDetail(
@@ -91,7 +100,7 @@ _PROGRESS_DETAILS = (
         "detect-ball",
         "Detecting the pickleball",
         "Running the tiny-object detector across the primary-court view.",
-        4,
+        5,
         _ANALYSIS_STEP_COUNT,
     ),
     _ProgressDetail(
@@ -101,7 +110,7 @@ _PROGRESS_DETAILS = (
         "Reconstructing the ball trajectory",
         "Associating frame-level candidates while preserving observed, interpolated, "
         "and unknown periods.",
-        5,
+        6,
         _ANALYSIS_STEP_COUNT,
     ),
     _ProgressDetail(
@@ -110,7 +119,7 @@ _PROGRESS_DETAILS = (
         "analyze-audio",
         "Analyzing synchronized audio",
         "Extracting optional transient evidence without creating events from sound alone.",
-        6,
+        7,
         _ANALYSIS_STEP_COUNT,
     ),
     _ProgressDetail(
@@ -119,7 +128,7 @@ _PROGRESS_DETAILS = (
         "segment-rallies",
         "Segmenting rallies",
         "Combining structured motion and reset signals into candidate rally boundaries.",
-        7,
+        8,
         _ANALYSIS_STEP_COUNT,
     ),
     _ProgressDetail(
@@ -128,7 +137,7 @@ _PROGRESS_DETAILS = (
         "detect-bounces",
         "Detecting bounces",
         "Evaluating visual trajectory reversals with optional synchronized audio support.",
-        8,
+        9,
         _ANALYSIS_STEP_COUNT,
     ),
     _ProgressDetail(
@@ -137,7 +146,7 @@ _PROGRESS_DETAILS = (
         "detect-contacts",
         "Detecting paddle contacts",
         "Evaluating ball-direction changes near tracked players.",
-        9,
+        10,
         _ANALYSIS_STEP_COUNT,
     ),
     _ProgressDetail(
@@ -146,7 +155,7 @@ _PROGRESS_DETAILS = (
         "identify-hitters",
         "Identifying hitters",
         "Resolving each contact to the most defensible logical player or UNKNOWN.",
-        10,
+        11,
         _ANALYSIS_STEP_COUNT,
     ),
     _ProgressDetail(
@@ -155,7 +164,7 @@ _PROGRESS_DETAILS = (
         "reconstruct-shots",
         "Reconstructing shots",
         "Connecting contacts, trajectories, bounces, hitters, and landing evidence.",
-        11,
+        12,
         _ANALYSIS_STEP_COUNT,
     ),
     _ProgressDetail(
@@ -164,7 +173,7 @@ _PROGRESS_DETAILS = (
         "apply-shot-review",
         "Applying reviewed shot labels",
         "Applying available reviewed semantics while retaining the original predictions.",
-        12,
+        13,
         _ANALYSIS_STEP_COUNT,
     ),
     _ProgressDetail(
@@ -173,7 +182,7 @@ _PROGRESS_DETAILS = (
         "analyze-match",
         "Calculating match analytics",
         "Producing deterministic metrics from the structured match records.",
-        13,
+        14,
         _ANALYSIS_STEP_COUNT,
     ),
     _ProgressDetail(

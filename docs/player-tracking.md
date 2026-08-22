@@ -27,6 +27,20 @@ side under a bounded distance gate. The normal local command remains provenance-
 and portable mode never chooses the four highest-confidence people or silently forces
 an unmatched identity.
 
+Hosted pipelines should validate the portable profile before starting a full-video
+person-detection pass:
+
+```bash
+uv run pickleball-vision validate-player-profile /absolute/path/to/match.mp4 \
+  --calibration /absolute/path/to/calibration.json \
+  --assignments /absolute/path/to/player-assignments.json
+```
+
+This check decodes only the reviewed anchor frames. A `player_profile_mismatch` error
+means the calibration or assignments belong to a different recording or camera setup;
+create recording-specific calibration and role assignments instead of loosening the
+matching gate.
+
 Human-readable names are optional and remain independent of the four stable roles.
 Put a `player-names.json` beside `player-assignments.json`, or pass it explicitly
 with `--player-names`:

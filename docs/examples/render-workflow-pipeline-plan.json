@@ -4,6 +4,18 @@
   "stages": [
     {
       "stage": "PLAYER_PROCESSING",
+      "progress": 0.12,
+      "argv": [
+        "validate-player-profile",
+        "{source}",
+        "--calibration",
+        "{input}/calibration.json",
+        "--assignments",
+        "{input}/player-assignments.json"
+      ]
+    },
+    {
+      "stage": "PLAYER_PROCESSING",
       "progress": 0.15,
       "argv": [
         "detect-people",

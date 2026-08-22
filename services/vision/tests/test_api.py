@@ -655,8 +655,8 @@ def test_job_response_explains_the_current_pipeline_step() -> None:
     payload = response.json()
     assert payload["currentStep"] == "track-players"
     assert payload["currentStepLabel"] == "Tracking the four match players"
-    assert payload["currentStepIndex"] == 2
-    assert payload["totalSteps"] == 13
+    assert payload["currentStepIndex"] == 3
+    assert payload["totalSteps"] == 14
     assert payload["heartbeatAt"] == NOW.isoformat().replace("+00:00", "Z")
 
 

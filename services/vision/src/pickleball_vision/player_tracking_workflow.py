@@ -11,9 +11,23 @@ from dataclasses import dataclass, replace
 from pathlib import Path
 
 from pickleball_vision.calibration import load_calibration
-from pickleball_vision.config import PlayerIsolationSettings, PlayerTrackingSettings
-from pickleball_vision.errors import OutputWriteError, PlayerTrackingInputError
-from pickleball_vision.person_detection import PersonDetection, load_person_detection_run
+from pickleball_vision.config import (
+    PersonDetectionSettings,
+    PlayerIsolationSettings,
+    PlayerTrackingSettings,
+)
+from pickleball_vision.detectors import UltralyticsPersonDetector
+from pickleball_vision.errors import (
+    ErrorCode,
+    OutputWriteError,
+    PickleballVisionError,
+    PlayerTrackingInputError,
+)
+from pickleball_vision.person_detection import (
+    PersonDetection,
+    PersonDetector,
+    load_person_detection_run,
+)
 from pickleball_vision.player_appearance import (
     appearance_similarity,
     build_appearance_prototypes,
@@ -37,12 +51,30 @@ from pickleball_vision.player_tracking import (
 )
 from pickleball_vision.player_tracking_render import render_player_tracking_frame
 from pickleball_vision.trackers import UltralyticsByteTracker
-from pickleball_vision.video import VideoMetadata, inspect_video, iter_video_frames
+from pickleball_vision.video import (
+    VideoMetadata,
+    inspect_video,
+    iter_selected_video_frames,
+    iter_video_frames,
+)
 from pickleball_vision.video_output import CompressedVideoWriter
 
 TRACKS_NAME = "tracks.json"
 ANNOTATED_VIDEO_NAME = "annotated.mp4"
 SUMMARY_NAME = "tracking-summary.json"
+
+
+class PlayerProfileMismatchError(PickleballVisionError):
+    """A reviewed manual player profile cannot be transferred to this recording."""
+
+    def __init__(self, roles: set[LogicalPlayerRole]) -> None:
+        labels = ", ".join(sorted(role.value for role in roles))
+        super().__init__(
+            "Reviewed player anchors do not match this recording for: "
+            f"{labels}. Create a recording-specific court calibration and player assignment.",
+            code=ErrorCode.PLAYER_PROFILE_MISMATCH,
+            details={"roles": sorted(role.value for role in roles)},
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -186,14 +218,58 @@ def _rebind_manual_anchors(
 
     missing = set(LOGICAL_PLAYER_ROLES) - selected_roles
     if missing:
-        labels = ", ".join(sorted(role.value for role in missing))
-        raise PlayerTrackingInputError(
-            "portable manual anchors could not be matched to fresh detections for: "
-            f"{labels}; create or enrich player assignments from this recording"
-        )
+        raise PlayerProfileMismatchError(missing)
     return replace(
         assignments, assignments=tuple(rebound_by_role[role] for role in LOGICAL_PLAYER_ROLES)
     )
+
+
+def validate_portable_player_profile(
+    video_path: Path,
+    *,
+    calibration_path: Path,
+    assignments_path: Path,
+    person_settings: PersonDetectionSettings,
+    isolation_settings: PlayerIsolationSettings,
+    detector: PersonDetector | None = None,
+) -> dict[str, object]:
+    """Validate portable anchors on only their source frames before full-video inference."""
+
+    source = inspect_video(video_path)
+    resolved_calibration_path = calibration_path.expanduser().resolve()
+    _validate_calibration_metadata(resolved_calibration_path, source)
+    assignments = load_player_assignments(assignments_path)
+    anchor_frames = tuple(sorted({item.anchor_frame_number for item in assignments.assignments}))
+    if any(frame_number >= source.frame_count for frame_number in anchor_frames):
+        raise PlayerProfileMismatchError(set(LOGICAL_PLAYER_ROLES))
+
+    active_detector = detector or UltralyticsPersonDetector(person_settings)
+    detections: list[PersonDetection] = []
+    decoded_frames = 0
+    for decoded in iter_selected_video_frames(video_path, anchor_frames):
+        decoded_frames += 1
+        detections.extend(
+            active_detector.detect(
+                decoded.image,
+                frame_number=decoded.frame_index,
+                timestamp_s=decoded.timestamp,
+            )
+        )
+    if decoded_frames != len(anchor_frames):
+        raise PlayerProfileMismatchError(set(LOGICAL_PLAYER_ROLES))
+    rebound = _rebind_manual_anchors(
+        assignments,
+        detections=tuple(detections),
+        calibration_path=resolved_calibration_path,
+        source=source,
+        isolation_settings=isolation_settings,
+    )
+    return {
+        "compatible": True,
+        "anchor_frame_count": len(anchor_frames),
+        "anchor_detection_count": len(detections),
+        "matched_roles": [item.logical_player.value for item in rebound.assignments],
+    }
 
 
 def _validate_calibration_metadata(calibration_path: Path, source: VideoMetadata) -> None:

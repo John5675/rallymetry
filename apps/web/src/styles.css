@@ -833,6 +833,12 @@ p {
   border-color: #f2cabc;
 }
 
+.processing-banner--setup {
+  color: #6b4b00;
+  background: #fff7d6;
+  border-color: #e9ca69;
+}
+
 .processing-banner__copy {
   display: grid;
   gap: 0.2rem;

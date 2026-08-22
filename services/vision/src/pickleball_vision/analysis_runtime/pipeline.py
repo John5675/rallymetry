@@ -18,7 +18,11 @@ from pickleball_vision.analysis_runtime.models import (
     PipelineStagePlan,
     StructuredResultPlan,
 )
-from pickleball_vision.errors import AnalysisConfigurationError, AnalysisPipelineError
+from pickleball_vision.errors import (
+    AnalysisConfigurationError,
+    AnalysisPipelineError,
+    AnalysisSetupRequiredError,
+)
 from pickleball_vision.persistence.models import (
     AnalyticsRecord,
     ArtifactAccess,
@@ -49,6 +53,7 @@ _ALLOWED_COMMANDS = {
         "isolate-players",
         "track-players",
         "analyze-players",
+        "validate-player-profile",
     },
     ProcessingJobStatus.BALL_PROCESSING: {"ball", "track-ball"},
     ProcessingJobStatus.AUDIO_PROCESSING: {"analyze-audio"},
@@ -325,6 +330,11 @@ class PlannedCliPipelineRunner(PipelineRunner):
             if return_code != 0:
                 detail = self._failure_detail(stderr_path, stdout_path)
                 suffix = f": {detail}" if detail else ""
+                if "error [player_profile_mismatch]" in detail:
+                    raise AnalysisSetupRequiredError(
+                        "the reviewed manual player anchors are incompatible with this recording",
+                        stage=stage_plan.stage.value,
+                    )
                 raise AnalysisPipelineError(
                     f"local CLI command {argv[0]} exited with status {return_code}{suffix}",
                     stage=stage_plan.stage.value,

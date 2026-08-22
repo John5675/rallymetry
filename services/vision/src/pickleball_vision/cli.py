@@ -53,7 +53,10 @@ from pickleball_vision.media import (
 from pickleball_vision.person_detection_pipeline import detect_people_in_video
 from pickleball_vision.player_analysis_workflow import analyze_players_in_video
 from pickleball_vision.player_isolation_workflow import isolate_primary_players
-from pickleball_vision.player_tracking_workflow import track_players_in_video
+from pickleball_vision.player_tracking_workflow import (
+    track_players_in_video,
+    validate_portable_player_profile,
+)
 from pickleball_vision.rally_segmentation_workflow import segment_rallies_in_video
 from pickleball_vision.shot_dataset import build_shot_training_dataset
 from pickleball_vision.shot_pretraining import pretrain_shot_representation
@@ -228,6 +231,24 @@ def build_parser() -> argparse.ArgumentParser:
         type=Path,
         required=True,
         help="directory for detections.json, annotated.mp4, and summary.json",
+    )
+
+    validate_profile_parser = subparsers.add_parser(
+        "validate-player-profile",
+        help="check reviewed player anchors before expensive full-video inference",
+    )
+    validate_profile_parser.add_argument("video", type=Path, help="path to a local video file")
+    validate_profile_parser.add_argument(
+        "--calibration",
+        type=Path,
+        required=True,
+        help="reviewed court calibration JSON",
+    )
+    validate_profile_parser.add_argument(
+        "--assignments",
+        type=Path,
+        required=True,
+        help="reviewed player-assignments.json with portable image anchors",
     )
 
     isolate_parser = subparsers.add_parser(
@@ -1128,6 +1149,28 @@ def _run_detect_people(
     return EXIT_OK
 
 
+def _run_validate_player_profile(
+    video_path: Path,
+    *,
+    calibration_path: Path,
+    assignments_path: Path,
+    settings: Settings,
+) -> int:
+    result = validate_portable_player_profile(
+        video_path,
+        calibration_path=calibration_path,
+        assignments_path=assignments_path,
+        person_settings=settings.person_detection,
+        isolation_settings=settings.player_isolation,
+    )
+    logging.getLogger("pickleball_vision.cli").info(
+        "portable_player_profile_validated",
+        extra={"context": result},
+    )
+    _print_json(result)
+    return EXIT_OK
+
+
 def _run_isolate_players(
     video_path: Path,
     *,
@@ -1781,6 +1824,13 @@ def main(argv: Sequence[str] | None = None) -> int:
                 cast(Path, args.video),
                 calibration_path=cast(Path, args.calibration),
                 output_dir=cast(Path, args.output_dir),
+                settings=settings,
+            )
+        if args.command == "validate-player-profile":
+            return _run_validate_player_profile(
+                cast(Path, args.video),
+                calibration_path=cast(Path, args.calibration),
+                assignments_path=cast(Path, args.assignments),
                 settings=settings,
             )
         if args.command == "isolate-players":

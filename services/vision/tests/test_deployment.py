@@ -76,3 +76,12 @@ def test_workflow_publishes_exact_source_ai_review_without_using_it_for_analytic
     analytics_stage = next(stage for stage in plan["stages"] if stage["stage"] == "ANALYTICS")
     shots_argument = analytics_stage["argv"][analytics_stage["argv"].index("--shots") + 1]
     assert shots_argument == "{workspace}/shots/shots.json"
+
+
+def test_macos_worker_installer_refreshes_the_local_project_wheel() -> None:
+    installer = (REPOSITORY_ROOT / "scripts" / "install-macos-worker.sh").read_text(
+        encoding="utf-8"
+    )
+
+    assert "--reinstall" in installer
+    assert "--refresh-package pickleball-vision" in installer

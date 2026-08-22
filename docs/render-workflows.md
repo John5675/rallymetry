@@ -80,7 +80,12 @@ configured existing match. The import endpoint creates new match-scoped artifact
 references plus an explicit `analysisProfileMatchId` owner reference to the same
 immutable private setup objects; it never duplicates or modifies the profile match.
 This is appropriate only for recordings compatible with that court, camera,
-player-role, and model profile.
+player-role, and model profile. Before full-video person inference, the trusted plan
+runs `validate-player-profile` on only the reviewed anchor frames. An incompatible
+camera view or player layout terminates with `ANALYSIS_SETUP_REQUIRED`; the system
+does not weaken the anchor gate or substitute neighboring-court people. A failed
+preflight requires a recording-specific calibration and four reviewed player
+assignments before retrying.
 
 The workflow downloads setup plus either the private Blob source or the YouTube
 source into the current job's temporary `input` directory. It preserves audio,

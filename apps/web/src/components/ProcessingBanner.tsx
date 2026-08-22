@@ -18,16 +18,21 @@ function formatWorkerCheckIn(value: string | null): string | null {
 
 export function ProcessingBanner({ job }: ProcessingBannerProps) {
   const failed = job.status === "FAILED";
-  const label = job.currentStepLabel ?? job.stage?.replaceAll("_", " ") ?? job.status;
-  const description = failed
-    ? job.errorMessage ?? "Analysis stopped before completion."
+  const setupRequired = failed && job.errorCode === "ANALYSIS_SETUP_REQUIRED";
+  const label = setupRequired
+    ? "Recording setup required"
+    : job.currentStepLabel ?? job.stage?.replaceAll("_", " ") ?? job.status;
+  const description = setupRequired
+    ? "This camera view or player lineup does not match the reviewed analysis profile. Add a recording-specific court calibration and four player assignments before retrying."
+    : failed
+      ? job.errorMessage ?? "Analysis stopped before completion."
     : job.currentStepDescription ??
       "Analysis is running in the background. You can safely leave this page.";
   const workerCheckIn = formatWorkerCheckIn(job.heartbeatAt ?? null);
 
   return (
     <section
-      className={`processing-banner processing-banner--${failed ? "failed" : "active"}`}
+      className={`processing-banner processing-banner--${setupRequired ? "setup" : failed ? "failed" : "active"}`}
       aria-live="polite"
     >
       <div className="processing-banner__copy">

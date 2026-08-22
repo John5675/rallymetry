@@ -966,7 +966,7 @@ Exit criteria:
 
 - Processing-job API responses expose a stable current-step key, friendly label,
   short description, and analysis step index/count when the job is inside the
-  configured 13-command CV/audio pipeline.
+  configured 14-command CV/audio pipeline, including the player-profile preflight.
 - Existing jobs created before this contract receive deterministic detail from
   their persisted stage/progress values; no active job must be restarted.
 - The match page polls and displays the current operation, analysis step count,
@@ -978,6 +978,26 @@ Exit criteria:
   heartbeat visibility, and failure precedence.
 - Python and frontend tests, lint, formatting, type checks, builds, and the CLI
   doctor pass.
+
+## 24D. Hosted recording setup compatibility guard — complete
+
+Reject a copied manual player profile before expensive full-video inference when a
+new recording does not match its reviewed anchors. Preserve the explicit manual
+setup boundary instead of silently selecting nearby people from neighboring courts.
+
+Exit criteria:
+
+- A lightweight CLI preflight decodes only the reviewed anchor frames and runs the
+  existing person-detector adapter against source-resolution images.
+- Portable role anchors still require unique detections, matching court side, and a
+  bounded image-space distance; a missing role produces a stable profile-mismatch
+  error rather than weakening identity safeguards.
+- The hosted pipeline runs this compatibility check before the full person scan and
+  maps mismatch failures to `ANALYSIS_SETUP_REQUIRED`.
+- The web dashboard explains that a recording-specific court calibration and four
+  player assignments are required, without exposing local paths or raw logs.
+- Tests cover successful preflight, incompatible layouts, hosted error mapping, and
+  the user-facing setup-required state.
 
 ## Future milestones — not current
 
